@@ -298,7 +298,10 @@ Detected by the system:
                     .unwrap_or_default();
                 (
                     format!(
-                        "You help an approver review a change request on {db}. In {lang}, in at most 6 short bullet points:                          what the statements do, which tables and roughly how many rows they affect, the main risks,                          and how to roll back. Be factual; do not invent row counts you cannot infer. Do not include SQL code blocks."
+                        "You help an approver review a change request on {db}. In {lang}, in at most 6 short lines \
+                         starting with \"- \": what the statements do, which tables and roughly how many rows they affect, \
+                         the main risks, and how to roll back. Be factual; do not invent row counts you cannot infer. \
+                         Plain text only: no Markdown emphasis, headings or code blocks."
                     ),
                     format!(
                         "Current schema: {schema}
@@ -416,7 +419,10 @@ Statements:
             return Err(Error::NotFound { what: msg!("ai.tables_not_found") });
         }
         let system = format!(
-            "You classify columns of a {db} database that may hold sensitive data, from names, types and comments.              Categories: personal (names, ID numbers, phone, email, address, birthday), credential (passwords, tokens, keys),              financial (bank accounts, card numbers, salaries, balances), other. Only list columns that are likely sensitive.              Reply with JSON only: {{\"columns\":[{{\"table\":\"<table>\",\"column\":\"<column>\",\"category\":\"<category>\",\"reason\":\"<short reason in {lang}>\"}}]}}."
+            "You classify columns of a {db} database that may hold sensitive data, from names, types and comments. \
+             Categories: personal (names, ID numbers, phone, email, address, birthday), credential (passwords, tokens, keys), \
+             financial (bank accounts, card numbers, salaries, balances), other. Only list columns that are likely sensitive; \
+             timestamps, serial numbers and generic tags are not. Reply with JSON only: {{\"columns\":[{{\"table\":\"<table>\",\"column\":\"<column>\",\"category\":\"<category>\",\"reason\":\"<short reason in {lang}>\"}}]}}."
         );
         let text =
             dblens_ai::complete(access.config, access.key, &Prompt { system, user: ctx }, access.allow_cli)
