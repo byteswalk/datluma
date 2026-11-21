@@ -32,7 +32,9 @@
       "docx": "Word",
       "xlsx": "Excel",
       "checklist": "Excel 自查表"
-    }
+    },
+    "ai_menu": "AI 修复建议",
+    "ai_link": "AI 建议"
   },
   "report": {
     "reviewer": "检查人",

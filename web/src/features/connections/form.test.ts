@@ -179,6 +179,17 @@ describe('连接表单', () => {
   })
 })
 
+describe('AI 选项', () => {
+  it('样例数据和 MCP 访问放进 options，读回时不进其他参数', () => {
+    const f = { ...emptyForm(), name: 'x', host: 'h', user: 'u', aiSamples: true, mcpAccess: true }
+    const input = toProfileInput(f)
+    expect(input.options).toMatchObject({ ai_samples: '1', mcp_access: '1' })
+    const back = fromProfile({ ...input, id: 'p' } as Profile, false)
+    expect([back.aiSamples, back.mcpAccess, back.extra]).toEqual([true, true, ''])
+    expect(toProfileInput(emptyForm()).options).not.toHaveProperty('ai_samples')
+  })
+})
+
 describe('SQLite', () => {
   const f = { ...emptyForm('sqlite'), name: 'app' }
 

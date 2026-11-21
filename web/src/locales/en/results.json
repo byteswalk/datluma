@@ -88,5 +88,10 @@
     "reveal": "Open Containing Folder",
     "failed": "Export failed: {{name}}",
     "cancelled": "Export cancelled: {{name}}"
+  },
+  "ai": {
+    "fix": "AI fix",
+    "plan": "AI: analyze plan",
+    "optimizeCell": "AI: optimize this SQL"
   }
 }

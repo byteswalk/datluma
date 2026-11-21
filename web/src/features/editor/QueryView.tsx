@@ -8,10 +8,12 @@ import { useTranslation } from 'react-i18next'
 import { Group, Panel, Separator, useDefaultLayout } from 'react-resizable-panels'
 
 import { useApi } from '../../app/context'
-import { type Profile, errorText } from '../../shared/api'
+import { type AiAskResponse, type Profile, errorText } from '../../shared/api'
 import { useHost } from '../../shared/host'
 import { hasCatalogs } from '../../shared/schemaOptions'
 import { layoutStorage } from '../../shared/settings'
+import { AiSqlContext } from '../ai/context'
+import { useAiDialog } from '../ai/store'
 import ResultsPanel from '../results/ResultsPanel'
 import { useExportDialog } from '../export/dialog'
 import { useFavoriteDialog } from '../favorites/dialog'
@@ -21,10 +23,11 @@ import { sqlClient } from '../sql/service'
 import { useSyntax } from '../sql/syntax'
 import ConfirmDialog from './ConfirmDialog'
 import Toolbar from './Toolbar'
-import { onCommand, onInsert } from './commands'
+import { onCommand, onInsert, sendInsert } from './commands'
 import { editorLanguage, formatSql } from './dialect'
 import { errorMarks } from './markers'
 import { runnerFor, useTabRuntime } from './runner'
+import { monaco } from './monaco'
 import SqlEditor, { type MonacoEditor } from './SqlEditor'
 import { type QueryTab, takeRun, useTabs } from './tabs'
 
@@ -44,6 +47,14 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
   const profile = profiles.find((p) => p.id === tab.profileId)
   const editor = useRef<MonacoEditor | null>(null)
   const layout = useDefaultLayout({ id: 'query', storage: layoutStorage })
+  // AI 用的当前位置：SQL Server 为会话的库和默认架构，其他为会话的 schema
+  const aiCatalog = profile && hasCatalogs(profile.driver) ? (rt.session?.schema ?? profile.database ?? undefined) : undefined
+  const aiSchema = profile
+    ? hasCatalogs(profile.driver)
+      ? defaultSchema(profile.driver, profile.user, profile.database)
+      : (rt.session?.schema ?? defaultSchema(profile.driver, profile.user, profile.database))
+    : undefined
+  const aiScope = useMemo(() => ({ catalog: aiCatalog, schema: aiSchema ?? undefined }), [aiCatalog, aiSchema])
   const onReady = useCallback((e: MonacoEditor | null) => {
     editor.current = e
   }, [])
@@ -62,6 +73,15 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
             : null
         const cursor = model.getOffsetAt(ed.getPosition() ?? { lineNumber: 1, column: 1 })
         const variant = rt.session?.variant ?? profile?.variant ?? null
+        /** 选中的部分，没有选中时为光标所在的语句（解析器不可用时为全文）。 */
+        const statementText = async (sel: typeof selected, at: number, v: typeof variant) => {
+          if (sel) return model.getValueInRange(sel).trim()
+          const all = model.getValue()
+          const r = profile
+            ? await sqlClient.statementAt(sqlDialect(profile.driver, v, rt.session?.compat).dialect, all, at)
+            : null
+          return (r?.ok && r.value ? all.slice(r.value.start, r.value.end) : all).trim()
+        }
         switch (cmd) {
           case 'run-current':
           case 'explain': {
@@ -79,22 +99,38 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
           case 'cancel':
             runner.cancel()
             break
+          case 'ai-generate':
+          case 'ai-explain':
+          case 'ai-optimize': {
+            if (!profile) return
+            const scope = { profile_id: profile.id, catalog: aiScope.catalog, schema: aiScope.schema }
+            const insert = { label: t('ai.dialog.insert'), needsSql: true, run: (r: AiAskResponse) => sendInsert(r.sql!) }
+            if (cmd === 'ai-generate') {
+              useAiDialog.getState().open({
+                title: t('ai.task.generate'),
+                req: { task: 'generate', ...scope },
+                askInstruction: true,
+                actions: [insert],
+              })
+              return
+            }
+            void statementText(selected, cursor, variant).then((sql) => {
+              if (!sql) return void message.info(t('ai.dialog.noStatement'))
+              const explain = cmd === 'ai-explain'
+              useAiDialog.getState().open({
+                title: t(explain ? 'ai.task.explain' : 'ai.task.optimize'),
+                req: { task: explain ? 'explain' : 'optimize', ...scope, sql },
+                actions: explain ? [] : [insert],
+              })
+            })
+            break
+          }
           case 'favorite': {
             // 收藏选中的部分，没有选中时收藏光标所在的语句（解析器不可用时收藏全文）
-            const text = selected ? model.getValueInRange(selected) : null
-            void (async () => {
-              let sql = text
-              if (!sql) {
-                const all = model.getValue()
-                const r = profile
-                  ? await sqlClient.statementAt(sqlDialect(profile.driver, variant, rt.session?.compat).dialect, all, cursor)
-                  : null
-                sql = r?.ok && r.value ? all.slice(r.value.start, r.value.end) : all
-              }
-              sql = sql.trim()
+            void statementText(selected, cursor, variant).then((sql) => {
               if (!sql) message.info(t('app.favorites.nothing'))
               else useFavoriteDialog.getState().open({ mode: 'create', kind: 'item', sql, driver: profile?.driver, variant })
-            })()
+            })
             break
           }
           case 'first-problem': {
@@ -120,7 +156,7 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
           }
         }
       }),
-    [runner, profile, rt.session?.variant, message, t, tab.id],
+    [runner, profile, rt.session?.variant, rt.session?.compat, message, t, tab.id, aiScope],
   )
 
   // 运维查询打开的标签：打开后立即执行全文
@@ -153,6 +189,34 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
       }),
     [],
   )
+
+  // 结果单元格里的 SQL（如慢 SQL 列表）交给 AI 优化
+  const aiOptimize = useMemo(
+    () =>
+      profile
+        ? (sql: string) =>
+            useAiDialog.getState().open({
+              title: t('ai.task.optimize'),
+              req: { task: 'optimize', profile_id: profile.id, ...aiScope, sql },
+              actions: [{ label: t('ai.dialog.insert'), needsSql: true, run: (r) => sendInsert(r.sql!) }],
+            })
+        : null,
+    [profile, aiScope, t],
+  )
+
+  /** 把编辑器里原来那条语句换成修好的；编辑器内容已变、找不到原文时插入到光标处。 */
+  const replaceStatement = (original: string, start: number, fixed: string) => {
+    const ed = editor.current
+    const model = ed?.getModel()
+    if (!ed || !model) return
+    const all = model.getValue()
+    const at = all.slice(start, start + original.length) === original ? start : all.indexOf(original)
+    if (at < 0) return sendInsert(fixed)
+    const s = model.getPositionAt(at)
+    const e = model.getPositionAt(at + original.length)
+    ed.executeEdits('ai-fix', [{ range: new monaco.Range(s.lineNumber, s.column, e.lineNumber, e.column), text: fixed }])
+    ed.focus()
+  }
 
   // 执行结束：刷新历史侧栏（服务端在后台写入历史，稍等片刻）；
   // 执行成功的语句中有 DDL 时，补全用的元数据（连同后端的元数据缓存）失效，新建的表马上能补全
@@ -264,6 +328,7 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
         </Panel>
         <Separator className="splitter-h" />
         <Panel id="results" defaultSize="40%" minSize={60}>
+          <AiSqlContext.Provider value={aiOptimize}>
           <ResultsPanel
             rt={rt}
             onFetchMore={() => runner.fetchMore()}
@@ -277,7 +342,27 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
                 inTransaction: !!rt.session?.in_transaction,
               })
             }}
+            onAiFix={(i) => {
+              if (!profile) return
+              const st = rt.exec.statements[i]
+              const sql = rt.source.slice(st.start, st.end)
+              useAiDialog.getState().open({
+                title: t('ai.task.fix'),
+                req: { task: 'fix', profile_id: profile.id, ...aiScope, sql, error: errorText(st.error!) },
+                actions: [{ label: t('ai.dialog.replace'), needsSql: true, run: (r) => replaceStatement(sql, st.start, r.sql!) }],
+              })
+            }}
+            onAiPlan={(i, plan) => {
+              if (!profile) return
+              const st = rt.exec.statements[i]
+              useAiDialog.getState().open({
+                title: t('ai.task.optimize'),
+                req: { task: 'optimize', profile_id: profile.id, ...aiScope, sql: rt.source.slice(st.start, st.end), plan },
+                actions: [{ label: t('ai.dialog.insert'), needsSql: true, run: (r) => sendInsert(r.sql!) }],
+              })
+            }}
           />
+          </AiSqlContext.Provider>
         </Panel>
       </Group>
       <ConfirmDialog

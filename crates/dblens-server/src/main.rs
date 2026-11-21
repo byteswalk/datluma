@@ -32,6 +32,8 @@ struct Args {
     allowed_origins: Vec<String>,
     /// 更新源；`None` 表示不检查新版本。
     update_url: Option<String>,
+    /// `mcp` 子命令：以 MCP 服务方式在标准输入输出上运行。
+    mcp: bool,
 }
 
 fn usage() -> String {
@@ -45,6 +47,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
         web_dir: None,
         allowed_origins: Vec::new(),
         update_url: Some(update::DEFAULT_URL.to_string()),
+        mcp: false,
     };
     let mut no_update_check = false;
     let mut it = args.into_iter();
@@ -63,6 +66,7 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Args, String> {
             "--allow-origin" => out.allowed_origins.push(value("--allow-origin")?),
             "--update-url" => out.update_url = Some(value("--update-url")?),
             "--no-update-check" => no_update_check = true,
+            "mcp" => out.mcp = true,
             "-h" | "--help" => return Err(usage()),
             other => {
                 return Err(format!("{}\n{}", msg!("server.unknown_arg", arg = other).current(), usage()));
@@ -103,6 +107,10 @@ async fn run(args: Args) -> Result<(), String> {
         None => default_data_dir().map_err(|e| e.to_string())?,
     };
     let service = Arc::new(Service::open(&data_dir).map_err(|e| e.to_string())?);
+    if args.mcp {
+        // 标准输出留给协议，提示都走标准错误
+        return dblens_mcp::serve_stdio(service).await.map_err(|e| e.to_string());
+    }
     let token = new_token();
     let listener = tokio::net::TcpListener::bind(args.listen)
         .await
@@ -183,6 +191,7 @@ mod tests {
         assert_eq!(a.data_dir, Some(PathBuf::from("d")));
         assert_eq!(a.web_dir, Some(PathBuf::from("w")));
         assert_eq!(a.allowed_origins, ["http://x", "http://y"]);
+        assert!(parse(&["mcp", "--data-dir", "d"]).unwrap().mcp);
         let zh = |args: &[&str]| with_lang(Lang::ZhCn, || parse(args).unwrap_err());
         assert!(zh(&["--listen"]).contains("缺少参数"));
         assert!(zh(&["--listen", "nope"]).contains("无效"));

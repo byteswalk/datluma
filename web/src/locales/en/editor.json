@@ -10,7 +10,10 @@
     "stop": "Stop",
     "format": "Format",
     "explain": "Explain Plan",
-    "favorite": "Add to Favorites"
+    "favorite": "Add to Favorites",
+    "aiGenerate": "AI: Generate SQL",
+    "aiExplain": "AI: Explain Statement",
+    "aiOptimize": "AI: Optimization Advice"
   },
   "toolbar": {
     "runCurrent": "Run Current Statement (Ctrl+Enter)",

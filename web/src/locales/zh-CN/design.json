@@ -7,7 +7,8 @@
     "discard": "撤销全部",
     "discardConfirm": "撤销全部未保存的改动？",
     "reload": "重新加载",
-    "reloadConfirm": "重新加载会丢弃未保存的改动，继续吗？"
+    "reloadConfirm": "重新加载会丢弃未保存的改动，继续吗？",
+    "aiComments": "AI 补注释"
   },
   "tabs": {
     "columns": "列",
@@ -162,5 +163,9 @@
     "addIndex": "新增索引 {{name}}",
     "dropIndex": "删除索引 {{name}}",
     "renameIndex": "索引 {{from}} 改名为 {{to}}"
+  },
+  "ai": {
+    "apply": "填入设计器",
+    "applied": "已填入，检查后保存生效"
   }
 }

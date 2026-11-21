@@ -8,6 +8,7 @@ publish.workspace = true
 [dependencies]
 dblens-api.workspace = true
 dblens-core.workspace = true
+dblens-mcp.workspace = true
 dblens-service.workspace = true
 reqwest.workspace = true
 semver.workspace = true

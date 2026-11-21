@@ -27,6 +27,8 @@ pub struct ShellInfo {
     pub maximized: bool,
     pub always_on_top: bool,
     pub auto_check_update: bool,
+    /// 本程序的完整路径，设置里给 AI 智能体的 MCP 配置用。
+    pub exe: Option<String>,
 }
 
 /// 页面发起的窗口操作。
@@ -54,6 +56,7 @@ pub fn info(app: &AppHandle) -> ShellInfo {
         maximized,
         always_on_top: window::always_on_top(app),
         auto_check_update: update::auto_check(app),
+        exe: std::env::current_exe().ok().map(|p| p.display().to_string()),
     }
 }
 
@@ -225,10 +228,11 @@ mod tests {
             maximized: false,
             always_on_top: true,
             auto_check_update: true,
+            exe: None,
         };
         assert_eq!(
             serde_json::to_value(&i).unwrap(),
-            serde_json::json!({"platform":"windows","version":"0.1.0","maximized":false,"always_on_top":true,"auto_check_update":true})
+            serde_json::json!({"platform":"windows","version":"0.1.0","maximized":false,"always_on_top":true,"auto_check_update":true,"exe":null})
         );
     }
 }

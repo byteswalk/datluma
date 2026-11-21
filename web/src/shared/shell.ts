@@ -11,6 +11,8 @@ export interface ShellInfo {
   maximized: boolean
   always_on_top: boolean
   auto_check_update: boolean
+  /** 本程序的完整路径（MCP 配置用）。 */
+  exe?: string | null
 }
 
 export type WindowAction =

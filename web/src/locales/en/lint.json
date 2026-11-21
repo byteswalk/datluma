@@ -32,7 +32,9 @@
       "docx": "Word",
       "xlsx": "Excel",
       "checklist": "Excel checklist"
-    }
+    },
+    "ai_menu": "AI: how to fix",
+    "ai_link": "Ask AI"
   },
   "report": {
     "reviewer": "Reviewer",

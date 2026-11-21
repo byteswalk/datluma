@@ -1,0 +1,63 @@
+{
+  "dialog": {
+    "copied": "Copied",
+    "copyFailed": "Copy failed",
+    "disclaimer": "AI answers can be wrong. Review before running.",
+    "copySql": "Copy SQL",
+    "close": "Close",
+    "instructionPlaceholder": "Describe what you want, e.g. orders per department last month (Ctrl+Enter to send)",
+    "send": "Generate",
+    "thinking": "Thinking…",
+    "openSettings": "Settings",
+    "retry": "Retry",
+    "copy": "Copy",
+    "insert": "Insert into editor",
+    "replace": "Replace statement",
+    "noStatement": "No statement at the cursor",
+    "openInTarget": "Open on target connection",
+    "openInTab": "Open in new tab"
+  },
+  "comments": {
+    "none": "All comments on these tables are already filled in."
+  },
+  "task": {
+    "generate": "AI: generate SQL",
+    "explain": "AI: explain",
+    "optimize": "AI: optimization advice",
+    "fix": "AI: fix",
+    "convert": "AI: convert {{name}}",
+    "comments": "AI: fill in comments",
+    "lintFix": "AI: how to fix"
+  },
+  "settings": {
+    "unavailable": "This server does not support AI.",
+    "managedOn": "AI is enabled by the administrator",
+    "managedOff": "AI is not enabled",
+    "managedHint": "The provider is configured by the administrator.",
+    "saved": "Saved",
+    "enabled": "Enabled",
+    "enabledHint": "When off, AI entries are hidden everywhere.",
+    "kind": "Provider",
+    "kindOpenai": "OpenAI compatible",
+    "kindCli": "Local command",
+    "command": "Command",
+    "commandHint": "The question goes to the command's standard input and the answer is read from its standard output. The command runs in an empty temporary folder.",
+    "baseUrl": "Base URL",
+    "baseUrlHint": "Address of an OpenAI-compatible API (OpenAI, DeepSeek, Qwen, Ollama…), usually ending in /v1.",
+    "baseUrlAnthropicHint": "Leave empty for the official endpoint.",
+    "model": "Model",
+    "keyHint": "Stored in the system keychain or the local vault and never shown. Not needed for a local Ollama.",
+    "keySaved": "Saved (type a new one to replace)",
+    "keyEmpty": "Not set",
+    "keyClear": "Clear",
+    "timeout": "Timeout",
+    "seconds": "s",
+    "save": "Save",
+    "test": "Test",
+    "testOk": "Connected. Reply: {{reply}}",
+    "boundary": "By default only the structure (table names, columns, types, comments, indexes) and your statements are sent to the provider, never data. Sample rows for comment inference must be enabled per connection in its advanced options. AI results are suggestions and never run automatically."
+  },
+  "mcp": {
+    "hint": "Add this to your agent's MCP settings (Claude Code, Codex, Cursor…) to let it read structure and run read-only queries. Only connections with \"Allow MCP access\" in their advanced options are visible."
+  }
+}

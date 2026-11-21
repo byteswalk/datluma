@@ -2267,6 +2267,7 @@ async fn model_flow(env: &str) {
         view_definitions: true,
         diagrams: vec![],
         output: Some(out.clone()),
+        ai_comments: vec![],
     };
     let st = wait_task(s, &s.start_document(req, true).await.unwrap()).await;
     assert_eq!(st.state, TaskState::Done, "{env}：{st:?}");

@@ -1,13 +1,14 @@
 // 结果面板（设计稿第 2 部分）：结果集、失败的语句、消息各一个标签。每次执行后自动选中第一个结果集，
 // 没有结果集时选中第一个失败的语句，再没有就选"消息"。结果集标签右侧有"导出"按钮（M1c3，执行计划的结果除外）。
 
-import { IconAlertCircle, IconArrowAutofitWidth, IconBinaryTree, IconDownload, IconMessage, IconTable } from '@tabler/icons-react'
+import { IconAlertCircle, IconArrowAutofitWidth, IconBinaryTree, IconDownload, IconMessage, IconSparkles, IconTable } from '@tabler/icons-react'
 import { Button, Spin } from 'antd'
 import { type ReactNode, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { errorText } from '../../shared/api'
 import type { ResultSet } from '../../shared/exec'
+import { useAiEnabled } from '../ai/store'
 import type { TabRuntime } from '../editor/runner'
 import type { Order } from '../data/sort'
 import ResultGrid from './ResultGrid'
@@ -23,6 +24,17 @@ export interface ResultsPanelProps {
   onExport?(stmt: number): void
   /** 自己画结果集（数据标签的可编辑表格，M2a）；不给时用只读的结果表格。 */
   renderResult?(result: ResultSet, waiting: boolean): ReactNode
+  /** AI 修复第 `stmt` 条失败的语句；不给或未启用 AI 时不显示。 */
+  onAiFix?(stmt: number): void
+  /** AI 分析第 `stmt` 条语句的执行计划。 */
+  onAiPlan?(stmt: number, plan: string): void
+}
+
+/** 执行计划结果集转成文字，给 AI 看。 */
+export function planText(r: ResultSet): string {
+  const cell = (v: unknown) => (v === null || v === undefined ? '' : typeof v === 'object' ? JSON.stringify(v) : String(v))
+  const lines = r.rows.map((row) => row.map(cell).join(' | '))
+  return r.columns.length > 1 ? [r.columns.map((c) => c.name).join(' | '), ...lines].join('\n') : lines.join('\n')
 }
 
 function TabIcon({ tab, explain }: { tab: ResultTab; explain: boolean }) {
@@ -31,7 +43,17 @@ function TabIcon({ tab, explain }: { tab: ResultTab; explain: boolean }) {
   return explain ? <IconBinaryTree size={16} /> : <IconTable size={16} />
 }
 
-export default function ResultsPanel({ rt, onFetchMore, sort, onSort, onExport, renderResult }: ResultsPanelProps) {
+export default function ResultsPanel({
+  rt,
+  onFetchMore,
+  sort,
+  onSort,
+  onExport,
+  renderResult,
+  onAiFix,
+  onAiPlan,
+}: ResultsPanelProps) {
+  const ai = useAiEnabled()
   const { t } = useTranslation()
   const { exec, explain, capped, running } = rt
   const tabs = resultTabs(exec, explain, capped)
@@ -73,6 +95,28 @@ export default function ResultsPanel({ rt, onFetchMore, sort, onSort, onExport, 
             style={{ marginRight: 4 }}
           >
             {t('results.fitColumns')}
+          </Button>
+        )}
+        {ai && onAiFix && current.kind === 'error' && !running && (
+          <Button
+            type="text"
+            size="small"
+            icon={<IconSparkles size={16} />}
+            onClick={() => onAiFix(current.stmt)}
+            style={{ marginRight: 4 }}
+          >
+            {t('results.ai.fix')}
+          </Button>
+        )}
+        {ai && onAiPlan && current.kind === 'result' && explain && !running && (
+          <Button
+            type="text"
+            size="small"
+            icon={<IconSparkles size={16} />}
+            onClick={() => onAiPlan(current.stmt, planText(exec.statements[current.stmt].results[current.result]))}
+            style={{ marginRight: 4 }}
+          >
+            {t('results.ai.plan')}
           </Button>
         )}
         {onExport && current.kind === 'result' && !explain && (

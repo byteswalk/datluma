@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import { useApi } from '../../app/context'
 import { useUi } from '../../app/ui'
 import {
+  type DdlKind,
   type ExistingAction,
   type MigrationEnd,
   type MigrationMode,
@@ -26,7 +27,9 @@ import {
 } from '../../shared/api'
 import { schemaOptions } from '../../shared/schemaOptions'
 import { desktop } from '../../shared/shell'
+import { useAiDialog, useAiEnabled } from '../ai/store'
 import { withVault } from '../connections/vault'
+import { useQueryActions } from '../editor/actions'
 import SqlBox from '../design/SqlBox'
 import { type QueryTab, useTabs } from '../editor/tabs'
 import { ProgressTable, UnfinishedList } from './progress'
@@ -171,6 +174,31 @@ export default function MigrateView({ tab, profiles }: { tab: QueryTab; profiles
   const file = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
   const track = (id: string) => setTask({ id, state: 'running', progress: { statements_done: 0, statements_total: 0 }, failures: [], migration: null } as unknown as TaskStatus)
+
+  // AI 转换不迁移的对象：取源库的定义，按目标库改写，结果在目标连接的新标签里打开（不执行）
+  const ai = useAiEnabled()
+  const { openSql } = useQueryActions()
+  const aiConvert = async (o: { kind: string; name: string; table?: string; definition?: string | null }) => {
+    let definition = o.definition ?? null
+    if (!definition) {
+      try {
+        definition = await withVault(api, () => api.ddl(plan.source.profile, plan.source.schema, o.kind as DdlKind, o.name))
+      } catch (e) {
+        return void message.error((e as Error).message)
+      }
+    }
+    useAiDialog.getState().open({
+      title: t('ai.task.convert', { name: o.name }),
+      req: {
+        task: 'convert',
+        profile_id: plan.source.profile,
+        schema: plan.source.schema,
+        object: { kind: o.kind, name: o.name, definition },
+        target: { profile_id: plan.target.profile },
+      },
+      actions: [{ label: t('ai.dialog.openInTarget'), needsSql: true, run: (r) => openSql(r.sql!, plan.target.profile) }],
+    })
+  }
 
   const { data: p, error, isFetching, refetch } = useQuery({
     queryKey: ['migration-preview', JSON.stringify(plan)],
@@ -423,9 +451,16 @@ export default function MigrateView({ tab, profiles }: { tab: QueryTab; profiles
                   <summary>{t('migrate.others', { count: p.others.length })}</summary>
                   <div>{t('migrate.othersHint')}</div>
                   {p.others.map((o) => (
-                    <div key={`${o.kind}:${o.table ?? ''}:${o.name}`}>
-                      {o.kind} {o.table ? `${o.table}.` : ''}
-                      {o.name}
+                    <div key={`${o.kind}:${o.table ?? ''}:${o.name}`} className="row migrate-other">
+                      <span className="grow">
+                        {o.kind} {o.table ? `${o.table}.` : ''}
+                        {o.name}
+                      </span>
+                      {ai && o.kind !== 'synonym' && (
+                        <Button size="small" type="link" onClick={() => void aiConvert(o)}>
+                          {t('migrate.aiConvert')}
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </details>

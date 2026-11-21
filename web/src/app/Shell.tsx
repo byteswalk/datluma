@@ -8,6 +8,7 @@ import { Suspense, lazy, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Group, Panel, type PanelImperativeHandle, Separator, useDefaultLayout } from 'react-resizable-panels'
 
+import AiDialog from '../features/ai/AiDialog'
 import { useQueryActions } from '../features/editor/actions'
 import { type EditorCommand, sendCommand } from '../features/editor/commands'
 import { useTabs } from '../features/editor/tabs'
@@ -180,6 +181,7 @@ export default function Shell() {
       <ModelDialogs />
       <ExportDocDialog />
       <LintStartDialog />
+      <AiDialog />
     </div>
   )
 }

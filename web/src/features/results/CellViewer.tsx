@@ -1,11 +1,13 @@
 // 单元格查看对话框（设计稿第 3 部分）：文本 / JSON / 十六进制，可复制。
 
 import { App, Button, Modal, Tabs } from 'antd'
-import { IconCopy } from '@tabler/icons-react'
+import { IconCopy, IconSparkles } from '@tabler/icons-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import type { CellValue } from '../../shared/exec'
+import { looksLikeSql, useAiSql } from '../ai/context'
+import { useAiEnabled } from '../ai/store'
 import { cellBytes, cellFullText, hexDump, lobNote, prettyJson } from './cell'
 
 export interface ViewedCell {
@@ -19,6 +21,8 @@ export default function CellViewer({ cell, onClose }: { cell: ViewedCell | null;
   const { t } = useTranslation()
   const { message } = App.useApp()
   const [tab, setTab] = useState('text')
+  const aiSql = useAiSql()
+  const ai = useAiEnabled() && aiSql
   if (!cell) return null
   const json = prettyJson(cell.value)
   const views: Record<string, string> = { text: cellFullText(cell.value), hex: hexDump(cellBytes(cell.value)) }
@@ -36,9 +40,22 @@ export default function CellViewer({ cell, onClose }: { cell: ViewedCell | null;
       onCancel={onClose}
       width={640}
       footer={
-        <Button icon={<IconCopy size={14} />} onClick={copy}>
-          {t('results.viewer.copy')}
-        </Button>
+        <>
+          {ai && looksLikeSql(views.text) && (
+            <Button
+              icon={<IconSparkles size={14} />}
+              onClick={() => {
+                aiSql(views.text)
+                onClose()
+              }}
+            >
+              {t('results.ai.optimizeCell')}
+            </Button>
+          )}
+          <Button icon={<IconCopy size={14} />} onClick={copy}>
+            {t('results.viewer.copy')}
+          </Button>
+        </>
       }
     >
       <Tabs

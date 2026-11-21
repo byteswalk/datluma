@@ -44,6 +44,10 @@ export interface ConnectionForm {
   /** 只用于 SQLite：只读打开；文件不存在时新建。数据库文件的路径放在 database。 */
   readOnly: boolean
   createFile: boolean
+  /** AI 补注释时可以带几行样例数据（选项 ai_samples）。 */
+  aiSamples: boolean
+  /** 本机智能体可以通过 MCP 查这个连接（选项 mcp_access）。 */
+  mcpAccess: boolean
   timeoutSecs: number
   /** 其他驱动参数，一行一个 `键=值`。 */
   extra: string
@@ -138,6 +142,8 @@ export function emptyForm(id: ProductId = 'mysql'): ConnectionForm {
     dbLocale: '',
     readOnly: false,
     createFile: false,
+    aiSamples: false,
+    mcpAccess: false,
     trustCert: false,
     timeoutSecs: 10,
     extra: '',
@@ -157,7 +163,7 @@ export function switchProduct(f: ConnectionForm, id: ProductId): ConnectionForm 
   return { ...switchDriver(f, next.driver), product: id, port }
 }
 
-const KNOWN_OPTIONS = ['tls', 'tls_ca', 'sid', 'auth', 'instance', 'client', 'jdbc_kind', 'jdbc_dir', 'server_name', 'db_locale', 'trust_server_certificate', 'read_only', 'create']
+const KNOWN_OPTIONS = ['tls', 'tls_ca', 'sid', 'auth', 'instance', 'client', 'jdbc_kind', 'jdbc_dir', 'server_name', 'db_locale', 'trust_server_certificate', 'read_only', 'create', 'ai_samples', 'mcp_access']
 
 export function fromProfile(p: Profile, hasPassword: boolean): ConnectionForm {
   const opts = p.options ?? {}
@@ -189,6 +195,8 @@ export function fromProfile(p: Profile, hasPassword: boolean): ConnectionForm {
     dbLocale: opts.db_locale ?? '',
     readOnly: opts.read_only === '1',
     createFile: opts.create === '1',
+    aiSamples: opts.ai_samples === '1',
+    mcpAccess: opts.mcp_access === '1',
     trustCert: opts.trust_server_certificate === 'true',
     timeoutSecs: p.connect_timeout_secs ?? 10,
     extra,
@@ -201,6 +209,8 @@ export function toProfileInput(f: ConnectionForm): ProfileInput {
     const i = line.indexOf('=')
     if (i > 0) options[line.slice(0, i).trim()] = line.slice(i + 1).trim()
   }
+  if (f.aiSamples) options.ai_samples = '1'
+  if (f.mcpAccess) options.mcp_access = '1'
   if (supportsTls(f.driver) && f.product !== 'goldendb' && f.tls !== 'disable') {
     options.tls = f.tls
     if (f.tls === 'verify' && f.tlsCa.trim()) options.tls_ca = f.tlsCa.trim()

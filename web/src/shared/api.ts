@@ -788,7 +788,8 @@ export interface MigrationPreview {
     notes: MigrationNote[]
   }
   /** 不迁移的对象（视图、例程、触发器、同义词）。 */
-  others: { kind: string; name: string; table?: string }[]
+  /** 不迁移的对象；触发器带定义。 */
+  others: { kind: string; name: string; table?: string; definition?: string | null }[]
   statements: MigrationStatement[]
   text: string
   /** 不能开始的原因。 */
@@ -1337,11 +1338,64 @@ export interface DocumentRequest {
   view_definitions: boolean
   diagrams: DocDiagramImage[]
   output?: string | null
+  /** AI 推断的注释：只填进文档里空着的注释并标明。 */
+  ai_comments?: AiTableComments[]
 }
 
 export interface DocumentProblem {
   field: 'template' | 'reference' | 'output' | 'format'
   error: ErrorBody
+}
+
+// AI 辅助（AI 设计文档）
+export type AiProviderKind = 'openai' | 'anthropic' | 'cli'
+
+export interface AiProviderConfig {
+  enabled: boolean
+  kind: AiProviderKind
+  base_url?: string | null
+  model?: string | null
+  /** 命令行提供方：整条命令，问题从标准输入给。 */
+  command?: string | null
+  timeout_secs: number
+}
+
+export interface AiConfigView {
+  config: AiProviderConfig
+  has_key: boolean
+  /** 审计版为 false：由管理员固定。 */
+  configurable: boolean
+  cli_allowed: boolean
+  samples_allowed: boolean
+}
+
+export type AiTask = 'generate' | 'fix' | 'explain' | 'optimize' | 'convert' | 'comments' | 'lint_fix' | 'review' | 'sensitive'
+
+export interface AiAskRequest {
+  task: AiTask
+  profile_id: string
+  catalog?: string
+  schema?: string
+  sql?: string
+  error?: string
+  instruction?: string
+  plan?: string
+  object?: { kind: string; name: string; definition: string }
+  target?: { profile_id?: string; product?: string }
+  tables?: string[]
+  issue?: { object: string; message: string; suggestion?: string | null; rule?: string | null }
+}
+
+export interface AiTableComments {
+  table: string
+  comment?: string | null
+  columns: Record<string, string>
+}
+
+export interface AiAskResponse {
+  text: string
+  sql?: string
+  comments?: AiTableComments[]
 }
 
 export type FetchFn = (input: string, init?: RequestInit) => Promise<Response>
@@ -1637,6 +1691,16 @@ export function createApi(token: string, fetchFn: FetchFn = (i, o) => fetch(i, o
     /** 报告下载地址。 */
     lintReportUrl: (run: string, format: string, reviewer?: string) =>
       `/api/lint/runs/${encodeURIComponent(run)}/report${q({ format, reviewer, token })}`,
+    // AI 辅助
+    aiConfig: () => request<AiConfigView>('GET', '/ai/config'),
+    setAiConfig: (config: AiProviderConfig) => request<AiConfigView>('PUT', '/ai/config', config),
+    setAiKey: (key: string | null) => request<AiConfigView>('PUT', '/ai/key', { key }),
+    aiTest: async () => (await request<{ reply: string }>('POST', '/ai/test')).reply,
+    /** `schema` 为界面里的 schema（SQL Server 合成的会拆成库和架构）。 */
+    aiAsk: (req: AiAskRequest) => {
+      const { catalog, schema } = req.schema ? splitCatalog(req.schema) : { catalog: undefined, schema: undefined }
+      return request<AiAskResponse>('POST', '/ai/ask', { ...req, catalog: req.catalog ?? catalog, schema })
+    },
     openSession: (profileId: string) => request<SessionInfo>('POST', '/sessions', { profile_id: profileId }),
     session: (id: number) => request<SessionInfo>('GET', `/sessions/${id}`),
     /** 关闭会话；有未提交的修改时按 commit 提交或回滚。 */

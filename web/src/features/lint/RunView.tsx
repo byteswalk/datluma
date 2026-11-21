@@ -6,9 +6,11 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
-import type { LintClauseResult, LintIssue, LintRun, LintVerdict, LintWaivedIssue } from '../../shared/api'
+import type { LintClauseResult, LintIssue, LintRun, LintSource, LintVerdict, LintWaivedIssue } from '../../shared/api'
 import { joinCatalog } from '../../shared/api'
 import { desktop } from '../../shared/shell'
+import { useAiDialog, useAiEnabled } from '../ai/store'
+import { useQueryActions } from '../editor/actions'
 import { type QueryTab, useTabs } from '../editor/tabs'
 import { download, effectiveVerdict, groupBySection, reviewable, summarize, verdictTone } from './logic'
 
@@ -21,6 +23,8 @@ interface WaiveActions {
   onUnwaive: (clause: string, object: string) => void
   /** 打开问题所在的表；来源未知时为 undefined。 */
   onOpenTable?: (table: string) => void
+  /** AI 给出修复建议；未启用 AI 或来源不是库时为 undefined。 */
+  onAi?: (clause: string, issue: LintIssue) => void
 }
 
 /** 在表设计器里打开检查对象中的一张表。 */
@@ -42,6 +46,8 @@ function VerdictTag({ v }: { v: LintVerdict }) {
 }
 
 export default function RunView({ tab }: { tab: QueryTab }) {
+  const ai = useAiEnabled()
+  const { openSql } = useQueryActions()
   const api = useApi()
   const { t } = useTranslation()
   const { message } = App.useApp()
@@ -103,6 +109,25 @@ export default function RunView({ tab }: { tab: QueryTab }) {
     },
     onUnwaive: (clause, object) => unwaive.mutate({ clause, object }),
     onOpenTable: run.source ? (table) => openTable(run, table) : undefined,
+    onAi:
+      ai && run.source?.kind === 'database'
+        ? (clause, issue) => {
+            const s = run.source as Extract<LintSource, { kind: 'database' }>
+            const meta = run.clauses.find((c) => c.id === clause)
+            useAiDialog.getState().open({
+              title: t('ai.task.lintFix'),
+              req: {
+                task: 'lint_fix',
+                profile_id: s.profile,
+                catalog: s.catalog ?? undefined,
+                schema: s.schema,
+                tables: issue.table ? [issue.table] : [],
+                issue: { object: issue.object, message: issue.message, suggestion: issue.suggestion, rule: meta?.text ?? clause },
+              },
+              actions: [{ label: t('ai.dialog.openInTab'), needsSql: true, run: (r) => openSql(r.sql!, s.profile) }],
+            })
+          }
+        : undefined,
   }
 
   return (
@@ -250,8 +275,17 @@ function Issues({ result, actions }: { result: LintClauseResult; actions: WaiveA
         <Dropdown
           trigger={['contextMenu']}
           menu={{
-            items: target ? [{ key: 'waive', label: t('lint.run.waive_menu') }] : [],
-            onClick: () => target && actions.onWaive(result.clause, target),
+            items: target
+              ? [
+                  { key: 'waive', label: t('lint.run.waive_menu') },
+                  ...(actions.onAi ? [{ key: 'ai', label: t('lint.run.ai_menu') }] : []),
+                ]
+              : [],
+            onClick: ({ key }) => {
+              const issue = result.issues.find((x) => x.object === target)
+              if (key === 'ai' && issue) actions.onAi?.(result.clause, issue)
+              else if (key === 'waive' && target) actions.onWaive(result.clause, target)
+            },
           }}
         >
           <div onContextMenuCapture={() => setTarget(null)}>
@@ -282,6 +316,17 @@ function Issues({ result, actions }: { result: LintClauseResult; actions: WaiveA
                   dataIndex: 'suggestion',
                   render: (v?: string | null) => <span style={{ color: '#888' }}>{v || ''}</span>,
                 },
+                ...(actions.onAi
+                  ? [
+                      {
+                        key: 'ai',
+                        width: 80,
+                        render: (_: unknown, r: LintIssue) => (
+                          <a onClick={() => actions.onAi?.(result.clause, r)}>{t('lint.run.ai_link')}</a>
+                        ),
+                      },
+                    ]
+                  : []),
               ]}
             />
           </div>

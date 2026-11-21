@@ -25,6 +25,7 @@ chacha20poly1305.workspace = true
 calamine.workspace = true
 chrono.workspace = true
 csv.workspace = true
+dblens-ai.workspace = true
 dblens-core.workspace = true
 dblens-dialect.workspace = true
 dblens-lint.workspace = true

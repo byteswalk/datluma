@@ -1,10 +1,11 @@
-// 设置：主题（跟随系统 / 亮色 / 暗色）、结果行数上限、语法检查、历史，桌面版另有"启动时自动检查更新"。
+// 设置：常规页为主题（跟随系统 / 亮色 / 暗色）、结果行数上限、语法检查、历史，桌面版另有"启动时自动检查更新"；AI 页配置 AI 提供方。
 // macOS 上没有页面菜单，主题只能在这里改。
 
 import { useQueryClient } from '@tanstack/react-query'
-import { App, Button, Form, InputNumber, Modal, Radio, Switch } from 'antd'
+import { App, Button, Form, InputNumber, Modal, Radio, Switch, Tabs } from 'antd'
 import { useTranslation } from 'react-i18next'
 
+import AiSettings from '../features/ai/AiSettings'
 import { DEFAULT_ROW_CAP, ROW_CAP_KEY, rowCap } from '../features/editor/runner'
 import { SYNTAX_KEY, syntaxEnabled } from '../features/sql/syntax'
 import { LANG_KEY, parseLangPref } from '../shared/i18n'
@@ -45,76 +46,87 @@ export default function SettingsDialog() {
         }
       },
     })
-  return (
-    <Modal title={t('app.settings.title')} open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={null} width={480}>
-      <Form layout="horizontal" labelCol={{ span: 8 }} style={{ marginTop: 16 }}>
-        <Form.Item label={t('app.settings.language')} extra={t('app.settings.languageHint')}>
-          <Radio.Group
-            value={lang}
-            onChange={(e) => useSettings.getState().set(LANG_KEY, e.target.value)}
-            options={[
-              { value: 'auto', label: t('common.lang.auto') },
-              { value: 'zh-CN', label: t('common.lang.zh-CN') },
-              { value: 'en', label: t('common.lang.en') },
-            ]}
+  const general = (
+    <Form layout="horizontal" labelCol={{ span: 8 }} style={{ marginTop: 8 }}>
+      <Form.Item label={t('app.settings.language')} extra={t('app.settings.languageHint')}>
+        <Radio.Group
+          value={lang}
+          onChange={(e) => useSettings.getState().set(LANG_KEY, e.target.value)}
+          options={[
+            { value: 'auto', label: t('common.lang.auto') },
+            { value: 'zh-CN', label: t('common.lang.zh-CN') },
+            { value: 'en', label: t('common.lang.en') },
+          ]}
+        />
+      </Form.Item>
+      <Form.Item label={t('app.settings.theme')}>
+        <Radio.Group
+          value={theme}
+          onChange={(e) => useSettings.getState().set(THEME_KEY, e.target.value)}
+          options={[
+            { value: 'system', label: t('app.theme.system') },
+            { value: 'light', label: t('app.menu.view.themeLight') },
+            { value: 'dark', label: t('app.menu.view.themeDark') },
+            { value: 'slate', label: t('app.menu.view.themeSlate') },
+            { value: 'rose', label: t('app.menu.view.themeRose') },
+          ]}
+        />
+      </Form.Item>
+      <Form.Item label={t('app.settings.rowCap')} extra={t('app.settings.rowCapHint')}>
+        <InputNumber
+          min={500}
+          step={10000}
+          value={rowCap()}
+          onChange={(v) => useSettings.getState().set(ROW_CAP_KEY, v === null ? null : String(v))}
+          placeholder={String(DEFAULT_ROW_CAP)}
+          style={{ width: 160 }}
+        />
+      </Form.Item>
+      <Form.Item label={t('app.settings.syntaxCheck')} extra={t('app.settings.syntaxCheckHint')}>
+        <Switch checked={syntax} onChange={(on) => useSettings.getState().set(SYNTAX_KEY, on ? null : 'off')} />
+      </Form.Item>
+      <Form.Item label={t('app.settings.history')} extra={t('app.settings.historyHint')}>
+        <div className="row" style={{ gap: 8 }}>
+          <Switch
+            checked={historyOn}
+            onChange={(on) => useSettings.getState().set(HISTORY_ENABLED_KEY, on ? null : 'off')}
           />
-        </Form.Item>
-        <Form.Item label={t('app.settings.theme')}>
-          <Radio.Group
-            value={theme}
-            onChange={(e) => useSettings.getState().set(THEME_KEY, e.target.value)}
-            options={[
-              { value: 'system', label: t('app.theme.system') },
-              { value: 'light', label: t('app.menu.view.themeLight') },
-              { value: 'dark', label: t('app.menu.view.themeDark') },
-              { value: 'slate', label: t('app.menu.view.themeSlate') },
-              { value: 'rose', label: t('app.menu.view.themeRose') },
-            ]}
-          />
-        </Form.Item>
-        <Form.Item label={t('app.settings.rowCap')} extra={t('app.settings.rowCapHint')}>
           <InputNumber
-            min={500}
-            step={10000}
-            value={rowCap()}
-            onChange={(v) => useSettings.getState().set(ROW_CAP_KEY, v === null ? null : String(v))}
-            placeholder={String(DEFAULT_ROW_CAP)}
-            style={{ width: 160 }}
+            min={100}
+            max={1_000_000}
+            step={1000}
+            value={historyLimit}
+            placeholder="10000"
+            onChange={(v) => useSettings.getState().set(HISTORY_LIMIT_KEY, v === null ? null : String(v))}
+            style={{ width: 110 }}
+          />
+          <span className="muted">{t('app.settings.historyLimitUnit')}</span>
+          <Button size="small" danger onClick={clearHistory}>
+            {t('app.settings.clearHistory')}
+          </Button>
+        </div>
+      </Form.Item>
+      {desktop && (
+        <Form.Item label={t('app.settings.autoCheckUpdate')}>
+          <Switch
+            checked={info?.auto_check_update ?? true}
+            onChange={(on) => desktop?.setAutoCheckUpdate(on).catch(console.warn)}
           />
         </Form.Item>
-        <Form.Item label={t('app.settings.syntaxCheck')} extra={t('app.settings.syntaxCheckHint')}>
-          <Switch checked={syntax} onChange={(on) => useSettings.getState().set(SYNTAX_KEY, on ? null : 'off')} />
-        </Form.Item>
-        <Form.Item label={t('app.settings.history')} extra={t('app.settings.historyHint')}>
-          <div className="row" style={{ gap: 8 }}>
-            <Switch
-              checked={historyOn}
-              onChange={(on) => useSettings.getState().set(HISTORY_ENABLED_KEY, on ? null : 'off')}
-            />
-            <InputNumber
-              min={100}
-              max={1_000_000}
-              step={1000}
-              value={historyLimit}
-              placeholder="10000"
-              onChange={(v) => useSettings.getState().set(HISTORY_LIMIT_KEY, v === null ? null : String(v))}
-              style={{ width: 110 }}
-            />
-            <span className="muted">{t('app.settings.historyLimitUnit')}</span>
-            <Button size="small" danger onClick={clearHistory}>
-              {t('app.settings.clearHistory')}
-            </Button>
-          </div>
-        </Form.Item>
-        {desktop && (
-          <Form.Item label={t('app.settings.autoCheckUpdate')}>
-            <Switch
-              checked={info?.auto_check_update ?? true}
-              onChange={(on) => desktop?.setAutoCheckUpdate(on).catch(console.warn)}
-            />
-          </Form.Item>
-        )}
-      </Form>
+      )}
+    </Form>
+  )
+  return (
+    <Modal title={t('app.settings.title')} open={settingsOpen} onCancel={() => setSettingsOpen(false)} footer={null} width={600}>
+      <Tabs
+        size="small"
+        destroyOnHidden
+        items={[
+          { key: 'general', label: t('app.settings.tabGeneral'), children: general },
+          { key: 'ai', label: 'AI', children: <AiSettings /> },
+        ]}
+      />
     </Modal>
   )
 }
+

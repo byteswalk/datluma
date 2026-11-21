@@ -234,6 +234,84 @@ impl Secrets {
     }
 }
 
+impl Secrets {
+    /// 取不属于连接的密码（如 `ai.key`）；没有保存过时返回 None。密码库锁着而确实存过时返回 `Locked`。
+    pub fn get_app(&self, name: &str) -> Result<Option<String>> {
+        match self.backend {
+            SecretBackend::Keyring => match app_entry(name)?.get_password() {
+                Ok(p) => Ok(Some(p)),
+                Err(keyring::Error::NoEntry) => Ok(None),
+                Err(e) => Err(Error::internal(msg!("secret.keyring_read_failed", error = e))),
+            },
+            SecretBackend::Vault => {
+                let row: Option<(Vec<u8>, Vec<u8>)> = self.store.with(|c| {
+                    c.query_row("SELECT nonce, cipher FROM app_secrets WHERE name = ?1", params![name], |r| {
+                        Ok((r.get(0)?, r.get(1)?))
+                    })
+                    .optional()
+                })?;
+                match row {
+                    None => Ok(None),
+                    Some((nonce, cipher)) => {
+                        let plain = open(&self.key()?, &nonce, &cipher)
+                            .ok_or_else(|| crypto_err(msg!("secret.op.decrypt")))?;
+                        String::from_utf8(plain).map(Some).map_err(|_| crypto_err(msg!("secret.op.decrypt")))
+                    }
+                }
+            }
+        }
+    }
+
+    /// 是否保存过（不需要解锁）。
+    pub fn has_app(&self, name: &str) -> Result<bool> {
+        match self.backend {
+            SecretBackend::Keyring => self.get_app(name).map(|v| v.is_some()),
+            SecretBackend::Vault => self.store.with(|c| {
+                c.query_row("SELECT 1 FROM app_secrets WHERE name = ?1", params![name], |_| Ok(()))
+                    .optional()
+                    .map(|r| r.is_some())
+            }),
+        }
+    }
+
+    pub fn set_app(&self, name: &str, secret: &str) -> Result<()> {
+        match self.backend {
+            SecretBackend::Keyring => app_entry(name)?
+                .set_password(secret)
+                .map_err(|e| Error::internal(msg!("secret.keyring_write_failed", error = e))),
+            SecretBackend::Vault => {
+                let (nonce, cipher) = seal(&self.key()?, secret.as_bytes())?;
+                self.store.with(|c| {
+                    c.execute(
+                        "INSERT INTO app_secrets (name, nonce, cipher) VALUES (?1, ?2, ?3)
+                         ON CONFLICT(name) DO UPDATE SET nonce = excluded.nonce, cipher = excluded.cipher",
+                        params![name, nonce, cipher],
+                    )
+                })?;
+                Ok(())
+            }
+        }
+    }
+
+    pub fn delete_app(&self, name: &str) -> Result<()> {
+        match self.backend {
+            SecretBackend::Keyring => match app_entry(name)?.delete_credential() {
+                Ok(()) | Err(keyring::Error::NoEntry) => Ok(()),
+                Err(e) => Err(Error::internal(msg!("secret.keyring_delete_failed", error = e))),
+            },
+            SecretBackend::Vault => {
+                self.store.with(|c| c.execute("DELETE FROM app_secrets WHERE name = ?1", params![name]))?;
+                Ok(())
+            }
+        }
+    }
+}
+
+fn app_entry(name: &str) -> Result<keyring::Entry> {
+    keyring::Entry::new(KEYRING_SERVICE, &format!("app:{name}"))
+        .map_err(|e| Error::internal(msg!("secret.keyring_unavailable", error = e)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -304,6 +382,29 @@ mod tests {
         store.delete_profile(&id).unwrap();
         let n: i64 = store.with(|c| c.query_row("SELECT COUNT(*) FROM secrets", [], |r| r.get(0))).unwrap();
         assert_eq!(n, 0);
+    }
+
+    #[test]
+    fn app_secrets_in_vault() {
+        let (store, s, _) = vault();
+        assert!(!s.has_app("ai.key").unwrap());
+        assert_eq!(s.get_app("ai.key").unwrap(), None, "锁着、没存过时也能取到无");
+        assert!(matches!(s.set_app("ai.key", "sk-1"), Err(Error::Locked)));
+        s.init_vault("m").unwrap();
+        s.set_app("ai.key", "sk-1").unwrap();
+        s.set_app("ai.key", "sk-2").unwrap();
+        assert!(s.has_app("ai.key").unwrap());
+        let raw: Vec<u8> =
+            store.with(|c| c.query_row("SELECT cipher FROM app_secrets", [], |r| r.get(0))).unwrap();
+        assert!(!raw.windows(4).any(|w| w == b"sk-2"));
+        let again = Secrets::with_backend(store.clone(), SecretBackend::Vault);
+        assert!(again.has_app("ai.key").unwrap(), "锁着也知道存过");
+        assert!(matches!(again.get_app("ai.key"), Err(Error::Locked)));
+        again.unlock("m").unwrap();
+        assert_eq!(again.get_app("ai.key").unwrap().as_deref(), Some("sk-2"));
+        again.delete_app("ai.key").unwrap();
+        again.delete_app("ai.key").unwrap();
+        assert!(!again.has_app("ai.key").unwrap());
     }
 
     /// 真实的系统钥匙串。没有可用钥匙串的环境（如无图形会话的 Linux CI）跳过。

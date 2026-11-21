@@ -74,5 +74,10 @@
     "reveal": "打开所在文件夹",
     "failed": "导出失败：{{name}}",
     "cancelled": "已取消导出：{{name}}"
+  },
+  "ai": {
+    "fix": "AI 修复",
+    "plan": "AI 分析计划",
+    "optimizeCell": "AI 优化这条 SQL"
   }
 }

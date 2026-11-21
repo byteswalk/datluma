@@ -1,6 +1,7 @@
 //! HTTP 接口：REST（连接配置、驱动、密码库、元数据、会话管理）和会话的 WebSocket 执行协议。
 //! 另提供前端页面的静态文件服务（`with_web`）。桌面模式和浏览器模式（`dblens-server`）共用。所有请求都要带访问令牌，浏览器请求还要通过 Origin 校验。
 
+mod ai;
 mod auth;
 mod design;
 mod diagrams;
@@ -25,6 +26,7 @@ use axum::routing::{delete, get, post, put};
 use dblens_service::Service;
 use tokio::net::TcpListener;
 
+pub use ai::fix_provider;
 pub use error::{ApiError, status_of};
 pub use lang::negotiate;
 pub use tasks::{DEFAULT_UPLOAD_LIMIT_MB, UPLOAD_LIMIT_SETTING};
@@ -62,6 +64,10 @@ pub fn api_routes() -> Router<AppState> {
         .route("/drivers", get(routes::drivers))
         .route("/drivers/{driver}/lib-dir", put(routes::set_lib_dir))
         .route("/settings", get(routes::settings))
+        .route("/ai/config", get(ai::config).put(ai::set_config))
+        .route("/ai/key", put(ai::set_key))
+        .route("/ai/test", post(ai::test))
+        .route("/ai/ask", post(ai::ask))
         .route("/client-log", post(routes::client_log))
         .route("/settings/{key}", put(routes::set_setting))
         .route("/history", get(routes::history).delete(routes::clear_history))

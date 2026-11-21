@@ -92,6 +92,12 @@ const MIGRATIONS: &[&str] = &[
         body         TEXT NOT NULL
     );
     CREATE INDEX lint_runs_at ON lint_runs(created_at);",
+    // 版本 6：不属于连接的密码，如 AI 提供方的 API key（密码库模式用；钥匙串模式存在系统钥匙串）
+    "CREATE TABLE app_secrets (
+        name   TEXT PRIMARY KEY,
+        nonce  BLOB NOT NULL,
+        cipher BLOB NOT NULL
+    );",
 ];
 
 pub(crate) fn db_err(e: rusqlite::Error) -> Error {

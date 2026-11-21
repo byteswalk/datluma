@@ -35,5 +35,8 @@
     "cancelled": "{{title}} 已取消",
     "reveal": "在文件夹中显示",
     "truncated": "{{count}} 个单元格超过 32767 个字符，已截断"
-  }
+  },
+  "aiComments": "用 AI 推断空着的注释",
+  "aiCommentsHint": "只写进文档，标明“AI 推断”，不改数据库。每 10 张表问一次。",
+  "inferring": "AI 推断注释 {{done}}/{{total}}"
 }

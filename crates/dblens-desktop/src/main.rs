@@ -115,6 +115,12 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+fn run_mcp(data_dir: &Path) -> Result<(), String> {
+    let service = Arc::new(Service::open(data_dir).map_err(|e| e.to_string())?);
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(dblens_mcp::serve_stdio(service)).map_err(|e| e.to_string())
+}
+
 /// 数据目录：环境变量 `DBLENS_DATA_DIR`（开发和测试时用，避免碰到真实数据）优先，否则用默认的用户数据目录。
 fn data_dir() -> dblens_core::Result<PathBuf> {
     match std::env::var_os("DBLENS_DATA_DIR") {
@@ -138,6 +144,15 @@ fn main() {
             None
         }
     };
+    // `--mcp`：不开窗口，作为 MCP 服务在标准输入输出上运行（智能体启动的子进程）
+    if std::env::args().skip(1).any(|a| a == "--mcp") {
+        tracing::info!("DBLens {} 以 MCP 服务方式启动", env!("CARGO_PKG_VERSION"));
+        if let Err(e) = run_mcp(&data_dir) {
+            tracing::error!("MCP 服务失败：{e}");
+            std::process::exit(1);
+        }
+        return;
+    }
     tracing::info!("DBLens {} 启动", env!("CARGO_PKG_VERSION"));
     if let Err(e) = run(data_dir) {
         tracing::error!("启动失败：{e}");

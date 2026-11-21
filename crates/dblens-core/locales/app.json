@@ -1909,8 +1909,8 @@
     "en": "Cannot reach the update source %{url}: %{error}"
   },
   "server.usage": {
-    "zh-CN": "用法：dblens-server [--listen 地址:端口] [--data-dir 目录] [--web-dir 目录] [--allow-origin 来源]...\n                     [--update-url 地址] [--no-update-check]",
-    "en": "Usage: dblens-server [--listen host:port] [--data-dir dir] [--web-dir dir] [--allow-origin origin]...\n                     [--update-url url] [--no-update-check]"
+    "zh-CN": "用法：dblens-server [--listen 地址:端口] [--data-dir 目录] [--web-dir 目录] [--allow-origin 来源]...\n                     [--update-url 地址] [--no-update-check]\n       dblens-server mcp [--data-dir 目录]    以 MCP 服务方式运行（标准输入输出），给本机智能体用",
+    "en": "Usage: dblens-server [--listen host:port] [--data-dir dir] [--web-dir dir] [--allow-origin origin]...\n                     [--update-url url] [--no-update-check]\n       dblens-server mcp [--data-dir dir]    run as an MCP server on stdin/stdout for local agents"
   },
   "session.broken_reconnect": {
     "zh-CN": "连接已断开，请先重新连接",
@@ -2155,5 +2155,105 @@
   "variant.polardb": {
     "zh-CN": "PolarDB（MySQL 版）",
     "en": "PolarDB for MySQL"
+  },
+  "ai.disabled": {
+    "zh-CN": "AI 未启用，请先在设置的“AI”页配置",
+    "en": "AI is not enabled. Configure it on the AI page of Settings first"
+  },
+  "ai.base_url_required": {
+    "zh-CN": "请填写接口地址",
+    "en": "Enter the API address"
+  },
+  "ai.model_required": {
+    "zh-CN": "请填写模型名称",
+    "en": "Enter the model name"
+  },
+  "ai.command_required": {
+    "zh-CN": "请填写命令行",
+    "en": "Enter the command line"
+  },
+  "ai.timeout_range": {
+    "zh-CN": "超时要在 5 到 1800 秒之间",
+    "en": "The timeout must be between 5 and 1800 seconds"
+  },
+  "ai.key_required": {
+    "zh-CN": "请先保存 API key",
+    "en": "Save an API key first"
+  },
+  "ai.cli_not_allowed": {
+    "zh-CN": "这个版本不能使用本机命令行作为 AI 提供方",
+    "en": "This edition cannot use a local command line as the AI provider"
+  },
+  "ai.cli_not_found": {
+    "zh-CN": "找不到命令：%{program}（请确认已安装并在 PATH 里）",
+    "en": "Command not found: %{program} (make sure it is installed and on PATH)"
+  },
+  "ai.cli_failed": {
+    "zh-CN": "运行命令行失败：%{detail}",
+    "en": "Failed to run the command line: %{detail}"
+  },
+  "ai.cli_exit": {
+    "zh-CN": "命令行异常退出（%{code}）：%{detail}",
+    "en": "The command line exited abnormally (%{code}): %{detail}"
+  },
+  "ai.client_failed": {
+    "zh-CN": "无法创建网络客户端：%{error}",
+    "en": "Cannot create the HTTP client: %{error}"
+  },
+  "ai.unreachable": {
+    "zh-CN": "连不上 AI 服务：%{error}",
+    "en": "Cannot reach the AI service: %{error}"
+  },
+  "ai.http_failed": {
+    "zh-CN": "AI 服务返回错误 %{status}：%{body}",
+    "en": "The AI service returned error %{status}: %{body}"
+  },
+  "ai.bad_response": {
+    "zh-CN": "AI 服务的回复格式不对，请检查接口地址和类型",
+    "en": "Unexpected reply from the AI service. Check the address and provider type"
+  },
+  "ai.empty_answer": {
+    "zh-CN": "AI 没有给出回答",
+    "en": "The AI returned no answer"
+  },
+  "ai.bad_config": {
+    "zh-CN": "保存的 AI 配置已损坏，请重新设置",
+    "en": "The saved AI settings are damaged. Set them again"
+  },
+  "ai.missing_field": {
+    "zh-CN": "缺少参数：%{field}",
+    "en": "Missing parameter: %{field}"
+  },
+  "ai.comment_batch": {
+    "zh-CN": "补注释一次要选 1 到 %{max} 张表",
+    "en": "Choose 1 to %{max} tables for each comment request"
+  },
+  "ai.tables_not_found": {
+    "zh-CN": "要补注释的表",
+    "en": "the tables to comment"
+  },
+  "ai.bad_json": {
+    "zh-CN": "AI 没有按要求的格式回答，请重试",
+    "en": "The AI did not answer in the expected format. Try again"
+  },
+  "ai.config_locked": {
+    "zh-CN": "AI 设置由管理员统一配置，不能在这里修改",
+    "en": "AI settings are managed by the administrator and cannot be changed here"
+  },
+  "mcp.one_statement": {
+    "zh-CN": "一次只能执行一条语句",
+    "en": "Only one statement can be run at a time"
+  },
+  "mcp.read_only": {
+    "zh-CN": "只能执行只读查询（SELECT、WITH、SHOW、EXPLAIN 等），不能执行 %{keyword}",
+    "en": "Only read-only queries (SELECT, WITH, SHOW, EXPLAIN…) are allowed, not %{keyword}"
+  },
+  "mcp.no_connection": {
+    "zh-CN": "没有叫“%{name}”的连接，或它没有打开 MCP 访问",
+    "en": "No connection named \"%{name}\", or it does not allow MCP access"
+  },
+  "document.ai_inferred": {
+    "zh-CN": "（AI 推断）",
+    "en": " (AI inferred)"
   }
 }

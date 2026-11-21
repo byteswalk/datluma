@@ -33,6 +33,7 @@ import {
   usesJdbc,
 } from './form'
 import { PRODUCT_GROUPS, product, productLabel, productNote } from './products'
+import { useAiConfig } from '../ai/store'
 import { withVault } from './vault'
 
 type Errors = ReturnType<typeof validate>
@@ -94,7 +95,7 @@ export default function ConnectionDialog() {
   const api = useApi()
   const qc = useQueryClient()
   const { t } = useTranslation()
-  const { message } = App.useApp()
+  const { message, modal } = App.useApp()
   const { connectionDialog, closeConnection } = useUi()
   const editingId = connectionDialog?.profileId ?? null
   const [form, setForm] = useState<ConnectionForm>(emptyForm())
@@ -322,6 +323,18 @@ export default function ConnectionDialog() {
     <Alert type="info" showIcon message={t('connections.tls.unsupported', { driver: form.product === 'goldendb' ? 'GoldenDB' : driverLabel(form.driver) })} />
   )
 
+  // 生产连接打开样例数据要再确认
+  const aiView = useAiConfig().data
+  const setAiSamples = (on: boolean) => {
+    if (on && form.environment === 'prod') {
+      modal.confirm({
+        title: t('connections.ai.samplesProdTitle'),
+        content: t('connections.ai.samplesProdContent'),
+        onOk: () => set('aiSamples', true),
+      })
+    } else set('aiSamples', on)
+  }
+
   const advanced = (
     <>
       {!isFileDb(form.driver) && (
@@ -356,6 +369,23 @@ export default function ConnectionDialog() {
       {form.driver === 'oracle' && form.product !== 'oceanbase_oracle' && (
         <Field label="SID">
           <Input value={form.oracleSid} onChange={(e) => set('oracleSid', e.target.value)} placeholder={t('connections.advanced.sidPlaceholder')} />
+        </Field>
+      )}
+      {aiView?.configurable && (
+        <Field label="AI">
+          <Space direction="vertical" size={2}>
+            {aiView.samples_allowed && (
+              <Checkbox checked={form.aiSamples} onChange={(e) => setAiSamples(e.target.checked)}>
+                {t('connections.ai.samples')}
+              </Checkbox>
+            )}
+            <Checkbox checked={form.mcpAccess} onChange={(e) => set('mcpAccess', e.target.checked)}>
+              {t('connections.ai.mcp')}
+            </Checkbox>
+            <span className="muted" style={{ fontSize: 12 }}>
+              {t('connections.ai.hint')}
+            </span>
+          </Space>
         </Field>
       )}
       <Field label={t('connections.advanced.color')}>

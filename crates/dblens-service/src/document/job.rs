@@ -4,7 +4,7 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use dblens_core::{Error, Result, current_lang, msg};
+use dblens_core::{Error, Lang, Result, current_lang, msg};
 use dblens_dialect::meta::{MetaArgs, MetaKey};
 use serde::{Deserialize, Serialize};
 use zip::write::SimpleFileOptions;
@@ -15,6 +15,7 @@ use super::content::{
 };
 use super::template::{TextFormat, check, render};
 use super::{docx, xlsx};
+use crate::ai::TableComments;
 use crate::model::DEFAULT_DIAGRAM;
 use crate::service::Service;
 use crate::task::{FileSource, TaskKind, TaskPhase};
@@ -106,6 +107,30 @@ pub struct DocumentRequest {
     /// 桌面版：写到这个路径；没有时写到任务目录，完成后下载。
     #[serde(default)]
     pub output: Option<PathBuf>,
+    /// AI 推断的注释（界面先按表分批问好）：只填进文档里空着的注释，并标明是推断的，不改库。
+    #[serde(default)]
+    pub ai_comments: Vec<TableComments>,
+}
+
+/// 把 AI 推断的注释填进空着的表注释、列注释，后面加上标记。
+fn apply_ai_comments(sources: &mut [SourceSchema], comments: &[TableComments], lang: Lang) {
+    let mark = msg!("document.ai_inferred").render(lang);
+    let empty = |c: &Option<String>| c.as_deref().is_none_or(|c| c.trim().is_empty());
+    for t in sources.iter_mut().flat_map(|s| s.tables.iter_mut()).map(|t| &mut t.table) {
+        let Some(c) = comments.iter().find(|c| c.table == t.name) else { continue };
+        if let Some(text) = c.comment.as_deref().filter(|x| !x.trim().is_empty())
+            && empty(&t.comment)
+        {
+            t.comment = Some(format!("{}{mark}", text.trim()));
+        }
+        for col in &mut t.columns {
+            if let Some(text) = c.columns.get(&col.name).filter(|x| !x.trim().is_empty())
+                && empty(&col.comment)
+            {
+                col.comment = Some(format!("{}{mark}", text.trim()));
+            }
+        }
+    }
 }
 
 /// 开始前检查出的问题。
@@ -309,9 +334,10 @@ impl Service {
         tokio::spawn(async move {
             let run = async {
                 let design = req.kind == DocKind::Design;
-                let sources = service
+                let mut sources = service
                     .document_sources(&req.source, design, || task.update(|s| s.progress.read += 1))
                     .await?;
+                apply_ai_comments(&mut sources, &req.ai_comments, lang);
                 if task.cancelled() {
                     return Err(Error::Cancelled);
                 }
@@ -424,7 +450,47 @@ mod tests {
             view_definitions: true,
             diagrams: vec![],
             output: None,
+            ai_comments: vec![],
         }
+    }
+
+    #[test]
+    fn ai_comments_fill_only_empty_and_are_marked() {
+        use dblens_core::schema::{Column, Table};
+        use dblens_core::{ColumnType, LogicalType};
+        let col = |n: &str, c: Option<&str>| Column {
+            name: n.into(),
+            ordinal: 1,
+            data_type: ColumnType { native: "int".into(), logical: LogicalType::Int { bits: 32 } },
+            nullable: true,
+            default: None,
+            comment: c.map(Into::into),
+            auto_increment: false,
+            generated: None,
+        };
+        let mut sources = vec![SourceSchema {
+            name: "s".into(),
+            tables: vec![SourceTable {
+                table: Table {
+                    name: "emp".into(),
+                    columns: vec![col("id", None), col("name", Some("姓名"))],
+                    ..Default::default()
+                },
+                logical_keys: vec![],
+            }],
+            ..Default::default()
+        }];
+        let ai = TableComments {
+            table: "emp".into(),
+            comment: Some("员工".into()),
+            columns: [("id".to_string(), "编号".to_string()), ("name".to_string(), "别改".to_string())]
+                .into(),
+        };
+        apply_ai_comments(&mut sources, &[ai], Lang::ZhCn);
+        let t = &sources[0].tables[0].table;
+        assert_eq!(t.comment.as_deref(), Some("员工（AI 推断）"));
+        assert_eq!(t.columns[0].comment.as_deref(), Some("编号（AI 推断）"));
+        assert_eq!(t.columns[1].comment.as_deref(), Some("姓名"));
     }
 
     #[test]

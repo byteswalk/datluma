@@ -7,6 +7,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useSetting } from '../../shared/settings'
+import { useAiEnabled } from '../ai/store'
 import { THEME_KEY, parseThemePref, resolveTheme, useSystemDark } from '../../shared/theme'
 import { attachChecker } from '../sql/checker'
 import { type EditorSqlContext, bindModel, registerSqlProviders } from '../sql/provider'
@@ -20,7 +21,7 @@ export type MonacoEditor = Parameters<OnMount>[0]
 registerSqlProviders()
 
 const { KeyMod, KeyCode } = monaco
-type CommandLabel = `editor.command.${'runCurrent' | 'runAll' | 'stop' | 'format' | 'explain' | 'favorite'}`
+type CommandLabel = `editor.command.${'runCurrent' | 'runAll' | 'stop' | 'format' | 'explain' | 'favorite' | 'aiGenerate' | 'aiExplain' | 'aiOptimize'}`
 // label 是词条键，注册动作时按当前界面语言翻译
 const ACTIONS: { id: EditorCommand; label: CommandLabel; keys: number[] }[] = [
   { id: 'run-current', label: 'editor.command.runCurrent', keys: [KeyMod.CtrlCmd | KeyCode.Enter] },
@@ -31,6 +32,14 @@ const ACTIONS: { id: EditorCommand; label: CommandLabel; keys: number[] }[] = [
   // 覆盖 Monaco 默认的 Ctrl+D（选中下一个相同的词）
   { id: 'favorite', label: 'editor.command.favorite', keys: [KeyMod.CtrlCmd | KeyCode.KeyD] },
 ]
+
+/** AI 命令：只在启用了 AI 提供方时出现在右键菜单、响应快捷键（Ctrl+I 未启用时仍是补全）。 */
+const AI_ACTIONS: { id: EditorCommand; label: CommandLabel; keys: number[] }[] = [
+  { id: 'ai-generate', label: 'editor.command.aiGenerate', keys: [KeyMod.CtrlCmd | KeyCode.KeyI] },
+  { id: 'ai-explain', label: 'editor.command.aiExplain', keys: [] },
+  { id: 'ai-optimize', label: 'editor.command.aiOptimize', keys: [] },
+]
+const AI_CONTEXT = 'dblensAi'
 
 export interface SqlEditorProps {
   path: string
@@ -52,6 +61,9 @@ export default function SqlEditor({ path, language, defaultValue, marks, sql, on
   sqlRef.current = sql
   useEffect(() => bindModel(path, () => sqlRef.current), [path])
   const checker = useRef<ReturnType<typeof attachChecker> | null>(null)
+  const aiEnabled = useAiEnabled()
+  const aiKey = useRef<{ set(v: boolean): void } | null>(null)
+  useEffect(() => aiKey.current?.set(aiEnabled), [aiEnabled])
   useEffect(() => () => checker.current?.dispose(), [])
   // 识别出变体（标准档 / 兼容档）、换了连接或界面语言时重新检查
   useEffect(() => checker.current?.recheck(), [sql?.driver, sql?.variant, sql?.compat, i18n.language])
@@ -65,6 +77,17 @@ export default function SqlEditor({ path, language, defaultValue, marks, sql, on
         label: t(a.label),
         keybindings: a.keys,
         contextMenuGroupId: a.id === 'cancel' ? undefined : '0_dblens',
+        run: () => sendCommand(a.id),
+      })
+    }
+    aiKey.current = editor.createContextKey(AI_CONTEXT, aiEnabled)
+    for (const a of AI_ACTIONS) {
+      editor.addAction({
+        id: `dblens.${a.id}`,
+        label: t(a.label),
+        keybindings: a.keys,
+        precondition: AI_CONTEXT,
+        contextMenuGroupId: '1_dblens_ai',
         run: () => sendCommand(a.id),
       })
     }

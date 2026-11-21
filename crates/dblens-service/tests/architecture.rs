@@ -52,6 +52,7 @@ fn connections_are_opened_in_known_places() {
     assert_eq!(
         users_of(".registry.connect("),
         [
+            "ai.rs",
             "design.rs",
             "export/job.rs",
             "import/job.rs",

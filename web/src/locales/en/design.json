@@ -7,7 +7,8 @@
     "discard": "Undo all",
     "discardConfirm": "Undo all unsaved changes?",
     "reload": "Reload",
-    "reloadConfirm": "Reloading discards unsaved changes. Continue?"
+    "reloadConfirm": "Reloading discards unsaved changes. Continue?",
+    "aiComments": "AI comments"
   },
   "tabs": {
     "columns": "Columns",
@@ -164,5 +165,9 @@
     "addIndex": "Add index {{name}}",
     "dropIndex": "Drop index {{name}}",
     "renameIndex": "Rename index {{from}} to {{to}}"
+  },
+  "ai": {
+    "apply": "Fill into designer",
+    "applied": "Filled in. Review and save to apply."
   }
 }

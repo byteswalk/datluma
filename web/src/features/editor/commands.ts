@@ -1,6 +1,16 @@
 // 编辑器命令：菜单、全局快捷键和工具栏都发命令，由当前标签页的视图执行（它持有编辑器实例）。
 
-export type EditorCommand = 'run-current' | 'run-all' | 'cancel' | 'format' | 'explain' | 'first-problem' | 'favorite'
+export type EditorCommand =
+  | 'run-current'
+  | 'run-all'
+  | 'cancel'
+  | 'format'
+  | 'explain'
+  | 'first-problem'
+  | 'favorite'
+  | 'ai-generate'
+  | 'ai-explain'
+  | 'ai-optimize'
 
 const bus = new EventTarget()
 

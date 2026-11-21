@@ -123,5 +123,6 @@
     "discardConfirm": "放弃这个迁移？迁移记录将删除，目标库中已迁的内容不会删除。",
     "running": "执行中"
   },
-  "unfinishedDone": "迁移没有全部完成，可在上方\"未完成的迁移\"中继续"
+  "unfinishedDone": "迁移没有全部完成，可在上方\"未完成的迁移\"中继续",
+  "aiConvert": "AI 转换"
 }

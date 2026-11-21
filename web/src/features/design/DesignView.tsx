@@ -4,7 +4,7 @@
 // "SQL 预览"换成变更列表和"与库比对"的入口。
 // 引入 Monaco（SQL 预览），由工作区懒加载。
 
-import { IconArrowsDiff, IconDeviceFloppy, IconRefresh, IconTrashX } from '@tabler/icons-react'
+import { IconArrowsDiff, IconDeviceFloppy, IconRefresh, IconSparkles, IconTrashX } from '@tabler/icons-react'
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Alert, App, Badge, Button, Progress, Spin, Tabs } from 'antd'
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useState } from 'react'
@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next'
 import { useApi } from '../../app/context'
 import { useUi } from '../../app/ui'
 import { type DesignRequest, type LintSource, type ModelDesignRequest, type Profile, type TaskStatus, errorText, schemaLabel } from '../../shared/api'
+import { useAiDialog, useAiEnabled } from '../ai/store'
 import { withVault } from '../connections/vault'
 import { useQueryActions } from '../editor/actions'
 import { type QueryTab, useTabs } from '../editor/tabs'
@@ -99,6 +100,7 @@ export default function DesignView({ tab, profiles }: { tab: QueryTab; profiles:
   }, [tab.id, target.table, load])
 
   const edit = (fn: (d: Draft) => Draft) => useDesigns.getState().edit(tab.id, fn)
+  const ai = useAiEnabled()
   const dirty = !!state && isDirty(state.draft, state.original)
 
   const request: DesignRequest | null = useMemo(
@@ -231,6 +233,30 @@ export default function DesignView({ tab, profiles }: { tab: QueryTab; profiles:
   const mp = modelPreview.data
   const compareWithDb = () =>
     useTabs.getState().openCompare({ source: { kind: 'model', path: modelPath!, schema: request?.schema ?? target.schema }, target: null })
+  // AI 补注释：只填空着的表注释、列注释，改进草稿，由用户检查后照常保存
+  const aiComments = () =>
+    useAiDialog.getState().open({
+      title: t('ai.task.comments'),
+      req: { task: 'comments', profile_id: tab.profileId, schema: target.schema, tables: [target.table!] },
+      actions: [
+        {
+          label: t('design.ai.apply'),
+          run: (r) => {
+            const c = r.comments?.find((x) => x.table === target.table) ?? r.comments?.[0]
+            if (!c) return
+            edit((d) => ({
+              ...d,
+              comment: d.comment?.trim() ? d.comment : (c.comment ?? d.comment),
+              columns: d.columns.map((col) =>
+                !col.comment?.trim() && c.columns[col.name] ? { ...col, comment: c.columns[col.name] } : col,
+              ),
+            }))
+            message.success(t('design.ai.applied'))
+          },
+        },
+      ],
+    })
+
   return (
     <div className="design-view" onKeyDown={onKeyDown} tabIndex={-1}>
       <div className="row toolbar">
@@ -247,6 +273,11 @@ export default function DesignView({ tab, profiles }: { tab: QueryTab; profiles:
         {!isNew && (
           <Button size="small" type="text" icon={<IconRefresh size={16} />} disabled={running} onClick={() => confirmThen(t('design.toolbar.reloadConfirm'), () => void load())}>
             {t('design.toolbar.reload')}
+          </Button>
+        )}
+        {ai && !modelPath && !isNew && profile && caps.data?.comments && (
+          <Button size="small" type="text" icon={<IconSparkles size={16} />} disabled={running} onClick={aiComments}>
+            {t('design.toolbar.aiComments')}
           </Button>
         )}
         {modelPath && !isNew && (
@@ -312,7 +343,26 @@ export default function DesignView({ tab, profiles }: { tab: QueryTab; profiles:
                 {t('design.tabs.lint')}
               </Badge>
             ),
-            children: <DesignLintPane lint={lint} />,
+            children: (
+              <DesignLintPane
+                lint={lint}
+                onAi={
+                  ai && profile && !modelPath
+                    ? (issue) =>
+                        useAiDialog.getState().open({
+                          title: t('ai.task.lintFix'),
+                          req: {
+                            task: 'lint_fix',
+                            profile_id: tab.profileId,
+                            schema: isNew ? schema : target.schema,
+                            tables: isNew ? [] : [target.table!],
+                            issue,
+                          },
+                        })
+                    : undefined
+                }
+              />
+            ),
           },
           modelPath ? {
             key: 'sql',

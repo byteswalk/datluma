@@ -218,5 +218,12 @@
     "options": "Open",
     "readOnly": "Read only",
     "create": "Create if missing"
+  },
+  "ai": {
+    "samples": "Allow sample rows for AI comment inference (5 per table)",
+    "mcp": "Allow local agents via MCP (read-only)",
+    "hint": "These do not change the connection; they only control what AI can see.",
+    "samplesProdTitle": "Send sample rows from a production connection?",
+    "samplesProdContent": "Comment inference will send the first 5 rows of each table (values cut to 50 characters) to the AI provider. Make sure this data may leave."
   }
 }

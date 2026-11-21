@@ -24,7 +24,8 @@
     "historyHint": "记录每条执行过的语句，只保存在本机；超过条数时删除最旧的",
     "historyLimitUnit": "条",
     "clearHistory": "清空历史",
-    "clearHistoryConfirm": "清空全部执行历史？此操作不能撤销。"
+    "clearHistoryConfirm": "清空全部执行历史？此操作不能撤销。",
+    "tabGeneral": "常规"
   },
   "theme": {
     "system": "跟随系统"

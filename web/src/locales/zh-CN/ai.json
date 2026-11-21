@@ -1,0 +1,63 @@
+{
+  "dialog": {
+    "copied": "已复制",
+    "copyFailed": "复制失败",
+    "disclaimer": "AI 的回答可能有误，执行前请检查。",
+    "copySql": "复制 SQL",
+    "close": "关闭",
+    "instructionPlaceholder": "用一句话描述要查什么，如：上个月每个部门的订单数（Ctrl+Enter 发送）",
+    "send": "生成",
+    "thinking": "正在思考…",
+    "openSettings": "去设置",
+    "retry": "重试",
+    "copy": "复制",
+    "insert": "插入编辑器",
+    "replace": "替换原语句",
+    "noStatement": "光标处没有语句",
+    "openInTarget": "在目标连接打开",
+    "openInTab": "在新标签打开"
+  },
+  "comments": {
+    "none": "这些表的注释都已填写，没有要补的。"
+  },
+  "task": {
+    "generate": "AI 生成 SQL",
+    "explain": "AI 解释",
+    "optimize": "AI 优化建议",
+    "fix": "AI 修复",
+    "convert": "AI 转换：{{name}}",
+    "comments": "AI 补注释",
+    "lintFix": "AI 修复建议"
+  },
+  "settings": {
+    "unavailable": "当前服务端不支持 AI。",
+    "managedOn": "AI 已由管理员开启",
+    "managedOff": "AI 未开启",
+    "managedHint": "提供方由管理员统一配置。",
+    "saved": "已保存",
+    "enabled": "启用",
+    "enabledHint": "关闭后各处的 AI 入口不显示。",
+    "kind": "提供方",
+    "kindOpenai": "OpenAI 兼容",
+    "kindCli": "本机命令行",
+    "command": "命令",
+    "commandHint": "问题从标准输入传给命令，回答从标准输出读回；命令在一个空的临时目录里运行。",
+    "baseUrl": "接口地址",
+    "baseUrlHint": "OpenAI、DeepSeek、通义、Ollama 等兼容接口的地址，一般以 /v1 结尾。",
+    "baseUrlAnthropicHint": "留空使用官方地址。",
+    "model": "模型",
+    "keyHint": "保存在系统钥匙串或本地密码库，不会显示出来。本机的 Ollama 可以不填。",
+    "keySaved": "已保存（输入新的可替换）",
+    "keyEmpty": "未设置",
+    "keyClear": "清除",
+    "timeout": "超时",
+    "seconds": "秒",
+    "save": "保存",
+    "test": "测试",
+    "testOk": "连接成功，回答：{{reply}}",
+    "boundary": "默认只把表结构（表名、列、类型、注释、索引）和你的语句发给提供方，不发数据。补注释带样例数据要在连接的高级选项里单独打开。AI 的结果只是建议，不会自动执行。"
+  },
+  "mcp": {
+    "hint": "把这段配置加进智能体（Claude Code、Codex、Cursor 等）的 MCP 设置，智能体就能查看结构、执行只读查询。只有在连接高级选项里打开了“允许 MCP 访问”的连接可见。"
+  }
+}

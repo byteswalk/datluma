@@ -123,5 +123,6 @@
     "discardConfirm": "Discard this migration? Its record is deleted; data already copied to the target stays.",
     "running": "Running"
   },
-  "unfinishedDone": "The migration did not finish; continue it from \"Unfinished migrations\" above"
+  "unfinishedDone": "The migration did not finish; continue it from \"Unfinished migrations\" above",
+  "aiConvert": "AI convert"
 }

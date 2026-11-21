@@ -37,7 +37,14 @@ export function useDesignLint(source: LintSource | null, draft: DesignTableModel
   return { ruleset, rulesets: rulesets.data ?? [], hits, count }
 }
 
-export default function DesignLintPane({ lint }: { lint: ReturnType<typeof useDesignLint> }) {
+export default function DesignLintPane({
+  lint,
+  onAi,
+}: {
+  lint: ReturnType<typeof useDesignLint>
+  /** AI 给出一条问题的修改建议；未启用 AI 时不给。 */
+  onAi?: (issue: { rule: string; object: string; message: string; suggestion?: string | null }) => void
+}) {
   const { t } = useTranslation()
   const rows: Row[] = (lint.hits.data ?? []).flatMap((hit) =>
     hit.issues.map((i, n) => ({ key: `${hit.clause}/${n}`, hit, object: i.object, message: i.message, suggestion: i.suggestion })),
@@ -73,6 +80,19 @@ export default function DesignLintPane({ lint }: { lint: ReturnType<typeof useDe
               dataIndex: 'suggestion',
               render: (v?: string | null) => <span style={{ color: '#888' }}>{v || ''}</span>,
             },
+            ...(onAi
+              ? [
+                  {
+                    key: 'ai',
+                    width: 70,
+                    render: (_: unknown, r: Row) => (
+                      <a onClick={() => onAi({ rule: r.hit.text, object: r.object, message: r.message, suggestion: r.suggestion })}>
+                        {t('lint.run.ai_link')}
+                      </a>
+                    ),
+                  },
+                ]
+              : []),
           ]}
         />
       ) : (

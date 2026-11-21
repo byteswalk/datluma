@@ -10,7 +10,10 @@
     "stop": "停止",
     "format": "格式化",
     "explain": "执行计划",
-    "favorite": "收藏当前 SQL"
+    "favorite": "收藏当前 SQL",
+    "aiGenerate": "AI 生成 SQL",
+    "aiExplain": "AI 解释语句",
+    "aiOptimize": "AI 优化建议"
   },
   "toolbar": {
     "runCurrent": "执行当前语句（Ctrl+Enter）",

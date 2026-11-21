@@ -36,5 +36,8 @@
     "reveal": "Show in Folder",
     "truncated_one": "{{count}} cell exceeded 32767 characters and was truncated",
     "truncated_other": "{{count}} cells exceeded 32767 characters and were truncated"
-  }
+  },
+  "aiComments": "Infer empty comments with AI",
+  "aiCommentsHint": "Written into the document only, marked \"AI inferred\"; the database is not changed. Asks 10 tables at a time.",
+  "inferring": "Inferring comments {{done}}/{{total}}"
 }

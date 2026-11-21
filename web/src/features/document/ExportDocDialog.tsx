@@ -7,9 +7,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
-import { DEFAULT_DIAGRAM, type DocFormat, type DocumentProblem, errorText, schemaLabel } from '../../shared/api'
+import { type AiTableComments, DEFAULT_DIAGRAM, type DocFormat, type DocumentProblem, errorText, schemaLabel } from '../../shared/api'
 import { useSettings } from '../../shared/settings'
 import { desktop } from '../../shared/shell'
+import { useAiEnabled } from '../ai/store'
 import { withVault } from '../connections/vault'
 import { LARGE } from '../er/limits'
 import { useDocExport } from './dialog'
@@ -25,6 +26,9 @@ import {
   optionsKey,
 } from './options'
 import type { DiagramJob } from './render'
+
+/** AI 补注释每次问几张表（服务端上限）。 */
+const AI_BATCH = 10
 import { useDocTracker } from './track'
 
 const SEP = '\u0000'
@@ -56,6 +60,10 @@ function Dialog({ target }: { target: DocTarget }) {
   const [problems, setProblems] = useState<DocumentProblem[]>([])
   const [busy, setBusy] = useState(false)
   const [drawing, setDrawing] = useState<{ done: number; total: number } | null>(null)
+  // AI 推断空着的注释（只写进文档，不改库），每次打开默认不勾
+  const ai = useAiEnabled() && target.kind === 'database'
+  const [aiComments, setAiComments] = useState(false)
+  const [inferring, setInferring] = useState<{ done: number; total: number } | null>(null)
   const stop = useRef(false)
 
   useEffect(() => setTables([]), [single])
@@ -171,7 +179,23 @@ function Dialog({ target }: { target: DocTarget }) {
         )
         if (!images) return
       }
-      const id = await api.startDocument(buildRequest(target, o, schemas, tables, images, output))
+      let ai_comments: AiTableComments[] = []
+      if (ai && aiComments && target.kind === 'database') {
+        const names = tables.length ? tables : (tablesQ.data ?? [])
+        setInferring({ done: 0, total: names.length })
+        for (let i = 0; i < names.length; i += AI_BATCH) {
+          if (stop.current) return
+          const r = await api.aiAsk({
+            task: 'comments',
+            profile_id: target.profile,
+            schema: target.schema,
+            tables: names.slice(i, i + AI_BATCH),
+          })
+          ai_comments = ai_comments.concat(r.comments ?? [])
+          setInferring({ done: Math.min(names.length, i + AI_BATCH), total: names.length })
+        }
+      }
+      const id = await api.startDocument({ ...buildRequest(target, o, schemas, tables, images, output), ai_comments })
       close()
       void track(id, o.title.trim() || draft.info.title || t('document.title'), output)
     } catch (e) {
@@ -179,6 +203,7 @@ function Dialog({ target }: { target: DocTarget }) {
     } finally {
       setBusy(false)
       setDrawing(null)
+      setInferring(null)
     }
   }
 
@@ -216,7 +241,15 @@ function Dialog({ target }: { target: DocTarget }) {
         if (!busy) close()
       }}
       footer={
-        drawing ? (
+        inferring ? (
+          <div className="row" style={{ gap: 12 }}>
+            <span className="grow" style={{ textAlign: 'left' }}>
+              {t('document.inferring', { done: inferring.done, total: inferring.total })}
+              <Progress percent={Math.round((inferring.done / Math.max(1, inferring.total)) * 100)} size="small" />
+            </span>
+            <Button onClick={() => (stop.current = true)}>{t('document.cancel')}</Button>
+          </div>
+        ) : drawing ? (
           <div className="row" style={{ gap: 12 }}>
             <span className="grow" style={{ textAlign: 'left' }}>
               {t('document.drawing', { done: drawing.done, total: drawing.total })}
@@ -323,6 +356,13 @@ function Dialog({ target }: { target: DocTarget }) {
           <Form.Item label=" ">
             <Checkbox checked={o.viewDefinitions} onChange={(e) => set({ viewDefinitions: e.target.checked })}>
               {t('document.viewDefinitions')}
+            </Checkbox>
+          </Form.Item>
+        )}
+        {ai && (
+          <Form.Item label=" " extra={t('document.aiCommentsHint')}>
+            <Checkbox checked={aiComments} onChange={(e) => setAiComments(e.target.checked)}>
+              {t('document.aiComments')}
             </Checkbox>
           </Form.Item>
         )}
