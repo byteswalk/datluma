@@ -456,7 +456,8 @@ Statements:
         Ok(out)
     }
 
-    /// 语句里提到的表（按名字匹配当前模式的表），最多 `REFERENCED_LIMIT` 张。
+    /// 语句里提到的表（按名字匹配当前模式的表），最多 `REFERENCED_LIMIT` 张。一张都对不上时（如表名写错）
+    /// 给出模式里的表名，模型才知道该改成哪张。
     async fn referenced_context(
         &self,
         profile: &Profile,
@@ -474,6 +475,9 @@ Statements:
             if let Some(t) = self.metadata.tables(profile, schema, Some(&o.name)).await?.first() {
                 out.push_str(&table_text(t, indexes));
             }
+        }
+        if out.is_empty() && !objects.is_empty() {
+            out = table_names(&objects.iter().map(|o| o.name.as_str()).collect::<Vec<_>>());
         }
         Ok(out)
     }
@@ -596,7 +600,7 @@ fn need(v: &Option<String>) -> Result<&str> {
 
 fn answer_lang() -> &'static str {
     match current_lang() {
-        Lang::ZhCn => "Simplified Chinese",
+        Lang::ZhCn => "Simplified Chinese (zh-Hans, not Traditional)",
         Lang::En => "English",
     }
 }
@@ -662,6 +666,20 @@ pub fn table_text(t: &Table, indexes: bool) -> String {
             ));
         }
     }
+    out
+}
+
+/// 模式里的表名，最多 `NAME_LIMIT` 个（只有名字，不含结构和数据）。
+fn table_names(names: &[&str]) -> String {
+    const NAME_LIMIT: usize = 300;
+    let mut out = format!(
+        "Tables in this schema: {}",
+        names.iter().take(NAME_LIMIT).copied().collect::<Vec<_>>().join(", ")
+    );
+    if names.len() > NAME_LIMIT {
+        out.push_str(&format!(" … ({} more)", names.len() - NAME_LIMIT));
+    }
+    out.push('\n');
     out
 }
 
@@ -844,6 +862,21 @@ mod tests {
         assert_eq!(out.len(), 2);
         assert_eq!((out[0].column.as_str(), out[0].category.as_str()), ("id", "personal"));
         assert_eq!(out[1].category, "other");
+    }
+
+    #[test]
+    fn table_names_are_capped() {
+        assert_eq!(
+            table_names(&["a", "b"]),
+            "Tables in this schema: a, b
+"
+        );
+        let many: Vec<String> = (0..305).map(|i| format!("t{i}")).collect();
+        let refs: Vec<&str> = many.iter().map(String::as_str).collect();
+        assert!(table_names(&refs).ends_with(
+            " … (5 more)
+"
+        ));
     }
 
     #[test]
