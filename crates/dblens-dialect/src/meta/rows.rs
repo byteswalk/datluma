@@ -42,7 +42,13 @@ impl MetaRows {
     }
 
     /// 检查结果里有这些列（模板写错列别名时尽早报错）。
+    ///
+    /// 既没有列也没有行的是空结果：这个方言没有这项查询（如 SQLite 没有存储过程、序列），服务层用 `Default` 代替，
+    /// 不用检查。真正执行过的查询即使没有行也带列名，写错列别名照样报错。
     pub fn require(&self, key: &str, columns: &[&str]) -> Result<()> {
+        if self.columns.is_empty() && self.rows.is_empty() {
+            return Ok(());
+        }
         match columns.iter().find(|c| !self.columns.iter().any(|have| have == *c)) {
             Some(missing) => Err(Error::internal(msg!("meta.missing_column", key = key, column = missing))),
             None => Ok(()),
@@ -200,6 +206,16 @@ mod tests {
         assert!(r.require("tables", &["name", "flag"]).is_ok());
         let err = r.require("tables", &["name", "comment"]).unwrap_err().to_string();
         assert!(err.contains("tables") && err.contains("comment"), "{err}");
+    }
+
+    #[test]
+    fn require_accepts_empty_result_but_not_wrong_columns() {
+        // 方言没有这项查询时的空结果：不报缺列
+        assert!(MetaRows::default().require("routines", &["name", "kind", "comment"]).is_ok());
+        // 执行过但没有行：仍按列名检查
+        let no_rows = MetaRows::new(vec!["name".into()], vec![]);
+        assert!(no_rows.require("routines", &["name"]).is_ok());
+        assert!(no_rows.require("routines", &["name", "kind"]).is_err());
     }
 
     #[test]
