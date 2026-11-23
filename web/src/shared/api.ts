@@ -1453,6 +1453,9 @@ export function createApi(token: string, fetchFn: FetchFn = (i, o) => fetch(i, o
     deleteProfile: (id: string) => request<null>('DELETE', p(id)),
     testConnection: (profile: ProfileInput, password: string) =>
       request<ServerSummary>('POST', '/profiles/test', { profile, password }),
+    /** 用（可能尚未保存的）连接配置列出服务器上的数据库（MySQL 系、PG 系、SQL Server），其他驱动为空。 */
+    listDatabases: (profile: ProfileInput, password: string, id?: string | null) =>
+      request<string[]>('POST', '/profiles/databases', { profile, password, id: id ?? null }),
     /** 库列表（只有 SQL Server 有这一层，其他驱动为空）。 */
     catalogs: (id: string, filter?: string) => request<SchemaInfo[]>('GET', `${p(id)}/catalogs${q({ filter })}`),
     /** `catalog`：SQL Server 中列出哪个库的架构，不给时是连接的初始库。 */

@@ -260,6 +260,24 @@ pub async fn test_connection(
     Ok(Json(s.service.test_connection(b.profile, &b.password).await?))
 }
 
+/// 用（可能尚未保存的）连接配置列出服务器上的数据库，供新建连接时选择。不支持的数据库返回空数组。
+#[derive(Deserialize)]
+pub struct ListDatabasesBody {
+    pub profile: ProfileInput,
+    #[serde(default)]
+    pub password: String,
+    /// 编辑已有连接时它的 id：密码留空时用保存的密码。
+    #[serde(default)]
+    pub id: Option<String>,
+}
+
+pub async fn list_databases(
+    State(s): State<AppState>,
+    Json(b): Json<ListDatabasesBody>,
+) -> ApiResult<Json<Vec<String>>> {
+    Ok(Json(s.service.list_databases(b.profile, &b.password, b.id.as_deref()).await?))
+}
+
 // ---- 元数据 ----
 
 #[derive(Deserialize)]

@@ -32,7 +32,8 @@ import {
   validate,
   usesJdbc,
 } from './form'
-import { PRODUCT_GROUPS, product, productLabel, productNote } from './products'
+import DatabaseInput, { supportsDatabaseList } from './DatabaseInput'
+import { PRODUCT_GROUPS, listedProduct, product, productLabel, productNote } from './products'
 import { useAiConfig } from '../ai/store'
 import { withVault } from './vault'
 
@@ -134,7 +135,10 @@ export default function ConnectionDialog() {
     setBusy('test')
     setResult(null)
     try {
-      setResult({ ok: await api.testConnection(toProfileInput(form), form.password) })
+      const ok = await api.testConnection(toProfileInput(form), form.password)
+      setResult({ ok })
+      // 选的 OceanBase、实际是 Oracle 模式租户（后端已改走 JDBC 连上）：表单跟着改，保存时直接存成这种连接
+      if (ok.variant === 'oceanbase_oracle' && form.product === 'oceanbase') setForm((f) => switchProduct(f, 'oceanbase_oracle'))
     } catch (e) {
       setResult({ error: (e as Error).message })
     } finally {
@@ -216,7 +220,8 @@ export default function ConnectionDialog() {
     <>
       {!usesJdbc(form) && <NativeLibNotice driver={form.driver} />}
       <Field label={t('connections.general.name')} error={errors.name}>
-        <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="prod-mysql" />
+        {/* 示例名称跟着所选的库变：prod-gaussdb、prod-oceanbase-oracle…… */}
+        <Input value={form.name} onChange={(e) => set('name', e.target.value)} placeholder={`prod-${form.product.replace(/_/g, '-')}`} />
       </Field>
       <Field label={t('connections.general.hostPort')} error={errors.host ?? errors.port}>
         <Space.Compact style={{ width: '100%' }}>
@@ -266,16 +271,27 @@ export default function ConnectionDialog() {
           {t('connections.general.savePassword')}
         </Checkbox>
       </Field>}
-      <Field label={oceanbaseOracle ? t('connections.obOracle.schema') : databaseLabel(form.driver)} error={errors.database}>
-        <Input
-          value={form.database}
-          onChange={(e) => set('database', e.target.value)}
-          placeholder={
-            oceanbaseOracle
-              ? t('connections.obOracle.schemaPlaceholder')
-              : form.driver === 'oracle' ? t('connections.general.oracleServicePlaceholder') : t('connections.general.optional')
-          }
-        />
+      <Field
+        label={
+          oceanbaseOracle
+            ? t('connections.obOracle.schema')
+            : form.product === 'oceanbase' ? t('connections.oceanbase.databaseOrSchema') : databaseLabel(form.driver)
+        }
+        error={errors.database}
+      >
+        {supportsDatabaseList(form) ? (
+          <DatabaseInput form={form} editingId={editingId} onChange={(v) => set('database', v)} />
+        ) : (
+          <Input
+            value={form.database}
+            onChange={(e) => set('database', e.target.value)}
+            placeholder={
+              oceanbaseOracle
+                ? t('connections.obOracle.schemaPlaceholder')
+                : form.driver === 'oracle' ? t('connections.general.oracleServicePlaceholder') : t('connections.general.optional')
+            }
+          />
+        )}
       </Field>
       <Field label={t('connections.general.environment')}>
         <Radio.Group
@@ -426,13 +442,14 @@ export default function ConnectionDialog() {
                 <div
                   key={p.id}
                   className="row"
-                  onClick={() => setForm((f) => switchProduct(f, p.id))}
+                  // 已识别为 OceanBase Oracle 模式租户的连接，点 OceanBase 时保持原配置
+                  onClick={() => setForm((f) => (listedProduct(f.product) === p.id ? f : switchProduct(f, p.id)))}
                   style={{
                     gap: 8,
                     padding: '4px 10px',
                     borderRadius: 4,
                     cursor: 'pointer',
-                    background: form.product === p.id ? 'var(--sel)' : undefined,
+                    background: listedProduct(form.product) === p.id ? 'var(--sel)' : undefined,
                   }}
                 >
                   <DbIcon driver={p.driver} variant={p.id} size={16} />

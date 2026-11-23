@@ -80,6 +80,7 @@ pub fn api_routes() -> Router<AppState> {
         .route("/secrets/lock", post(routes::lock))
         .route("/profiles", get(routes::profiles).post(routes::create_profile))
         .route("/profiles/test", post(routes::test_connection))
+        .route("/profiles/databases", post(routes::list_databases))
         .route(
             "/profiles/{id}",
             get(routes::profile).put(routes::update_profile).delete(routes::delete_profile),

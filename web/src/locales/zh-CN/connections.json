@@ -46,7 +46,7 @@
     },
     "oceanbase": {
       "label": "OceanBase",
-      "note": "MySQL 模式；用户名写成 用户@租户（如 root@sys），经 OBProxy 连接时端口一般是 2883"
+      "note": "MySQL 模式和 Oracle 模式租户都用这个入口，连上后自动识别（Oracle 模式经官方 JDBC 驱动）；用户名写成 用户@租户（如 root@sys），经 OBProxy 连接时端口一般是 2883"
     },
     "oceanbase_oracle": {
       "label": "OceanBase（Oracle 模式）",
@@ -153,6 +153,10 @@
     "savePassword": "保存密码",
     "oracleServicePlaceholder": "FREEPDB1；用 SID 连接时在「高级」中填写",
     "optional": "可选",
+    "databasesLoading": "正在读取数据库列表…",
+    "databasesFailed": "读不到数据库列表：{{error}}",
+    "databasesEmpty": "没有可选的数据库，可以直接输入",
+    "databasePickPlaceholder": "可选，点开下拉从服务器读取",
     "environment": "环境",
     "prodHint": "生产连接：标签页标红；不带 WHERE 的 UPDATE/DELETE、DROP、TRUNCATE 执行前要确认"
   },
@@ -225,5 +229,8 @@
     "hint": "都不改变连接本身，只控制 AI 能看到什么。",
     "samplesProdTitle": "生产连接带样例数据？",
     "samplesProdContent": "补注释时会把每张表的前 5 行（每个值最多 50 个字符）发给 AI 提供方。确认这些数据可以发出去。"
+  },
+  "oceanbase": {
+    "databaseOrSchema": "数据库/模式"
   }
 }

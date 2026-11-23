@@ -7,6 +7,11 @@
 标准 MySQL 客户端连不上 Oracle 模式租户，服务器直接拒绝：`Oracle tenant for current client driver is not supported`。所以走 JDBC 桥接，用官方驱动 `oceanbase-client`（LGPL-2.1，随包发布，见 `scripts/clients.manifest.json`）。
 
 - 连接配置：`driver=oracle`、`client=jdbc`、`jdbc_kind=oceanbase`，产品 `oceanbase_oracle`。用户名写成 `用户@租户`，`database` 是模式名，可留空。
+- 新建连接只有一个 OceanBase 入口（2026-11-23 起），配置是 `driver=mysql`、产品 `oceanbase`。连 Oracle 模式租户时服务器返回 1235，
+  `DriverRegistry::connect_probed` 随即把配置改成上面这样重连；已保存的连接写回新配置，下次直接走 JDBC。
+  对话框的“测试连接”识别出 Oracle 模式时，表单也跟着改，保存时直接存成这种配置。实测（企业版 4.4.2.2）：同一个入口连 `ora_t`
+  识别为 Oracle 模式、连 `sys` 识别为 MySQL 模式；官方 JDBC 驱动也能连 MySQL 模式租户，但识别逻辑按 Oracle 家族处理，所以 MySQL 模式仍走原生协议。
+- 各产品的模式和验证状态见 [product-modes](product-modes.md)。
 - 驱动报告的产品名是 Oracle，版本是 OceanBase 自己的。`JdbcConnection` 改成报告 OceanBase，由此识别出 `Variant::OceanBaseOracle`，家族仍是 `Family::Oracle`。
 
 ## 和 Oracle 不同的地方

@@ -46,11 +46,19 @@ export const PRODUCTS: Product[] = [
   { id: 'sqlite', driver: 'sqlite', port: 0 },
 ]
 
-/** 界面上的分组：国产库一组，其他一组。 */
+/**
+ * 界面上的分组：国产库一组，其他一组。每个产品一个入口，兼容模式连上后自动识别。
+ * OceanBase 也只有一个入口：Oracle 模式租户先按 MySQL 连会被拒绝，后端随即改走 JDBC，并把连接配置改成 `oceanbase_oracle`。
+ */
 export const PRODUCT_GROUPS: { key: 'domestic' | 'other'; products: ProductId[] }[] = [
-  { key: 'domestic', products: ['dameng', 'kingbase', 'gaussdb', 'opengauss', 'oceanbase', 'oceanbase_oracle', 'goldendb', 'tidb', 'gbase8s'] },
+  { key: 'domestic', products: ['dameng', 'kingbase', 'gaussdb', 'opengauss', 'oceanbase', 'goldendb', 'tidb', 'gbase8s'] },
   { key: 'other', products: ['mysql', 'mariadb', 'postgres', 'oracle', 'sqlserver', 'sqlite'] },
 ]
+
+/** 列表里对应的入口：OceanBase 的 Oracle 模式租户归在 OceanBase 下。 */
+export function listedProduct(id: ProductId): ProductId {
+  return id === 'oceanbase_oracle' ? 'oceanbase' : id
+}
 
 export function product(id: ProductId): Product {
   return PRODUCTS.find((p) => p.id === id) ?? PRODUCTS[0]

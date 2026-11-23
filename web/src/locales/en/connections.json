@@ -46,7 +46,7 @@
     },
     "oceanbase": {
       "label": "OceanBase",
-      "note": "MySQL mode; user name is user@tenant (e.g. root@sys); through OBProxy the port is usually 2883"
+      "note": "Use this for both MySQL-mode and Oracle-mode tenants; the mode is detected on connect (Oracle mode goes through the official JDBC driver). Write the user as user@tenant (e.g. root@sys); through OBProxy the port is usually 2883"
     },
     "oceanbase_oracle": {
       "label": "OceanBase (Oracle mode)",
@@ -153,6 +153,10 @@
     "savePassword": "Save password",
     "oracleServicePlaceholder": "FREEPDB1; to connect by SID, set it under Advanced",
     "optional": "Optional",
+    "databasesLoading": "Reading databases…",
+    "databasesFailed": "Could not list databases: {{error}}",
+    "databasesEmpty": "No databases to pick; type a name instead",
+    "databasePickPlaceholder": "Optional; open the list to read it from the server",
     "environment": "Environment",
     "prodHint": "Production connection: tabs are marked red; UPDATE/DELETE without WHERE, DROP and TRUNCATE require confirmation"
   },
@@ -225,5 +229,8 @@
     "hint": "These do not change the connection; they only control what AI can see.",
     "samplesProdTitle": "Send sample rows from a production connection?",
     "samplesProdContent": "Comment inference will send the first 5 rows of each table (values cut to 50 characters) to the AI provider. Make sure this data may leave."
+  },
+  "oceanbase": {
+    "databaseOrSchema": "Database / schema"
   }
 }

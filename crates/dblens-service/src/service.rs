@@ -174,6 +174,22 @@ impl Service {
         self.registry.test_connection(&p, password.to_string()).await
     }
 
+    /// 新建/编辑连接时"数据库"下拉的候选：用（可能尚未保存的）连接配置临时连一次列出。
+    /// 编辑已有连接、密码框留空（表示沿用原密码）时，`existing` 给出它的 id，用保存的密码。
+    pub async fn list_databases(
+        &self,
+        input: ProfileInput,
+        password: &str,
+        existing: Option<&str>,
+    ) -> Result<Vec<String>> {
+        let password = match existing {
+            Some(id) if password.is_empty() => self.password(id).await?,
+            _ => password.to_string(),
+        };
+        let p = Profile { id: String::new(), input, variant: None };
+        self.registry.list_databases(&p, password).await
+    }
+
     /// 连接可用的运维查询（M1c3）：按上次连接时识别出的变体选模板，没连接过时按驱动。不需要连接数据库。
     pub fn ops(&self, profile_id: &str) -> Result<&'static [OpsQuery]> {
         let p = self.profile(profile_id)?;

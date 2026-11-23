@@ -274,11 +274,30 @@ impl DriverRegistry {
         profile: &Profile,
         password: String,
     ) -> Result<(Box<dyn Connection>, Dialect, Option<String>)> {
-        let params = self.connect_params(profile, password)?;
-        let driver = self.driver_for(profile)?;
-        let mut conn = driver.connect(&params).await?;
+        let (mut conn, driver_id, switched) = match self.open(profile, password.clone()).await {
+            Ok((conn, id)) => (conn, id, None),
+            Err(e) => match oceanbase_oracle_tenant(profile, &e) {
+                Some(p) => {
+                    let (conn, id) = self.open(&p, password).await?;
+                    (conn, id, Some(p))
+                }
+                None => return Err(e),
+            },
+        };
+        // 改走 Oracle 方式连上了：已保存的连接写回新配置，下次直接这样连；界面重新取连接列表后按 Oracle 显示
+        if let Some(p) = &switched
+            && !profile.id.is_empty()
+        {
+            match self.store.update_profile(&profile.id, p.input.clone()) {
+                Ok(_) => {
+                    tracing::info!("连接 {} 是 OceanBase 的 Oracle 模式租户，已改为经 JDBC 连接", profile.id)
+                }
+                Err(e) => tracing::warn!("连接 {} 改为 OceanBase Oracle 模式时保存失败：{e}", profile.id),
+            }
+        }
+        let profile = switched.as_ref().unwrap_or(profile);
         let info = conn.server_info().await?;
-        let mut dialect = Dialect::detect(driver.id(), &info);
+        let mut dialect = Dialect::detect(driver_id, &info);
         let mut mode = None;
         if let Some(q) = dialect.meta_query(MetaKey::VariantProbe, &MetaArgs::default())? {
             // 探测失败不挡连接，按原生模式处理：达梦的低权限账号没有读 INI 参数的权限
@@ -304,6 +323,13 @@ impl DriverRegistry {
         Ok((conn, dialect, mode))
     }
 
+    /// 按连接配置选驱动、建立连接（不识别方言）。
+    async fn open(&self, profile: &Profile, password: String) -> Result<(Box<dyn Connection>, DriverId)> {
+        let params = self.connect_params(profile, password)?;
+        let driver = self.driver_for(profile)?;
+        Ok((driver.connect(&params).await?, driver.id()))
+    }
+
     /// 测试连接：连上、读出服务器信息后立即断开。
     pub async fn test_connection(&self, profile: &Profile, password: String) -> Result<ServerSummary> {
         let (mut conn, dialect, mode) = self.connect_probed(profile, password).await?;
@@ -322,6 +348,62 @@ impl DriverRegistry {
     }
 }
 
+/// OceanBase 只有一个入口，先按 MySQL 连。Oracle 模式租户不接受原生 MySQL 客户端，返回 1235
+/// （"Oracle tenant for current client driver is not supported"）：这时改用官方 JDBC 驱动、按 Oracle 方式连，
+/// 见 docs/notes/oceanbase-oracle.md。返回改好的连接配置；不是这种情况时为 None。
+fn oceanbase_oracle_tenant(profile: &Profile, err: &Error) -> Option<Profile> {
+    let i = &profile.input;
+    let oracle_tenant = matches!(err, Error::Sql { code, .. } if code == "1235");
+    if !oracle_tenant || i.driver != DriverId::Mysql || i.product != Some(Variant::OceanBase) {
+        return None;
+    }
+    let mut p = profile.clone();
+    p.input.driver = DriverId::Oracle;
+    p.input.product = Some(Variant::OceanBaseOracle);
+    // MySQL 的 TLS 选项对 JDBC 桥接无效，去掉免得混淆
+    p.input.options.retain(|k, _| !k.starts_with("tls"));
+    p.input.options.insert("client".into(), "jdbc".into());
+    p.input.options.insert("jdbc_kind".into(), "oceanbase".into());
+    p.variant = None;
+    Some(p)
+}
+
+/// 列出服务器上的数据库所用的语句。只有"一个连接下有多个库、要选一个连"的驱动有：
+/// MySQL 系（库即 schema）、PG 系、SQL Server。Oracle 填的是服务名，达梦一个实例一个库，SQLite 是文件，都不列。
+fn databases_sql(driver: DriverId) -> Option<&'static str> {
+    match driver {
+        DriverId::Mysql => {
+            Some("SELECT SCHEMA_NAME AS name FROM information_schema.SCHEMATA ORDER BY SCHEMA_NAME")
+        }
+        DriverId::Postgres => Some(
+            "SELECT datname AS name FROM pg_catalog.pg_database WHERE datallowconn AND NOT datistemplate ORDER BY datname",
+        ),
+        DriverId::SqlServer => {
+            Some("SELECT name FROM sys.databases WHERE HAS_DBACCESS(name) = 1 ORDER BY name")
+        }
+        _ => None,
+    }
+}
+
+impl DriverRegistry {
+    /// 新建连接时的"数据库"下拉：用（可能尚未保存的）连接配置临时连一次，列出能连的库，随即断开。
+    /// 不支持的驱动返回空列表。
+    pub async fn list_databases(&self, profile: &Profile, password: String) -> Result<Vec<String>> {
+        let Some(sql) = databases_sql(profile.input.driver) else { return Ok(vec![]) };
+        let (mut conn, dialect, _) = self.connect_probed(profile, password).await?;
+        // OceanBase 连上的是 Oracle 模式租户（已改走 JDBC）：这一栏填的是模式名，不列库
+        if dialect.variant() == Variant::OceanBaseOracle {
+            conn.close().await?;
+            return Ok(vec![]);
+        }
+        let rows = probe(conn.as_mut(), sql, &[]).await;
+        conn.close().await?;
+        let rows = rows?;
+        rows.require("databases", &["name"])?;
+        Ok(rows.iter().filter_map(|r| r.text("name")).collect())
+    }
+}
+
 /// 执行兼容模式探测查询，取回全部行。
 async fn probe(conn: &mut dyn Connection, sql: &str, params: &[dblens_core::Value]) -> Result<MetaRows> {
     let mut stream = conn.execute(sql, params).await?;
@@ -332,6 +414,59 @@ async fn probe(conn: &mut dyn Connection, sql: &str, params: &[dblens_core::Valu
 mod tests {
     use super::*;
     use crate::profile::tests::input;
+
+    fn oceanbase(tls: bool) -> Profile {
+        let mut input = input("ob");
+        input.driver = DriverId::Mysql;
+        input.product = Some(Variant::OceanBase);
+        input.options.clear();
+        if tls {
+            input.options.insert("tls".into(), "require".into());
+        }
+        Profile { id: "p1".into(), input, variant: Some(Variant::OceanBase) }
+    }
+
+    fn sql_error(code: &str) -> Error {
+        Error::Sql { code: code.into(), message: "x".into(), position: None }
+    }
+
+    #[test]
+    fn oceanbase_oracle_tenant_switches_to_jdbc() {
+        let p = oceanbase_oracle_tenant(&oceanbase(true), &sql_error("1235")).unwrap();
+        assert_eq!(p.input.driver, DriverId::Oracle);
+        assert_eq!(p.input.product, Some(Variant::OceanBaseOracle));
+        assert_eq!(p.input.options.get("client").map(String::as_str), Some("jdbc"));
+        assert_eq!(p.input.options.get("jdbc_kind").map(String::as_str), Some("oceanbase"));
+        assert!(!p.input.options.contains_key("tls"), "MySQL 的 TLS 选项去掉");
+        assert_eq!(p.variant, None);
+        assert_eq!((p.id.as_str(), p.input.host.as_str(), p.input.user.as_str()), ("p1", "db.local", "app"));
+    }
+
+    #[test]
+    fn other_errors_and_products_do_not_switch() {
+        assert!(oceanbase_oracle_tenant(&oceanbase(false), &sql_error("1045")).is_none());
+        assert!(oceanbase_oracle_tenant(&oceanbase(false), &Error::Timeout).is_none());
+        let mut mysql = oceanbase(false);
+        mysql.input.product = None;
+        assert!(oceanbase_oracle_tenant(&mysql, &sql_error("1235")).is_none(), "只认选了 OceanBase 的连接");
+        let mut tidb = oceanbase(false);
+        tidb.input.product = Some(Variant::TiDb);
+        assert!(oceanbase_oracle_tenant(&tidb, &sql_error("1235")).is_none());
+    }
+
+    #[test]
+    fn databases_listed_only_where_a_connection_picks_one_database() {
+        for d in [DriverId::Mysql, DriverId::Postgres, DriverId::SqlServer] {
+            assert!(
+                databases_sql(d)
+                    .is_some_and(|sql| sql.contains(" AS name") || sql.starts_with("SELECT name")),
+                "{d:?}"
+            );
+        }
+        for d in [DriverId::Oracle, DriverId::Dameng, DriverId::Informix, DriverId::Sqlite] {
+            assert!(databases_sql(d).is_none(), "{d:?}");
+        }
+    }
 
     fn registry() -> (tempfile::TempDir, DriverRegistry) {
         (tempfile::tempdir().unwrap(), DriverRegistry::new(Arc::new(Store::open_in_memory().unwrap())))
