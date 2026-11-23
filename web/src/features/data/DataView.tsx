@@ -34,6 +34,7 @@ import ChangePreview from './ChangePreview'
 import { countRows } from './count'
 import { type Pending, addRows, buildChanges, changeCount, deleteRows, emptyEdit, hasErrors, undoRow } from './edit'
 import EditableGrid from './EditableGrid'
+import { buildComments } from '../results/headerComment'
 import { editInfo } from './editable'
 import { useEdits } from './editStore'
 import { nextOrder } from './sort'
@@ -63,6 +64,8 @@ export default function DataView({ tab, profiles }: { tab: QueryTab; profiles: P
     () => (table && result ? editInfo(result.columns.map((c) => c.name), table) : null),
     [table, result?.columns],
   )
+  // 列注释（悬停列头显示）：直接用表信息里的
+  const comments = useMemo(() => (table ? buildComments(table.columns) : undefined), [table])
   const readOnly = !isTable || !info?.key
   const readOnlyReason = !isTable ? t('editor.data.edit.viewReadOnly') : info && !info.key ? t('editor.data.edit.noKey') : null
   // 人大金仓、openGauss 的 Oracle 兼容模式：空串存进去就是 NULL
@@ -326,6 +329,7 @@ export default function DataView({ tab, profiles }: { tab: QueryTab; profiles: P
                     onEdit={setEdit}
                     failedRow={failedRow}
                     onSelectRows={setSelectedRows}
+                    comments={comments}
                   />
                 )
               : undefined

@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { type CellValue, type ResultSet, cellText } from '../../shared/exec'
 import { columnWidth, useGridTheme } from '../results/ResultGrid'
 import { isNumeric } from '../results/cell'
+import { type ColumnComments, useHeaderComment } from '../results/headerComment'
 import { useNumericHeader } from '../results/numericHeader'
 import { shouldFetchMore } from '../results/results'
 import { type EditState, type Pending, deleteRows, paste, setCell, undoCell, undoRow } from './edit'
@@ -42,6 +43,8 @@ export interface EditableGridProps {
   failedRow: number | null
   /** 表格中选中的行（删除、复制行用）。 */
   onSelectRows(rows: number[]): void
+  /** 列注释，悬停列头时显示。 */
+  comments?: ColumnComments
 }
 
 const emptySelection: GridSelection = { columns: CompactSelection.empty(), rows: CompactSelection.empty() }
@@ -52,11 +55,12 @@ function truncated(v: CellValue | undefined): boolean {
 }
 
 export default function EditableGrid(props: EditableGridProps) {
-  const { result, waiting, onFetchMore, sort, onSort, columns, readOnly, edit, onEdit, failedRow, onSelectRows } = props
+  const { result, waiting, onFetchMore, sort, onSort, columns, readOnly, edit, onEdit, failedRow, onSelectRows, comments } = props
   const { t } = useTranslation()
   const { message } = App.useApp()
   const theme = useGridTheme()
   const drawHeader = useNumericHeader(result)
+  const headerTip = useHeaderComment(result.columns, comments)
   const [selection, setSelection] = useState<GridSelection>(emptySelection)
   const [menu, setMenu] = useState<{ x: number; y: number; cell: Item } | null>(null)
   const loaded = result.rows.length
@@ -196,6 +200,7 @@ export default function EditableGrid(props: EditableGridProps) {
         }}
         rowMarkers="both"
         drawHeader={drawHeader}
+        onItemHovered={headerTip.onItemHovered}
         smoothScrollX
         smoothScrollY
         rowHeight={28}
@@ -212,6 +217,7 @@ export default function EditableGrid(props: EditableGridProps) {
       >
         <span style={{ position: 'fixed', left: menu?.x ?? 0, top: menu?.y ?? 0, width: 1, height: 1 }} />
       </Dropdown>
+      {headerTip.tip}
     </>
   )
 }

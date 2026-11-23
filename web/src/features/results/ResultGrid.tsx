@@ -21,6 +21,7 @@ import { useSetting } from '../../shared/settings'
 import { THEME_KEY, useSystemDark } from '../../shared/theme'
 import CellViewer, { type ViewedCell } from './CellViewer'
 import { isNumeric } from './cell'
+import { type ColumnComments, useHeaderComment } from './headerComment'
 import { useNumericHeader } from './numericHeader'
 import { shouldFetchMore } from './results'
 
@@ -85,9 +86,11 @@ export interface ResultGridProps {
   onSort?(column: string): void
   /** 递增时按全部已加载的行自适应列宽。 */
   fitKey?: number
+  /** 列注释，悬停列头时显示。 */
+  comments?: ColumnComments
 }
 
-export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort, fitKey = 0 }: ResultGridProps) {
+export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort, fitKey = 0, comments }: ResultGridProps) {
   const theme = useGridTheme()
   const [viewed, setViewed] = useState<ViewedCell | null>(null)
   // 列宽在列信息和第一批行到达时估计，续取的行不影响
@@ -108,6 +111,7 @@ export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort,
   )
   const muted = useMemo(() => ({ textDark: theme.textLight }), [theme])
   const drawHeader = useNumericHeader(result)
+  const headerTip = useHeaderComment(result.columns, comments)
 
   const getCellContent = ([col, row]: Item): GridCell => {
     const c = result.rows[view[row]]?.[col] ?? { t: 'null' }
@@ -145,6 +149,7 @@ export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort,
         }
         rowMarkers="number"
         drawHeader={drawHeader}
+        onItemHovered={headerTip.onItemHovered}
         smoothScrollX
         smoothScrollY
         rowHeight={28}
@@ -154,6 +159,7 @@ export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort,
         height="100%"
       />
       <CellViewer cell={viewed} onClose={() => setViewed(null)} />
+      {headerTip.tip}
     </>
   )
 }

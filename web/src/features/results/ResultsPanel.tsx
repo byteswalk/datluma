@@ -12,6 +12,7 @@ import { useAiEnabled } from '../ai/store'
 import type { TabRuntime } from '../editor/runner'
 import type { Order } from '../data/sort'
 import ResultGrid from './ResultGrid'
+import type { ColumnComments } from './headerComment'
 import { type ResultTab, messageLines, resultTabs } from './results'
 
 export interface ResultsPanelProps {
@@ -24,6 +25,8 @@ export interface ResultsPanelProps {
   onExport?(stmt: number): void
   /** 自己画结果集（数据标签的可编辑表格，M2a）；不给时用只读的结果表格。 */
   renderResult?(result: ResultSet, waiting: boolean): ReactNode
+  /** 第 `stmt` 条语句结果的列注释，悬停列头时显示。 */
+  commentsFor?(stmt: number): ColumnComments | undefined
   /** AI 修复第 `stmt` 条失败的语句；不给或未启用 AI 时不显示。 */
   onAiFix?(stmt: number): void
   /** AI 分析第 `stmt` 条语句的执行计划。 */
@@ -52,6 +55,7 @@ export default function ResultsPanel({
   renderResult,
   onAiFix,
   onAiPlan,
+  commentsFor,
 }: ResultsPanelProps) {
   const ai = useAiEnabled()
   const { t } = useTranslation()
@@ -146,6 +150,7 @@ export default function ResultsPanel({
             sort={sort}
             onSort={onSort}
             fitKey={fitKey}
+            comments={explain ? undefined : commentsFor?.(current.stmt)}
           />
         )}
         {current.kind === 'error' && (

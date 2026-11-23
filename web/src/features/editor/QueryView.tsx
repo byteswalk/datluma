@@ -31,6 +31,8 @@ import { monaco } from './monaco'
 import SqlEditor, { type MonacoEditor } from './SqlEditor'
 import { type QueryTab, takeRun, useTabs } from './tabs'
 import { watermarkImage } from '../../shared/watermark'
+import type { ColumnComments } from '../results/headerComment'
+import { statementComments } from '../results/statementComments'
 
 /** 会改变对象结构的语句（按首个关键字）。 */
 const DDL = new Set(['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE', 'COMMENT'])
@@ -254,6 +256,31 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
         : null,
     [profile, meta, rt.session?.variant, rt.session?.compat, rt.session?.schema],
   )
+  // 结果的列注释（悬停列头显示）：每条有结果集的语句各查一次，结果到达后在后台算，不影响执行
+  const [comments, setComments] = useState<Map<number, ColumnComments>>(new Map())
+  const withResults = rt.exec.statements.map((s, i) => (s.results.length > 0 ? i : -1)).filter((i) => i >= 0)
+  const commentKey = `${rt.source.length}:${withResults.join(',')}`
+  // 补全的元数据最多等 1.5 秒、超时当作空；注释不急，多等一会儿（刚建的表、刚刷新的缓存第一次取会慢）
+  const slowMeta = useMemo(
+    () => (profile ? metaReader(qc, api, profile.id, profile.driver, catalog, 10_000) : null),
+    [qc, api, profile?.id, profile?.driver, catalog],
+  )
+  useEffect(() => {
+    if (!sql || !slowMeta || withResults.length === 0) return
+    let live = true
+    const statements = rt.exec.statements
+    const ctx = { ...sql, meta: slowMeta }
+    void Promise.all(
+      withResults.map(async (i) => [i, await statementComments(rt.source.slice(statements[i].start, statements[i].end), ctx)] as const),
+    ).then((entries) => {
+      if (live) setComments(new Map(entries))
+    })
+    return () => {
+      live = false
+    }
+    // 只在执行的语句或出结果的语句变化时重算；连接上下文换了（换连接、换 schema）也重算
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commentKey, sql, slowMeta])
   const confirm = !rt.running && !rt.declined ? rt.exec.confirm : null
   const sub = rt.submission
 
@@ -342,6 +369,7 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
           <ResultsPanel
             rt={rt}
             onFetchMore={() => runner.fetchMore()}
+            commentsFor={(i) => comments.get(i)}
             onExport={(i) => {
               // 导出这条语句的原文（取自执行时的全文）
               const s = rt.exec.statements[i]
