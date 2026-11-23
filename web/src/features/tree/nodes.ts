@@ -114,6 +114,21 @@ export function decodeKey(s: string): NodeKey {
   }
 }
 
+/**
+ * 树里（含下层）有没有对象或列节点：过滤时连接本身不匹配，就看它已展开的对象里有没有匹配的，没有就整个隐藏。
+ * 出错提示等不是对象的节点（键里带 ）不算。
+ */
+export function hasObject(nodes: readonly { key: unknown; children?: readonly unknown[] }[] | undefined): boolean {
+  return (nodes ?? []).some((n) => {
+    const key = String(n.key)
+    if (!key.includes('')) {
+      const type = decodeKey(key).type
+      if (type === 'o' || type === 'l') return true
+    }
+    return hasObject(n.children as { key: unknown; children?: readonly unknown[] }[] | undefined)
+  })
+}
+
 /** 过滤：名称或注释包含关键字（不区分大小写）。空关键字全部保留。 */
 export function matches(filter: string, name: string, comment?: string | null): boolean {
   const f = filter.trim().toLowerCase()

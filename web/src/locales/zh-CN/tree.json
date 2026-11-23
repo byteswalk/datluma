@@ -82,5 +82,10 @@
     "copy": "复制",
     "openInTab": "在新标签中打开",
     "close": "关闭"
+  },
+  "envFilter": {
+    "all": "全部环境",
+    "none": "未选环境",
+    "selectAll": "全选"
   }
 }

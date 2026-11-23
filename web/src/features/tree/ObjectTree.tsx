@@ -38,6 +38,7 @@ import { emptyPlan } from '../migrate/plan'
 import { useModelDialogs } from '../model/dialogs'
 import {
   type Api,
+  type Environment,
   type Profile,
   type RoutineInfo,
   exportSource,
@@ -50,7 +51,8 @@ import EnvTag from '../../shared/EnvTag'
 import { profileKind } from '../connections/form'
 import { withVault } from '../connections/vault'
 import { metaKey } from '../sql/metadata'
-import ConnName from './ConnName'
+import ConnName, { connHost, connKind } from './ConnName'
+import EnvFilter, { ALL_ENVS } from './EnvFilter'
 import type { DdlTarget } from './DdlDialog'
 import {
   type CategoryKind,
@@ -59,6 +61,7 @@ import {
   categoryLabel,
   decodeKey,
   encodeKey,
+  hasObject,
   isWithin,
   matches,
   qualifiedName,
@@ -185,6 +188,7 @@ export default function ObjectTree() {
   const [loaded, setLoaded] = useState<Record<string, Loaded>>({})
   const [expanded, setExpanded] = useState<Key[]>([])
   const [filter, setFilter] = useState('')
+  const [envs, setEnvs] = useState<Environment[]>(ALL_ENVS)
   const [menuNode, setMenuNode] = useState<NodeKey | null>(null)
   const [ddl, setDdl] = useState<DdlTarget | null>(null)
 
@@ -247,7 +251,8 @@ export default function ObjectTree() {
   }, [treeRefresh])
 
   const treeData = useMemo<DataNode[]>(() => {
-    const build = (parent: string, depth: number): DataNode[] | undefined => {
+    // filterObjects：按过滤词筛已加载的对象（表、视图……）；连接本身匹配时不筛，显示它下面的全部内容
+    const build = (parent: string, depth: number, filterObjects: boolean): DataNode[] | undefined => {
       const l = loaded[parent]
       if (!l) return undefined
       if (l.error) {
@@ -255,7 +260,7 @@ export default function ObjectTree() {
       }
       const items = l.items.filter((i) => {
         const type = decodeKey(i.key).type
-        return (type !== 'o' && type !== 'l') || matches(filter, i.label, i.comment)
+        return !filterObjects || (type !== 'o' && type !== 'l') || matches(filter, i.label, i.comment)
       })
       return items.map((i) => {
         const k = decodeKey(i.key)
@@ -276,14 +281,20 @@ export default function ObjectTree() {
               {i.comment && <span className="cm">{i.comment}</span>}
             </span>
           ),
-          children: build(i.key, depth + 1),
+          children: build(i.key, depth + 1, filterObjects),
         }
       })
     }
-    return profiles.map((p) => {
+    const text = filter.trim()
+    // 过滤词先对连接（名称、地址、数据库类型）；连接不匹配时，看已展开的对象里有没有匹配的，有就保留连接、只显示匹配的对象
+    return profiles.flatMap((p) => {
       const key = encodeKey({ type: 'c', profileId: p.id })
       const env = p.environment ?? 'none'
-      return {
+      if (!envs.includes(env)) return []
+      const self = !text || matches(text, p.name, `${connHost(p)} ${connKind(p)}`)
+      const children = build(key, 1, !self)
+      if (!self && !hasObject(children)) return []
+      return [{
         key,
         isLeaf: false,
         className: 'conn-node',
@@ -296,10 +307,10 @@ export default function ObjectTree() {
             <EnvTag env={env} />
           </span>
         ),
-        children: build(key, 1),
-      }
+        children,
+      }]
     })
-  }, [profiles, loaded, filter, t])
+  }, [profiles, loaded, filter, envs, t])
 
   const menuItems: MenuProps['items'] =
     menuNode?.type === 'c'
@@ -463,7 +474,7 @@ export default function ObjectTree() {
 
   return (
     <div className="tree" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ padding: 6 }}>
+      <div className="row" style={{ padding: 6, gap: 6 }}>
         <Input
           size="small"
           allowClear
@@ -472,6 +483,7 @@ export default function ObjectTree() {
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
+        <EnvFilter value={envs} onChange={setEnvs} />
       </div>
       {profilesError && <div className="err" style={{ padding: 8 }}>{(profilesError as Error).message}</div>}
       <Dropdown trigger={['contextMenu']} menu={{ items: shownItems, onClick: (e) => onMenu(e.key) }}>

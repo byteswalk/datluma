@@ -1447,3 +1447,25 @@ body {
   z-index: 1;
   background-repeat: repeat;
 }
+/* 对象树的环境过滤（tree/EnvFilter）：跟主题的黑白基调，框里只放一句概括，不画标签块；
+   下拉里选中项不铺底色、只打勾，悬停用主题的悬停色 */
+.tree .env-filter.ant-select .ant-select-selection-item {
+  background: transparent;
+  border: 0;
+  margin: 0;
+  padding-inline: 0;
+  color: var(--text);
+}
+/* 选择器加长是为了压过 antd 运行时注入的同级样式 */
+.ant-select-dropdown.env-filter-popup .ant-select-item-option-selected:not(.ant-select-item-option-disabled) {
+  background: transparent;
+  color: var(--text);
+  font-weight: 400;
+}
+.ant-select-dropdown.env-filter-popup .ant-select-item-option-active:not(.ant-select-item-option-disabled),
+.ant-select-dropdown.env-filter-popup .ant-select-item-option-selected.ant-select-item-option-active:not(.ant-select-item-option-disabled) {
+  background: var(--hover);
+}
+.ant-select-dropdown.env-filter-popup .ant-select-item-option-state {
+  color: var(--text-2);
+}

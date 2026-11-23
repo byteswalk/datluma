@@ -8,6 +8,7 @@ import {
   categoryLabel,
   decodeKey,
   encodeKey,
+  hasObject,
   isWithin,
   matches,
   qualifiedName,
@@ -113,5 +114,22 @@ describe('对象树节点', () => {
 describe('GBase 8s', () => {
   it('分类与 SQL Server 相同，没有物化视图', () => {
     expect(categoriesFor('informix').map((c) => c.kind)).toEqual(['tables', 'views', 'routines', 'sequences', 'synonyms'])
+  })
+})
+
+describe('对象树过滤：连接下有没有匹配的对象', () => {
+  const conn = encodeKey({ type: 'c', profileId: 'p' })
+  const schema = encodeKey({ type: 's', profileId: 'p', schema: 'public' })
+  const folder = encodeKey({ type: 'k', profileId: 'p', schema: 'public', kind: 'tables' })
+  const table = encodeKey({ type: 'o', profileId: 'p', schema: 'public', kind: 'tables', name: 'orders' })
+
+  it('下层有表、视图等对象时算有', () => {
+    expect(hasObject([{ key: schema, children: [{ key: folder, children: [{ key: table }] }] }])).toBe(true)
+  })
+
+  it('只有 schema、分类文件夹，或只有出错提示时算没有', () => {
+    expect(hasObject([{ key: schema, children: [{ key: folder, children: [] }] }])).toBe(false)
+    expect(hasObject([{ key: `${conn}err` }])).toBe(false)
+    expect(hasObject(undefined)).toBe(false)
   })
 })
