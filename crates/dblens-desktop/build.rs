@@ -4,6 +4,7 @@ fn main() {
         "shell_info",
         "window_action",
         "set_auto_check_update",
+        "set_title",
         "save_dialog",
         "open_dialog",
         "folder_dialog",

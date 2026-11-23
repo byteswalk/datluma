@@ -112,6 +112,8 @@ export default function Toolbar({ tab, rt, runner, profiles, refresh, onRefreshC
         onChange={switchProfile}
         disabled={rt.running}
         popupMatchSelectWidth={false}
+        // 选中后只显示连接名：环境已由标签、标题栏和状态栏的底色表明；下拉列表里仍带环境标签，选连接时看得清
+        labelRender={({ value }) => profiles.find((p) => p.id === value)?.name ?? value}
         options={profiles.map((p) => ({
           value: p.id,
           label: (

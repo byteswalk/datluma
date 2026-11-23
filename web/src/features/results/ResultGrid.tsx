@@ -21,6 +21,7 @@ import { useSetting } from '../../shared/settings'
 import { THEME_KEY, useSystemDark } from '../../shared/theme'
 import CellViewer, { type ViewedCell } from './CellViewer'
 import { isNumeric } from './cell'
+import { useNumericHeader } from './numericHeader'
 import { shouldFetchMore } from './results'
 
 /** 按列名和前几行的内容估计列宽。 */
@@ -106,6 +107,7 @@ export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort,
     [result.columns, hasRows, order, widths],
   )
   const muted = useMemo(() => ({ textDark: theme.textLight }), [theme])
+  const drawHeader = useNumericHeader(result)
 
   const getCellContent = ([col, row]: Item): GridCell => {
     const c = result.rows[view[row]]?.[col] ?? { t: 'null' }
@@ -142,6 +144,7 @@ export default function ResultGrid({ result, waiting, onFetchMore, sort, onSort,
           setViewed({ column: result.columns[col].name, row: view[row] + 1, value: result.rows[view[row]][col] })
         }
         rowMarkers="number"
+        drawHeader={drawHeader}
         smoothScrollX
         smoothScrollY
         rowHeight={28}

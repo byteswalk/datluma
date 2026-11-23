@@ -39,6 +39,8 @@ export interface DesktopShell {
   info(): Promise<ShellInfo>
   action(a: WindowAction): Promise<void>
   setAutoCheckUpdate(on: boolean): Promise<void>
+  /** 原生窗口标题（任务栏、Alt+Tab 里显示的）。 */
+  setTitle(title: string): Promise<void>
   /** 订阅状态变化，返回取消订阅的函数。 */
   onChange(cb: (info: ShellInfo) => void): Promise<() => void>
   /** 系统"另存为"对话框；用户取消时为 null。 */
@@ -63,6 +65,7 @@ function createDesktopShell(): DesktopShell {
     info: () => invoke<ShellInfo>('shell_info'),
     action: (action) => invoke('window_action', { action }),
     setAutoCheckUpdate: (on) => invoke('set_auto_check_update', { on }),
+    setTitle: (title) => invoke('set_title', { title }),
     onChange: async (cb) => listen<ShellInfo>(SHELL_EVENT, (e) => cb(e.payload)),
     saveDialog: (defaultName, filters) => invoke<string | null>('save_dialog', { defaultName, filters }),
     revealInFolder: (path) => invoke('reveal_in_folder', { path }),

@@ -104,6 +104,13 @@ pub fn window_action(app: AppHandle, action: WindowAction) -> Result<(), String>
     result.map_err(|e| e.to_string())
 }
 
+/// 原生窗口标题（任务栏、Alt+Tab 里显示的）跟页面标题保持一致，生产连接时带"【生产】"前缀。
+#[tauri::command]
+pub fn set_title(app: AppHandle, title: String) -> Result<(), String> {
+    let win = app.get_webview_window(window::MAIN).ok_or_else(|| msg!("desktop.no_main_window").current())?;
+    win.set_title(&title).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn set_auto_check_update(app: AppHandle, on: bool) {
     update::set_auto_check(&app, on);

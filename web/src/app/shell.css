@@ -106,8 +106,9 @@
   --scroll-hover: #c9aeb9;
   --bg: #f7eff2;
   --bar: #f7eff2;
-  --panel: #ffffff;
-  --panel-2: #fbf6f7;
+  /* 内容区（编辑器、表格、设计器）也带一点粉，比侧栏浅一档；和 monaco.ts 的 dblens-rose 编辑器底色一致 */
+  --panel: #fdf8fa;
+  --panel-2: #f9f1f4;
   --mark: #a84a70;
   --hover: #f5e8ed;
   --sel: #f6e0e9;
@@ -465,6 +466,49 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* 对象树不铺自己的底色，和侧栏同色（否则只铺到内容高度，下面一截颜色不同） */
+.tree .ant-tree {
+  background: transparent;
+}
+/* 连接节点单行：图标、连接名，环境标签靠右（不用 :has()，老内核不支持）；类型和地址在连接名的悬停提示里 */
+.tree .conn-node .ant-tree-node-content-wrapper {
+  padding-right: 0;
+}
+.tree .conn-node .ant-tree-title {
+  display: block;
+  min-width: 0;
+}
+.tree .conn-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+/* flex 里图标和名称之间的空格不起作用，用外边距 */
+.tree .conn-title > :first-child {
+  flex: none;
+  margin-right: 4px;
+}
+.tree .conn-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-right: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tree .conn-title .env-tag {
+  flex: none;
+  margin-left: auto;
+}
+/* 连接名和环境标签的文字同色 */
+.tree .conn-name.dev {
+  color: var(--env-dev);
+}
+.tree .conn-name.test {
+  color: var(--warn);
+}
+.tree .conn-name.prod {
+  color: var(--danger);
+}
 .product-group {
   font-size: var(--fs-xs);
   color: var(--muted);
@@ -645,16 +689,29 @@ body {
   background: var(--hover);
   color: var(--text);
 }
+/* 标签底色跟状态栏一致：开发浅绿、测试浅黄、生产浅红、未设环境浅灰。
+   顶部的线只给当前标签，颜色跟着环境；没选中的标签只靠底色区分 */
 .tab.dev {
-  border-top-color: var(--env-dev);
+  background: var(--ok-bg);
 }
 .tab.test {
-  border-top-color: var(--env-test);
+  background: var(--warn-bg);
+}
+.tab.none {
+  background: var(--bar);
 }
 .tab.prod {
-  border-top-color: var(--env-prod);
   background: var(--danger-bg);
   color: var(--danger);
+}
+.tab.on.dev {
+  border-top-color: var(--env-dev);
+}
+.tab.on.test {
+  border-top-color: var(--env-test);
+}
+.tab.on.prod {
+  border-top-color: var(--env-prod);
 }
 .tab.add {
   flex: none;
@@ -1356,4 +1413,37 @@ body {
 }
 .no-flex-gap .ant-btn > .ant-btn-icon + span {
   margin-left: 6px;
+}
+
+/* 状态栏按当前连接的环境换底色：生产浅红、测试浅黄、开发浅绿，未设环境和没有连接时是默认的浅灰 */
+.statusbar.env-prod {
+  background: var(--danger-bg);
+}
+.statusbar.env-test {
+  background: var(--warn-bg);
+}
+.statusbar.env-dev {
+  background: var(--ok-bg);
+}
+/* 标题栏和状态栏同色，规则见上面的 .statusbar.env-* */
+.titlebar.env-prod {
+  background: var(--danger-bg);
+}
+.titlebar.env-test {
+  background: var(--warn-bg);
+}
+.titlebar.env-dev {
+  background: var(--ok-bg);
+}
+/* 生产连接的编辑区：铺满斜向的淡色水印（图片由 shared/watermark.ts 生成），不挡鼠标 */
+.editor-wrap {
+  position: relative;
+  height: 100%;
+}
+.prod-watermark {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-repeat: repeat;
 }

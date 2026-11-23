@@ -30,6 +30,6 @@ monaco.editor.defineTheme('dblens-slate', {
   rules: [],
   colors: { 'editor.background': '#172029' },
 })
-monaco.editor.defineTheme('dblens-rose', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff' } })
+monaco.editor.defineTheme('dblens-rose', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#fdf8fa' } })
 
 export { monaco }

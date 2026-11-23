@@ -76,6 +76,7 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
             shell::shell_info,
             shell::window_action,
             shell::set_auto_check_update,
+            shell::set_title,
             shell::save_dialog,
             shell::open_dialog,
             shell::folder_dialog,

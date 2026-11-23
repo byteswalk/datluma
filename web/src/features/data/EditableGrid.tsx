@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { type CellValue, type ResultSet, cellText } from '../../shared/exec'
 import { columnWidth, useGridTheme } from '../results/ResultGrid'
 import { isNumeric } from '../results/cell'
+import { useNumericHeader } from '../results/numericHeader'
 import { shouldFetchMore } from '../results/results'
 import { type EditState, type Pending, deleteRows, paste, setCell, undoCell, undoRow } from './edit'
 import type { EditColumn } from './editable'
@@ -55,6 +56,7 @@ export default function EditableGrid(props: EditableGridProps) {
   const { t } = useTranslation()
   const { message } = App.useApp()
   const theme = useGridTheme()
+  const drawHeader = useNumericHeader(result)
   const [selection, setSelection] = useState<GridSelection>(emptySelection)
   const [menu, setMenu] = useState<{ x: number; y: number; cell: Item } | null>(null)
   const loaded = result.rows.length
@@ -193,6 +195,7 @@ export default function EditableGrid(props: EditableGridProps) {
           setMenu({ x: e.bounds.x + e.localEventX, y: e.bounds.y + e.localEventY, cell })
         }}
         rowMarkers="both"
+        drawHeader={drawHeader}
         smoothScrollX
         smoothScrollY
         rowHeight={28}

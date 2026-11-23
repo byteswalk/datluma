@@ -50,6 +50,7 @@
     "cancel": "取消"
   },
   "query": {
+    "prodWatermark": "生产环境 · {{name}}",
     "profileDeleted": "这个标签页的连接已被删除，请在工具栏中换一个连接",
     "disconnected": "与数据库的连接已断开，未提交的修改已丢失",
     "reconnect": "重新连接",
@@ -57,7 +58,6 @@
   },
   "tab": {
     "untitled": "查询{{n}}",
-    "prod": "生产",
     "profileDeleted": "连接已删除",
     "newQuery": "新建查询（Ctrl+T）",
     "close": "关闭",

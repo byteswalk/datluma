@@ -118,11 +118,7 @@ function TabTitle({ tab, active, envClass, profileName, profile }: {
           <IconFileCode size={16} />
         )}
         <span className="tab-title">{tab.title}</span>
-        {envClass === 'prod' ? (
-          <span className="tab-sub">· {t('editor.tab.prod')}</span>
-        ) : (
-          <span className="tab-sub muted">{profileName}</span>
-        )}
+        <span className="tab-sub muted">{profileName}</span>
         {rt.running && <span className="running-dot" />}
         <span
           className="x"
@@ -191,7 +187,8 @@ export default function Workspace() {
                 key={tb.id}
                 tab={tb}
                 active={tb.id === active}
-                envClass={p?.environment && p.environment !== 'none' ? p.environment : ''}
+                // 绑定连接的标签按环境上底色（shell.css 的 .tab.dev/.test/.prod/.none），模型、比对等标签不上色
+                envClass={p ? (p.environment ?? 'none') : ''}
                 profileName={profileName(tb.profileId)}
                 profile={p}
               />

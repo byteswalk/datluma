@@ -30,6 +30,7 @@ import { runnerFor, useTabRuntime } from './runner'
 import { monaco } from './monaco'
 import SqlEditor, { type MonacoEditor } from './SqlEditor'
 import { type QueryTab, takeRun, useTabs } from './tabs'
+import { watermarkImage } from '../../shared/watermark'
 
 /** 会改变对象结构的语句（按首个关键字）。 */
 const DDL = new Set(['CREATE', 'ALTER', 'DROP', 'RENAME', 'TRUNCATE', 'COMMENT'])
@@ -316,15 +317,24 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
       )}
       <Group orientation="vertical" className="grow" {...layout}>
         <Panel id="editor" minSize={80}>
-          <SqlEditor
-            path={tab.id}
-            language={profile ? editorLanguage(profile.driver, rt.session?.compat) : 'sql'}
-            defaultValue={tab.sql}
-            marks={marks}
-            sql={sql}
-            onChange={(v) => useTabs.getState().setSql(tab.id, v)}
-            onReady={onReady}
-          />
+          <div className="editor-wrap">
+            <SqlEditor
+              path={tab.id}
+              language={profile ? editorLanguage(profile.driver, rt.session?.compat) : 'sql'}
+              defaultValue={tab.sql}
+              marks={marks}
+              sql={sql}
+              onChange={(v) => useTabs.getState().setSql(tab.id, v)}
+              onReady={onReady}
+            />
+            {/* 生产连接：编辑区始终铺满斜向的淡色水印，写着连的是哪个库 */}
+            {profile?.environment === 'prod' && (
+              <div
+                className="prod-watermark"
+                style={{ backgroundImage: watermarkImage(t('editor.query.prodWatermark', { name: profile.name })) }}
+              />
+            )}
+          </div>
         </Panel>
         <Separator className="splitter-h" />
         <Panel id="results" defaultSize="40%" minSize={60}>

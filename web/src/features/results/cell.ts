@@ -67,3 +67,18 @@ export function hexDump(bytes: Uint8Array, max = 64 * 1024): string {
 export function isNumeric(c: CellValue): boolean {
   return c.t === 'int' || c.t === 'u_int' || c.t === 'float' || c.t === 'decimal'
 }
+
+/** 各库数值列的类型名（去掉长度、精度后比较）。interval、日期等不算。 */
+const NUMERIC_TYPE =
+  /^(tinyint|smallint|mediumint|int|integer|bigint|int2|int4|int8|serial|bigserial|smallserial|decimal|dec|numeric|number|real|float|float4|float8|double|double precision|binary_float|binary_double|money|smallmoney|bit_integer|pls_integer|unsigned)\b/
+
+/**
+ * 整列是不是数值列，决定表头靠右还是靠左（和下面的数字对齐）。先看列的类型名；类型名为空（如 SQLite 的表达式列）时，
+ * 看已加载的值：有非空值且非空值都是数值才算。只看列类型，整列 NULL 时表头不会忽左忽右。
+ */
+export function isNumericColumn(typeName: string, values: CellValue[]): boolean {
+  const name = typeName.trim().toLowerCase()
+  if (name) return NUMERIC_TYPE.test(name)
+  const filled = values.filter((v) => v.t !== 'null')
+  return filled.length > 0 && filled.every(isNumeric)
+}

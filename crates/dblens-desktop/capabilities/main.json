@@ -13,6 +13,7 @@
     "allow-shell-info",
     "allow-window-action",
     "allow-set-auto-check-update",
+    "allow-set-title",
     "allow-save-dialog",
     "allow-open-dialog",
     "allow-folder-dialog",

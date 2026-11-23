@@ -50,6 +50,7 @@ import EnvTag from '../../shared/EnvTag'
 import { profileKind } from '../connections/form'
 import { withVault } from '../connections/vault'
 import { metaKey } from '../sql/metadata'
+import ConnName from './ConnName'
 import type { DdlTarget } from './DdlDialog'
 import {
   type CategoryKind,
@@ -285,11 +286,13 @@ export default function ObjectTree() {
       return {
         key,
         isLeaf: false,
+        className: 'conn-node',
         title: (
-          <span>
-            <DbIcon driver={p.driver} variant={profileKind(p).icon} />{' '}
-            <b style={env === 'prod' ? { color: 'var(--danger)' } : undefined}>{p.name}</b>
-            <span className="cm">{profileKind(p).label}</span>
+          // 单行：连接名，环境标签靠右（各行对齐）。数据库类型和地址放在连接名的悬停提示里，
+          // 没有主机的本地库按本机 127.0.0.1。名称过长时先省略
+          <span className="conn-title">
+            <DbIcon driver={p.driver} variant={profileKind(p).icon} />
+            <ConnName profile={p} />
             <EnvTag env={env} />
           </span>
         ),
@@ -472,7 +475,8 @@ export default function ObjectTree() {
       </div>
       {profilesError && <div className="err" style={{ padding: 8 }}>{(profilesError as Error).message}</div>}
       <Dropdown trigger={['contextMenu']} menu={{ items: shownItems, onClick: (e) => onMenu(e.key) }}>
-        <div className="grow" style={{ overflow: 'auto' }}>
+        {/* 左右留白和上面的过滤框一致 */}
+        <div className="grow" style={{ overflow: 'auto', padding: '0 6px' }}>
           <Tree
             blockNode
             showIcon

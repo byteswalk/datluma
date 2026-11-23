@@ -13,6 +13,7 @@ import { useTabRuntime } from '../features/editor/runner'
 import { useTabs } from '../features/editor/tabs'
 import { useSyntax } from '../features/sql/syntax'
 import DbIcon from '../shared/DbIcon'
+import EnvTag from '../shared/EnvTag'
 import { lastSummary } from '../features/results/results'
 import type { Profile } from '../shared/api'
 import { useApi } from './context'
@@ -32,6 +33,7 @@ function TabStatus({ tabId, profile }: { tabId: string; profile: Profile | undef
         {profile ? <DbIcon driver={profile.driver} variant={s?.variant ?? profile.variant} /> : <IconPlugConnected size={14} />}
         {profile?.name ?? t('app.status.connectionDeleted')}
         {s?.schema && <span className="muted">· {s.schema}</span>}
+        {hasEnv(profile) && <EnvTag env={profile.environment} />}
       </span>
       {s && (
         <span style={{ color: s.in_transaction ? 'var(--warn)' : undefined }}>
@@ -59,6 +61,16 @@ function TabStatus({ tabId, profile }: { tabId: string; profile: Profile | undef
   )
 }
 
+/** 连接设了环境（开发、测试、生产）吗。 */
+function hasEnv(p: Profile | undefined): p is Profile {
+  return !!p?.environment && p.environment !== 'none'
+}
+
+/** 状态栏底色跟着连接的环境走（shell.css 的 .statusbar.env-*），未设环境和没有连接时用默认的浅灰。 */
+function barClass(p: Profile | undefined): string {
+  return hasEnv(p) ? `row statusbar env-${p.environment}` : 'row statusbar'
+}
+
 export default function StatusBar() {
   const { t } = useTranslation()
   const api = useApi()
@@ -75,19 +87,21 @@ export default function StatusBar() {
     )
   }
   if (active) {
+    const profile = profiles?.find((x) => x.id === active.profileId)
     return (
-      <div className="row statusbar">
-        <TabStatus tabId={active.id} profile={profiles?.find((x) => x.id === active.profileId)} />
+      <div className={barClass(profile)}>
+        <TabStatus tabId={active.id} profile={profile} />
       </div>
     )
   }
   const p = profiles?.find((x) => x.id === selected)
   return (
-    <div className="row statusbar">
+    <div className={barClass(p)}>
       {p ? (
         <span className="row" style={{ gap: 4 }}>
           <DbIcon driver={p.driver} variant={profileKind(p).icon} />
           {p.name} · {profileKind(p).label} · {p.user}@{p.host}:{p.port}
+          {hasEnv(p) && <EnvTag env={p.environment} />}
         </span>
       ) : (
         <span className="muted">{t('app.status.noConnection')}</span>

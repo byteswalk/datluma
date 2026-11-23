@@ -155,9 +155,14 @@ export default function TitleBar() {
           connection: tab.profileId ? (profile?.name ?? t('app.status.connectionDeleted')) : t('app.side.models'),
           app: appName,
         })
+  // 原生窗口标题（任务栏、Alt+Tab）跟着当前标签走
   useEffect(() => {
     document.title = title
+    desktop?.setTitle(title).catch(console.warn)
   }, [title])
+  // 标题栏底色跟状态栏一致，按当前标签（没有标签时按选中的连接）的环境（shell.css 的 .titlebar.env-*）
+  const envProfile = tab ? profile : profiles?.find((p) => p.id === ui.selectedProfile)
+  const env = envProfile?.environment && envProfile.environment !== 'none' ? ` env-${envProfile.environment}` : ''
 
   const run = (key: string) => {
     const [kind, arg] = key.split(':')
@@ -234,7 +239,7 @@ export default function TitleBar() {
 
   return (
     <>
-    <div className="row titlebar" onMouseDown={onMouseDown} style={{ paddingLeft: titleBarInset(info?.platform) }}>
+    <div className={`row titlebar${env}`} onMouseDown={onMouseDown} style={{ paddingLeft: titleBarInset(info?.platform) }}>
       <img src={logo} width={16} height={16} alt="" className="logo" />
       <div className="row" data-no-drag>
         {menus.map((g) => (
@@ -243,7 +248,9 @@ export default function TitleBar() {
           </Dropdown>
         ))}
       </div>
-      <span className="title">{title}</span>
+      <span className="title">
+        {title}
+      </span>
       <span className="grow" />
       <div className="row" data-no-drag>
         <span
