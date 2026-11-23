@@ -20,6 +20,7 @@ const VARIANTS = [
   'dameng',
   'sqlserver',
   'gbase8s',
+  'gbase8a',
   'sqlite',
 ]
 

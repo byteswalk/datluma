@@ -310,7 +310,7 @@ const SQLSERVER_RESERVED: &[&str] = &[
     "WRITETEXT",
 ];
 
-/// PostgreSQL、MySQL（8.0/8.4）、Oracle、达梦、GaussDB 以及国产库第一批（TiDB 等）的保留字与特殊值函数名（如 CURRENT_USER、SYSDATE）的并集，按字节序排列。
+/// PostgreSQL、MySQL（8.0/8.4）、Oracle、达梦、GaussDB、GBase 8c 以及国产库第一批（TiDB 等）的保留字与特殊值函数名（如 CURRENT_USER、SYSDATE）的并集，按字节序排列。
 /// 多加引号不会出错，所以宁多勿少；个别词只在部分方言中保留（如 PUBLIC），由 `is_reserved` 按家族豁免。新增方言时要补充。
 const RESERVED: &[&str] = &[
     "ACCESS",
@@ -569,6 +569,7 @@ const RESERVED: &[&str] = &[
     "PCTFREE",
     "PERCENT_RANK",
     "PERFORMANCE",
+    "PIVOT",
     "PLACING",
     "PRECISION",
     "PRIMARY",
@@ -673,6 +674,7 @@ const RESERVED: &[&str] = &[
     "UNIQUE",
     "UNIX_TIMESTAMP",
     "UNLOCK",
+    "UNPIVOT",
     "UNSIGNED",
     "UNTIL",
     "UPDATE",
@@ -916,6 +918,8 @@ mod tests {
         assert_eq!(ident(Family::MySql, "schema"), "`schema`");
         assert_eq!(ident(Family::Oracle, "SYSDATE"), "\"SYSDATE\"");
         assert_eq!(ident(Family::Oracle, "COMMENT"), "\"COMMENT\"");
+        // GBase 8c 把 UNPIVOT 列为保留字
+        assert_eq!(ident(Family::Postgres, "unpivot"), "\"unpivot\"");
         assert_eq!(ident(Family::Oracle, "UID"), "\"UID\"");
         assert_eq!(ident(Family::Dameng, "TOP"), "\"TOP\"");
         assert!(RESERVED.windows(2).all(|w| w[0] < w[1]));

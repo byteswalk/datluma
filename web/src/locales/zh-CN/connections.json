@@ -52,6 +52,10 @@
       "label": "OceanBase（Oracle 模式）",
       "note": "企业版的 Oracle 模式租户；用户名写成 用户@租户；经官方 JDBC 驱动连接"
     },
+    "gbase8a": {
+      "label": "GBase 8a",
+      "note": "南大通用 GBase 8a MPP，默认端口 5258，走 MySQL 协议；不支持回滚，只能自动提交；表设计器和迁移未适配"
+    },
     "goldendb": {
       "label": "GoldenDB",
       "note": "经官方 JDBC 驱动连接，端口是连接实例的端口；驱动 jar 要自己放到 JDBC 驱动目录"

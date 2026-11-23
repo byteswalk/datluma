@@ -552,6 +552,10 @@ impl Actor {
                 }
                 Command::SetAutocommit { on, reply: tx } => {
                     let r = match self.conn.as_mut() {
+                        // GBase 8a 接受 autocommit=0、BEGIN 和 ROLLBACK，但修改都已立即提交，回滚不生效
+                        Some(_) if !on && self.ctx.dialect.variant() == Variant::Gbase8a => {
+                            Err(Error::invalid(msg!("session.no_rollback", product = "GBase 8a")))
+                        }
                         Some(c) => c.set_autocommit(on).await,
                         None => Err(Error::connect(msg!("session.disconnected"))),
                     };

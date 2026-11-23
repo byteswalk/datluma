@@ -26,6 +26,7 @@ const TIDB: &str = include_str!("../sql/ops/tidb.sql");
 const OCEANBASE: &str = include_str!("../sql/ops/oceanbase.sql");
 const OCEANBASE_ORACLE: &str = include_str!("../sql/ops/oceanbase_oracle.sql");
 const GOLDENDB: &str = include_str!("../sql/ops/goldendb.sql");
+const GBASE8A: &str = include_str!("../sql/ops/gbase8a.sql");
 const OPENGAUSS: &str = include_str!("../sql/ops/opengauss.sql");
 const SQLSERVER: &str = include_str!("../sql/ops/sqlserver.sql");
 const INFORMIX: &str = include_str!("../sql/ops/informix.sql");
@@ -133,6 +134,7 @@ fn override_file(variant: Variant) -> Option<&'static str> {
         Variant::OceanBase => Some(OCEANBASE),
         Variant::OceanBaseOracle => Some(OCEANBASE_ORACLE),
         Variant::GoldenDb => Some(GOLDENDB),
+        Variant::Gbase8a => Some(GBASE8A),
         Variant::OpenGauss | Variant::GaussDb => Some(OPENGAUSS),
         _ => None,
     }

@@ -25,11 +25,12 @@ const TIDB: &str = include_str!("../../sql/tidb.sql");
 const OCEANBASE: &str = include_str!("../../sql/oceanbase.sql");
 const OCEANBASE_ORACLE: &str = include_str!("../../sql/oceanbase_oracle.sql");
 const GOLDENDB: &str = include_str!("../../sql/goldendb.sql");
+const GBASE8A: &str = include_str!("../../sql/gbase8a.sql");
 const SQLSERVER: &str = include_str!("../../sql/sqlserver.sql");
 const INFORMIX: &str = include_str!("../../sql/informix.sql");
 const SQLITE: &str = include_str!("../../sql/sqlite.sql");
 
-pub(crate) const ALL_VARIANTS: [Variant; 17] = [
+pub(crate) const ALL_VARIANTS: [Variant; 18] = [
     Variant::MySql,
     Variant::MariaDb,
     Variant::TiDb,
@@ -37,6 +38,7 @@ pub(crate) const ALL_VARIANTS: [Variant; 17] = [
     Variant::OceanBaseOracle,
     Variant::GoldenDb,
     Variant::PolarDb,
+    Variant::Gbase8a,
     Variant::Postgres,
     Variant::Kingbase,
     Variant::OpenGauss,
@@ -90,6 +92,7 @@ fn override_file(variant: Variant) -> Option<&'static str> {
         Variant::OceanBase => Some(OCEANBASE),
         Variant::OceanBaseOracle => Some(OCEANBASE_ORACLE),
         Variant::GoldenDb => Some(GOLDENDB),
+        Variant::Gbase8a => Some(GBASE8A),
         Variant::Kingbase => Some(KINGBASE),
         Variant::OpenGauss | Variant::GaussDb => Some(OPENGAUSS),
         _ => None,
@@ -165,6 +168,9 @@ pub(crate) fn render(
             kind => args.kind.is_some(),
             filter => args.filter.is_some(),
             schema_ident => args.schema.as_deref().map(|s| ident::quote_ident(family, s)),
+            // 不能绑定参数的 SHOW 语句用：对象名按标识符引用，种类只放行固定的几个词
+            name_ident => args.name.as_deref().map(|n| ident::quote_ident(family, n)),
+            kind_word => args.kind.as_deref().filter(|k| matches!(*k, "FUNCTION" | "PROCEDURE")),
             version => version,
             oracle_mode => oracle_mode,
         })

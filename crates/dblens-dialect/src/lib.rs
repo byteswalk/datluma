@@ -69,7 +69,11 @@ impl Dialect {
 
     /// 根据驱动和服务器版本识别兼容库和版本号。
     pub fn detect(driver: DriverId, info: &ServerInfo) -> Self {
-        let d = Self::new(Variant::detect(driver, info)).with_version(parse_version(&info.version));
+        let variant = Variant::detect(driver, info);
+        // GBase 8a 的产品版本号（9.5）和 MySQL 无关；数据字典相当于 MySQL 5.1（没有 PARAMETERS、
+        // GENERATION_EXPRESSION、DATETIME_PRECISION），按 5.1 走模板和表设计的版本分支。
+        let version = if variant == Variant::Gbase8a { Some(50100) } else { parse_version(&info.version) };
+        let d = Self::new(variant).with_version(version);
         // 版本号之后会换成所基于的 PG 版本（9.2.4），产品版本只在这里看得到
         let byte_positions =
             d.variant == Variant::OpenGauss && opengauss_major(&info.version).is_some_and(|m| m < 6);
@@ -273,6 +277,9 @@ impl Dialect {
         if self.variant == Variant::GoldenDb && key == MetaKey::Triggers {
             return meta::goldendb_triggers(&rows, args.table.as_deref());
         }
+        if self.variant == Variant::Gbase8a && key == MetaKey::RoutineSource {
+            return meta::show_create_source(&rows);
+        }
         rows
     }
 
@@ -399,6 +406,37 @@ mod tests {
         assert_eq!(Dialect::new(Variant::Oracle).with_version(Some(110200)).version(), Some(110200));
         assert_eq!(Variant::PolarDb.family(), Family::MySql);
     }
+    #[test]
+    fn gbase8a_uses_the_mysql_51_dictionary() {
+        let info = ServerInfo { product: "MySQL".into(), version: "GBase 8a 9.5.3.28.12509af275af".into() };
+        let d = Dialect::detect(DriverId::Mysql, &info);
+        assert_eq!((d.variant(), d.version()), (Variant::Gbase8a, Some(50100)));
+        let args = MetaArgs { schema: Some("s".into()), table: Some("t".into()), ..Default::default() };
+        let cols = d.meta_query(MetaKey::Columns, &args).unwrap().unwrap().sql;
+        assert!(!cols.contains("GENERATION_EXPRESSION"), "{cols}");
+        let args = MetaArgs {
+            schema: Some("s".into()),
+            name: Some("p`1".into()),
+            kind: Some("PROCEDURE".into()),
+            ..Default::default()
+        };
+        let src = d.meta_query(MetaKey::RoutineSource, &args).unwrap().unwrap().sql;
+        assert!(src.ends_with("\nSHOW CREATE PROCEDURE `s`.`p``1`"), "{src}");
+        // 种类不是固定的几个词时不拼进 SQL
+        let args = MetaArgs { kind: Some("PROCEDURE x".into()), ..args };
+        let src = d.meta_query(MetaKey::RoutineSource, &args).unwrap().unwrap().sql;
+        assert!(!src.contains("SHOW CREATE PROCEDURE"), "{src}");
+        // MySQL 5.7 起仍读生成列
+        let my = Dialect::new(Variant::MySql).with_version(Some(50744));
+        assert!(
+            my.meta_query(MetaKey::Columns, &MetaArgs { schema: Some("s".into()), ..Default::default() })
+                .unwrap()
+                .unwrap()
+                .sql
+                .contains("GENERATION_EXPRESSION")
+        );
+    }
+
     #[test]
     fn refine_finds_polardb() {
         let d = Dialect::new(Variant::MySql).with_version(Some(80016));

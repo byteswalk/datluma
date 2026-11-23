@@ -562,6 +562,18 @@ pub(crate) fn goldendb_triggers(rows: &MetaRows, table: Option<&str>) -> MetaRow
     MetaRows::new(columns, out)
 }
 
+/// `SHOW CREATE PROCEDURE/FUNCTION` 的结果换成 `routine_source` 要的 line、text 两列（GBase 8a 没有 PARAMETERS 表，
+/// 只有这条语句能给出带参数的完整定义）。没有 `Create …` 列时返回空结果。
+pub(crate) fn show_create_source(rows: &MetaRows) -> MetaRows {
+    let columns = ["line", "text"].map(String::from).to_vec();
+    let out = rows
+        .iter()
+        .filter_map(|r| r.columns().iter().find(|c| c.starts_with("create ")).and_then(|c| r.text(c)))
+        .map(|text| vec![dblens_core::Value::Int(1), dblens_core::Value::String(text)])
+        .collect();
+    MetaRows::new(columns, out)
+}
+
 #[cfg(test)]
 mod tests {
     use dblens_core::{LogicalType, Value};

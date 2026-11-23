@@ -41,6 +41,7 @@ export const VARIANT_ICONS: Record<string, DbIconDef> = {
   dameng: art(ART_ICONS.dameng),
   sqlserver: art(ART_ICONS.sqlserver),
   gbase8s: mark('8s', '#d0202e'),
+  gbase8a: mark('8a', '#d0202e'),
   sqlite: logo(siSqlite, '#4fa9de'),
 }
 

@@ -33,6 +33,8 @@
 | 达梦 DM8 | 兼容模式 0、2、3、4、7 | 内置 JDBC | 各模式全量；1、5、6、8 现场少见，没测 | [dameng-compat](dameng-compat.md) |
 | SQL Server | — | 原生 TDS | 2022、2025 Express；2017 未实测 | [m6a-sqlserver](m6a-sqlserver.md) |
 | GBase 8s | — | JDBC（gbasedbtjdbc，自备） | 除修改账号外的全部功能 | [m8a-gbase8s](m8a-gbase8s.md) |
+| GBase 8c | A 模式、PG 模式 | 原生 PG 协议，按 openGauss 处理 | V6 S1.3.0B19 全量 | [gbase-8a-8c](gbase-8a-8c.md) |
+| GBase 8a | — | 原生 MySQL 协议，`@@version_comment` 识别，按 MySQL 5.1 的数据字典处理 | 9.5.3：连接、浏览、执行、运维；不能回滚，只能自动提交；表设计器、迁移、导入未适配 | [gbase-8a-8c](gbase-8a-8c.md) |
 | SQLite | — | 内置 | 全量（桌面版和本机运行的浏览器版） | [m10a-sqlite](m10a-sqlite.md) |
 
 “全量”指工作区的驱动一致性、元数据、数据编辑、导入导出、表设计、迁移等测试。版本号以各笔记为准，这里只列主线。

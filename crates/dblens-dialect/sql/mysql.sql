@@ -62,7 +62,9 @@ SELECT c.TABLE_NAME AS table_name,
        CASE WHEN c.IS_NULLABLE = 'YES' THEN 1 ELSE 0 END AS nullable,
        CASE
          WHEN c.COLUMN_DEFAULT IS NULL THEN NULL
+{% if version >= 50706 %}
          WHEN c.GENERATION_EXPRESSION <> '' THEN NULL
+{% endif %}
          WHEN c.EXTRA LIKE '%DEFAULT!_GENERATED%' ESCAPE '!' THEN c.COLUMN_DEFAULT
          -- OceanBase 的 EXTRA 中没有 DEFAULT_GENERATED：时间列的 CURRENT_TIMESTAMP 默认值按表达式处理
          WHEN c.DATA_TYPE IN ('datetime', 'timestamp') AND UPPER(c.COLUMN_DEFAULT) LIKE 'CURRENT!_TIMESTAMP%' ESCAPE '!' THEN c.COLUMN_DEFAULT
@@ -71,7 +73,11 @@ SELECT c.TABLE_NAME AS table_name,
        END AS default_value,
        NULLIF(c.COLUMN_COMMENT, '') AS comment,
        CASE WHEN c.EXTRA LIKE '%auto!_increment%' ESCAPE '!' THEN 1 ELSE 0 END AS auto_increment,
+{% if version >= 50706 %}
        NULLIF(c.GENERATION_EXPRESSION, '') AS `generated`
+{% else %}
+       NULL AS `generated`
+{% endif %}
 FROM information_schema.COLUMNS c
 WHERE c.TABLE_SCHEMA = {{ bind("schema") }}
 {% if table %}
@@ -189,6 +195,7 @@ WHERE v.TABLE_SCHEMA = {{ bind("schema") }}
 -- (params, RETURNS, DETERMINISTIC, SQL SECURITY, COMMENT, body). One row, line = 1. Character-set clauses are not reproduced.
 SELECT 1 AS line,
        CONCAT('CREATE ', r.ROUTINE_TYPE, ' `', REPLACE(r.ROUTINE_NAME, '`', '``'), '`(',
+{% if version >= 50500 %}
               COALESCE((SELECT GROUP_CONCAT(
                                  CONCAT(CASE WHEN r.ROUTINE_TYPE = 'PROCEDURE' THEN CONCAT(COALESCE(p.PARAMETER_MODE, 'IN'), ' ') ELSE '' END,
                                         '`', REPLACE(p.PARAMETER_NAME, '`', '``'), '` ', p.DTD_IDENTIFIER)
@@ -196,6 +203,9 @@ SELECT 1 AS line,
                           FROM information_schema.PARAMETERS p
                          WHERE p.SPECIFIC_SCHEMA = r.ROUTINE_SCHEMA AND p.SPECIFIC_NAME = r.SPECIFIC_NAME
                            AND p.ROUTINE_TYPE = r.ROUTINE_TYPE AND p.ORDINAL_POSITION > 0), ''),
+{% else %}
+              '',
+{% endif %}
               ')',
               CASE WHEN r.ROUTINE_TYPE = 'FUNCTION' THEN CONCAT(' RETURNS ', r.DTD_IDENTIFIER) ELSE '' END,
               CHAR(10), '    ', r.SQL_DATA_ACCESS,

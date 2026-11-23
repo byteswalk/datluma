@@ -252,6 +252,16 @@ async fn full_flow(env: &str) {
     assert_eq!(detail[0].columns.len(), 2);
     assert!(detail[0].primary_key.is_some());
 
+    // GBase 8a 的回滚不生效，不允许切到手动提交
+    if env.contains("GBASE8A") {
+        let err = s.sessions.set_autocommit(id, false).await.unwrap_err();
+        assert!(format!("{err:?}").contains("session.no_rollback"), "{err:?}");
+        live.run(id, &drop).await;
+        s.sessions.close(id, false).await.unwrap();
+        s.delete_profile(&live.profile_id).await.unwrap();
+        return;
+    }
+
     // 手动提交：修改后有未提交的事务，回滚后数据不在
     s.sessions.set_autocommit(id, false).await.unwrap();
     live.run(id, &format!("INSERT INTO {qualified} (id, name) VALUES (1, 'a')")).await;
@@ -2555,6 +2565,96 @@ async fn oceanbase_oracle_design() {
 #[tokio::test]
 async fn oceanbase_oracle_model() {
     model_flow("DBLENS_TEST_OB_ORACLE_URL").await;
+}
+
+#[tokio::test]
+async fn gbase8a_flow() {
+    full_flow("DBLENS_TEST_GBASE8A_URL").await;
+}
+
+#[tokio::test]
+async fn gbase8a_workbench() {
+    workbench_flow("DBLENS_TEST_GBASE8A_URL").await;
+}
+
+#[tokio::test]
+async fn gbase8a_cancel() {
+    let slow = "SELECT COUNT(*) FROM information_schema.columns a, information_schema.columns b, information_schema.columns c";
+    cancel_flow("DBLENS_TEST_GBASE8A_URL", slow).await;
+}
+
+#[tokio::test]
+async fn gbase8a_ops() {
+    ops_flow("DBLENS_TEST_GBASE8A_URL", &[]).await;
+}
+
+#[tokio::test]
+async fn gbase8a_sql_file() {
+    sql_file_flow("DBLENS_TEST_GBASE8A_URL").await;
+}
+
+/// GBase 8a 的浏览：分布表、复制表、视图、存储过程，读回 DDL。8a 建不了唯一约束和普通索引，所以不跑通用的对象流程。
+#[tokio::test]
+async fn gbase8a_browse() {
+    let Some(live) = setup("DBLENS_TEST_GBASE8A_URL").await else { return };
+    let s = &live.service;
+    let profile = s.profile(&live.profile_id).unwrap();
+    let id = s.open_session(&live.profile_id).await.unwrap().id;
+    let sc = &live.schema;
+    for sql in [
+        "DROP VIEW IF EXISTS g8_v",
+        "DROP PROCEDURE IF EXISTS g8_p",
+        "DROP TABLE IF EXISTS g8_t",
+        "DROP TABLE IF EXISTS g8_r",
+    ] {
+        live.run(id, sql).await;
+    }
+    live.run(
+        id,
+        "CREATE TABLE g8_t (id INT NOT NULL AUTO_INCREMENT PRIMARY KEY, k INT COMMENT '分布列', name VARCHAR(20) DEFAULT 'x', \
+         d DATETIME, amt DECIMAL(10,2)) DISTRIBUTED BY('k') COMMENT='分布表'",
+    )
+    .await;
+    live.run(id, "CREATE TABLE g8_r (id INT, code VARCHAR(10)) REPLICATED").await;
+    live.run(id, "CREATE VIEW g8_v AS SELECT id, name FROM g8_t").await;
+    live.run(id, "CREATE PROCEDURE g8_p(IN n INT) select n").await;
+
+    let schemas = s.metadata.schemas(&profile, None).await.unwrap();
+    assert!(schemas.iter().any(|x| x.name == "gclusterdb" && x.is_system), "{schemas:?}");
+    assert!(schemas.iter().any(|x| x.name == *sc && !x.is_system), "{schemas:?}");
+
+    let tables = s.metadata.objects(&profile, sc, MetaKey::Tables, None).await.unwrap();
+    assert!(["g8_t", "g8_r"].iter().all(|t| tables.iter().any(|o| o.name == *t)), "{tables:?}");
+    let t = &s.metadata.tables(&profile, sc, Some("g8_t")).await.unwrap()[0];
+    let cols: Vec<_> = t.columns.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(cols, ["id", "k", "name", "d", "amt"]);
+    assert!(t.columns[0].auto_increment && t.primary_key.is_some(), "{t:?}");
+    assert_eq!(t.columns[1].comment.as_deref(), Some("分布列"));
+    assert_eq!(t.comment.as_deref(), Some("分布表"));
+
+    let views = s.metadata.views(&profile, sc, MetaKey::Views).await.unwrap();
+    let v = views.iter().find(|v| v.name == "g8_v").expect("视图");
+    assert_eq!(v.columns.len(), 2);
+    let def = s.metadata.source(&profile, sc, MetaKey::ViewDefinition, "g8_v", None).await.unwrap();
+    assert!(def.is_some_and(|d| d.contains("g8_t")));
+
+    let routines = s.metadata.routines(&profile, sc).await.unwrap();
+    assert!(routines.iter().any(|r| r.name == "g8_p"), "{routines:?}");
+    let src = s.metadata.ddl(&profile, sc, DdlKind::Procedure, "g8_p").await.unwrap();
+    assert!(src.contains("IN n INT") && src.contains("select n"), "{src}");
+
+    // 读回的 DDL 带 8a 的分布方式
+    let ddl = s.metadata.ddl(&profile, sc, DdlKind::Table, "g8_t").await.unwrap();
+    assert!(ddl.contains("DISTRIBUTED BY"), "{ddl}");
+    let ddl = s.metadata.ddl(&profile, sc, DdlKind::Table, "g8_r").await.unwrap();
+    assert!(ddl.contains("REPLICATED"), "{ddl}");
+    eprintln!("{ddl}");
+
+    for sql in ["DROP VIEW g8_v", "DROP PROCEDURE g8_p", "DROP TABLE g8_t", "DROP TABLE g8_r"] {
+        live.run(id, sql).await;
+    }
+    s.sessions.close(id, false).await.unwrap();
+    s.delete_profile(&live.profile_id).await.unwrap();
 }
 
 #[tokio::test]

@@ -1920,6 +1920,10 @@
     "zh-CN": "正在执行，请等待完成或先取消",
     "en": "A statement is running; wait for it to finish or cancel it first"
   },
+  "session.no_rollback": {
+    "zh-CN": "%{product} 不支持回滚，修改会立即生效，所以不能切换到手动提交",
+    "en": "%{product} cannot roll back: changes take effect immediately, so manual commit is not available"
+  },
   "session.disconnected": {
     "zh-CN": "连接已断开",
     "en": "The connection is closed"

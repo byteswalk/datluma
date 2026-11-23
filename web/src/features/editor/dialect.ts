@@ -80,6 +80,7 @@ const VARIANT_NAMES: Record<string, string> = {
   oracle: 'Oracle',
   sqlserver: 'SQL Server',
   gbase8s: 'GBase 8s',
+  gbase8a: 'GBase 8a',
   sqlite: 'SQLite',
 }
 

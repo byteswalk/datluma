@@ -778,6 +778,10 @@ async fn opengauss_family(env: &str, oracle_mode: bool) {
         let script = script.replace(", c_domain dblens_meta.posint", "");
         let skip = ["inh_child", "dom_ty", "idx_gin", "mv_dept", "mv_dept_c", "mv_dept_cc"];
         live.run_script_with(&script, &skip, &[]).await;
+    } else if live.banner.contains("GBase8c") {
+        // GBase 8c V6（openGauss 6.0.2）建表时不接受枚举数组列：no collation was derived for column
+        let script = script.replace(", c_enum_arr dblens_meta.mood[]", "");
+        live.run_script_with(&script, &[], &[]).await;
     } else if live.banner.contains("openGauss 5.") {
         // openGauss 5.0 不支持表继承
         live.run_script_with(script, &["inh_child"], &[]).await;

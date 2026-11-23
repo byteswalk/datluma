@@ -96,6 +96,9 @@ pub enum Variant {
     /// 阿里云 PolarDB 的 MySQL 版。版本字符串与 MySQL 相同，靠 `Dialect::refine` 识别。
     #[serde(rename = "polardb")]
     PolarDb,
+    /// 南大通用 GBase 8a MPP。`VERSION()` 里没有产品名，MySQL 驱动从 `@@version_comment` 认出后补在版本号前。
+    #[serde(rename = "gbase8a")]
+    Gbase8a,
     #[serde(rename = "postgres")]
     Postgres,
     #[serde(rename = "kingbase")]
@@ -126,7 +129,8 @@ impl Variant {
             | Variant::TiDb
             | Variant::OceanBase
             | Variant::GoldenDb
-            | Variant::PolarDb => Family::MySql,
+            | Variant::PolarDb
+            | Variant::Gbase8a => Family::MySql,
             Variant::Postgres
             | Variant::Kingbase
             | Variant::OpenGauss
@@ -150,6 +154,7 @@ impl Variant {
             Variant::OceanBaseOracle => msg!("variant.oceanbase_oracle"),
             Variant::GoldenDb => Msg::raw("GoldenDB"),
             Variant::PolarDb => msg!("variant.polardb"),
+            Variant::Gbase8a => Msg::raw("GBase 8a"),
             Variant::Postgres => Msg::raw("PostgreSQL"),
             Variant::Kingbase => msg!("variant.kingbase"),
             Variant::OpenGauss => Msg::raw("openGauss"),
@@ -186,9 +191,11 @@ impl Variant {
             DriverId::Mysql if v.contains("tidb") => Variant::TiDb,
             DriverId::Mysql if v.contains("oceanbase") => Variant::OceanBase,
             DriverId::Mysql if v.contains("goldendb") => Variant::GoldenDb,
+            DriverId::Mysql if v.starts_with("gbase 8a") => Variant::Gbase8a,
             DriverId::Oracle if v.contains("oceanbase") => Variant::OceanBaseOracle,
             DriverId::Postgres if v.contains("kingbase") => Variant::Kingbase,
-            DriverId::Postgres if v.contains("opengauss") => Variant::OpenGauss,
+            // GBase 8c 基于 openGauss（V6 S1.3 是 6.0.2），版本串里只有 `GBase8cV6 …`，数据字典与 openGauss 相同
+            DriverId::Postgres if v.contains("opengauss") || v.contains("gbase8c") => Variant::OpenGauss,
             DriverId::Postgres if v.contains("gaussdb") => Variant::GaussDb,
             DriverId::Postgres if v.contains("highgo") => Variant::HighGo,
             _ => Variant::base(driver),
@@ -235,6 +242,9 @@ mod tests {
         );
         let gd = Variant::detect(DriverId::Mysql, &info("GoldenDB", "GoldenDB 8.9.99"));
         assert_eq!((gd, gd.family()), (Variant::GoldenDb, Family::MySql));
+        let g8a = Variant::detect(DriverId::Mysql, &info("MySQL", "GBase 8a 9.5.3.28.12509af275af"));
+        assert_eq!((g8a, g8a.family()), (Variant::Gbase8a, Family::MySql));
+        assert_eq!(Variant::detect(DriverId::Mysql, &info("MySQL", "9.5.3.28.12509af275af")), Variant::MySql);
     }
 
     #[test]
@@ -245,6 +255,8 @@ mod tests {
         assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", kb)), Variant::Kingbase);
         let og = "(openGauss 5.0.1 build 33b035fd) compiled at 2023-12-15 on x86_64-unknown-linux-gnu";
         assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", og)), Variant::OpenGauss);
+        let gb = "(GBase8cV6 S1.3.0B19 build 8a2447f6) compiled at 2026-09-23 14:29:40 commit 0 last mr 22";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", gb)), Variant::OpenGauss);
         let gs = "gaussdb (GaussDB Kernel 505.1.0 build 2c0ba3b1) compiled at 2024-03-01";
         assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", gs)), Variant::GaussDb);
         let hg = "HighGo Security Enterprise Edition Release 4.5.8 on x86_64";

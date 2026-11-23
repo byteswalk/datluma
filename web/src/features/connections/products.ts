@@ -19,6 +19,7 @@ export type ProductId =
   | 'dameng'
   | 'sqlserver'
   | 'gbase8s'
+  | 'gbase8a'
   | 'sqlite'
 
 export interface Product {
@@ -42,6 +43,7 @@ export const PRODUCTS: Product[] = [
   { id: 'dameng', driver: 'dameng', port: 5236 },
   { id: 'sqlserver', driver: 'sqlserver', port: 1433 },
   { id: 'gbase8s', driver: 'informix', port: 9088 },
+  { id: 'gbase8a', driver: 'mysql', port: 5258 },
   // 本机文件，没有端口；只有桌面版可用
   { id: 'sqlite', driver: 'sqlite', port: 0 },
 ]
@@ -51,7 +53,7 @@ export const PRODUCTS: Product[] = [
  * OceanBase 也只有一个入口：Oracle 模式租户先按 MySQL 连会被拒绝，后端随即改走 JDBC，并把连接配置改成 `oceanbase_oracle`。
  */
 export const PRODUCT_GROUPS: { key: 'domestic' | 'other'; products: ProductId[] }[] = [
-  { key: 'domestic', products: ['dameng', 'kingbase', 'gaussdb', 'opengauss', 'oceanbase', 'goldendb', 'tidb', 'gbase8s'] },
+  { key: 'domestic', products: ['dameng', 'kingbase', 'gaussdb', 'opengauss', 'oceanbase', 'goldendb', 'tidb', 'gbase8s', 'gbase8a'] },
   { key: 'other', products: ['mysql', 'mariadb', 'postgres', 'oracle', 'sqlserver', 'sqlite'] },
 ]
 

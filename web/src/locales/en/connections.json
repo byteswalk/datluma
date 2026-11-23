@@ -52,6 +52,10 @@
       "label": "OceanBase (Oracle mode)",
       "note": "Oracle-mode tenant of the Enterprise Edition; user is user@tenant; connects through the official JDBC driver"
     },
+    "gbase8a": {
+      "label": "GBase 8a",
+      "note": "GBase 8a MPP, default port 5258, over the MySQL protocol. No rollback, so autocommit only; the table designer and migration are not adapted"
+    },
     "goldendb": {
       "label": "GoldenDB",
       "note": "Connects through the official JDBC driver; the port is that of the connection instance. Put the driver jar in the JDBC driver folder yourself"

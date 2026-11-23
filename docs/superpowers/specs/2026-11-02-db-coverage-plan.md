@@ -15,6 +15,8 @@
 | GoldenDB | Oracle、MySQL 租户 | V6.1.03.12SP5 |
 | TiDB | — | v8.5.8 |
 | GBase 8s | — | V8.8_3.6.5 开发版 |
+| GBase 8c | A、PG | V6 S1.3.0B19（内核 openGauss 6.0.2，说明 `docs/notes/gbase-8a-8c.md`） |
+| GBase 8a | — | 9.5.3.28.12 FREE 单节点，第三层适配（同上） |
 | MySQL | — | 9.7.4 |
 | MariaDB | — | 12.3.3 |
 | PostgreSQL | — | 18.6 |
@@ -87,6 +89,22 @@ PostgreSQL 12.20、14.19 于 2026-11-05 验证，见 `docs/notes/postgres-versio
 
 M10a、M10b 于 2026-11-05 完成，只在桌面版（能打开本机文件时）开放，见 `docs/notes/m10a-sqlite.md`、`docs/notes/m10b-sqlite.md`。
 
+### GBase 8a、GBase 8c
+
+2026-11-23 用户要求纳入。已支持的 GBase 8s（JDBC 桥接）之外，南大通用还有两款独立产品，数据字典和连接方式都不同：
+
+| 产品 | 定位 | 连接方式（待实测确认） |
+|---|---|---|
+| GBase 8c | 多模分布式；实测的 V6 S1.3 内核是 openGauss 6.0.2 | PG 协议，先按 openGauss 的查询连接；另有 MySQL 兼容（B 兼容）库，可用 MySQL 协议连 |
+| GBase 8a MPP Cluster | 分析型，MPP 列存 | 官方 JDBC `gbase-connector-java`（驱动类 `com.gbase.jdbc.Driver`，`jdbc:gbase://主机:5258/库`），资料称走 GBase 自有协议；语法和类型与 MySQL 高度兼容。先试 MySQL 协议能否连上，不行走 JDBC 桥接（同 GBase 8s、GoldenDB） |
+
+按覆盖规则属于第三层，先保证能连、能浏览、能执行 SQL、出错有提示，再看表设计器、DDL 读回、迁移：
+
+- 8c：在 openGauss 的测试集上全量跑一遍，差异再修。分布式部署有 CN、DN、GTM、DCS 等组件，建表多了分布键；先找集中式或单机的安装方式。
+- 8a：数据字典单独写；表有哈希分布列、复制表等分布方式，读回 DDL 和迁移要处理。集群可以单节点安装。
+
+需要用户提供：南大通用官网的 8a、8c 安装包和驱动（下载需登录）。Docker Hub 上的第三方镜像来源不明，不用。
+
 ## 测试机安排
 
 - 106 内存 23G，磁盘只剩 18G：Docker 占 52G（数据卷 45G）。虚拟机文件在 D 盘，D 盘只剩 32G。
@@ -104,5 +122,7 @@ M10a、M10b 于 2026-11-05 完成，只在桌面版（能打开本机文件时�
 6. 达梦兼容模式和大小写不敏感。已完成（2026-11-03）
 7. PostgreSQL 12、14。已完成（2026-11-05）
 8. SQLite。已完成（2026-11-05）：M10a 连接、浏览、查询、编辑、导出、运维页；M10b 表设计器、导入、比对、模型、迁移、规范检查
+9. GBase 8c：按 openGauss 路径实测。已完成（2026-11-23），见 `docs/notes/gbase-8a-8c.md`
+10. GBase 8a：走内置 MySQL 协议，按第三层适配。已完成（2026-11-23），见 `docs/notes/gbase-8a-8c.md`
 
-要用户提供的：需要登录才能下载的安装包（金仓、Oracle 19c 已提供）。
+要用户提供的：需要登录才能下载的安装包（金仓、Oracle 19c 已提供；GBase 8a、8c 已提供）。

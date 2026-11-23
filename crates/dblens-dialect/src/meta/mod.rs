@@ -12,12 +12,12 @@ use serde::{Deserialize, Serialize};
 
 use dblens_core::Value;
 
-pub(crate) use assemble::goldendb_triggers;
 pub use assemble::{
     DependentView, Grant, LintTable, ObjectInfo, ReferencingKey, SchemaInfo, TableRows, TableStorage,
     dependent_views, function_indexes, grants, lint_tables, objects, referencing_keys, reserved_words,
     routines, schemas, sequences, source_text, synonyms, table_storage, tables, trigger_ddl, views,
 };
+pub(crate) use assemble::{goldendb_triggers, show_create_source};
 pub use rows::{MetaRow, MetaRows};
 
 /// 元数据查询的种类。每个 key 对应模板文件里的一段 `-- [key]`。
