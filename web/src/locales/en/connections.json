@@ -89,7 +89,7 @@
     },
     "sqlite": {
       "label": "SQLite",
-      "note": "A database file on this computer; only the desktop app can open it."
+      "note": "A database file on this computer; only the desktop app or the browser edition running on this computer can open it."
     }
   },
   "databaseLabel": {

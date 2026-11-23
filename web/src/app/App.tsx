@@ -1,5 +1,6 @@
 // 应用入口：拿到令牌后读取设置，按主题配置 antd，挂上外壳和全局对话框。
 
+import { StyleProvider, legacyLogicalPropertiesTransformer } from '@ant-design/cssinjs'
 import { App as AntApp, ConfigProvider, Result, Spin, theme as antdTheme } from 'antd'
 import enUS from 'antd/locale/en_US'
 import zhCN from 'antd/locale/zh_CN'
@@ -11,6 +12,7 @@ import ConnectionDialog from '../features/connections/ConnectionDialog'
 import { TABS_KEY, persistTabs, useTabs } from '../features/editor/tabs'
 import VaultDialog from '../features/connections/VaultDialog'
 import { type Api, createApi } from '../shared/api'
+import { LEGACY_CSS } from '../shared/compat'
 import { type Host, HostContext } from '../shared/host'
 import { LANG_KEY, applyLang, parseLangPref, resolveLang } from '../shared/i18n'
 import { useSetting, useSettings } from '../shared/settings'
@@ -40,7 +42,7 @@ function Themed() {
   const algorithm = isDarkTheme(theme) ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm
   // 不用 compactAlgorithm：它把字号再减 2px。正文 14px 与 shell.css 的 --fs 一致，控件高度略收紧
   const token = { fontSize: 14, borderRadius: 4, controlHeight: 30, controlHeightSM: 26, ...THEME_PRIMARY[theme] }
-  return (
+  const ui = (
     <ConfigProvider locale={lang === 'en' ? enUS : zhCN} theme={{ algorithm, token }}>
       <AntApp style={{ height: '100%' }}>
         <CrashBoundary>
@@ -51,6 +53,14 @@ function Themed() {
         <SettingsDialog />
       </AntApp>
     </ConfigProvider>
+  )
+  // 老内核不认 antd 样式里的 :where() 和逻辑属性，换成普通选择器和左右属性（antd 文档的兼容做法）
+  return LEGACY_CSS ? (
+    <StyleProvider hashPriority="high" transformers={[legacyLogicalPropertiesTransformer]}>
+      {ui}
+    </StyleProvider>
+  ) : (
+    ui
   )
 }
 

@@ -1,0 +1,3 @@
+allowBuilds:
+  # 只打印赞助广告，不需要运行
+  core-js: false

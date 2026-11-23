@@ -1343,3 +1343,17 @@ body {
   border-top: 1px solid var(--border);
   margin: 8px 0;
 }
+
+/* 老内核（Chromium 84 之前）flex 不支持 gap，只给最显眼的几处补间距，见 shared/compat.ts */
+.no-flex-gap .statusbar > * + * {
+  margin-left: 16px;
+}
+.no-flex-gap .quickbar .q > :first-child {
+  margin-right: 6px;
+}
+.no-flex-gap .tab > * + * {
+  margin-left: 6px;
+}
+.no-flex-gap .ant-btn > .ant-btn-icon + span {
+  margin-left: 6px;
+}
