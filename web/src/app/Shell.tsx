@@ -3,7 +3,7 @@
 // 没有查询标签时工作区显示欢迎页；工作区（Monaco、结果表格）懒加载。
 
 import { Button, Spin } from 'antd'
-import { IconDatabase, IconFileCode, IconHistory, IconPlus, IconSchema, IconSettings, IconStar, IconTool } from '@tabler/icons-react'
+import { IconDatabase, IconFileCode, IconHistory, IconPlus, IconCube, IconSettings, IconStar, IconTool } from '@tabler/icons-react'
 import { Suspense, lazy, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Group, Panel, type PanelImperativeHandle, Separator, useDefaultLayout } from 'react-resizable-panels'
@@ -41,7 +41,7 @@ const Workspace = lazy(async () => {
 // 侧栏名称在渲染时按 app.side.<key> 取
 const SIDES: { key: SideKey; icon: typeof IconDatabase }[] = [
   { key: 'db', icon: IconDatabase },
-  { key: 'models', icon: IconSchema },
+  { key: 'models', icon: IconCube },
   { key: 'history', icon: IconHistory },
   { key: 'favorites', icon: IconStar },
   { key: 'ops', icon: IconTool },

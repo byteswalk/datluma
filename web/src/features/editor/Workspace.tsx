@@ -3,7 +3,7 @@
 // 标签多时先缩窄（悬停看全名），再放不下就用滚轮横向滚动，不显示滚动条；右端 ▾ 列出全部标签；右键菜单批量关闭。
 
 import { Dropdown, type MenuProps } from 'antd'
-import { IconAffiliate, IconArrowsDiff, IconTransfer, IconChevronDown, IconClipboardCheck, IconFileCode, IconPlus, IconShieldLock, IconSchema, IconTable, IconTableOptions, IconX } from '@tabler/icons-react'
+import { IconAffiliate, IconArrowsDiff, IconTransfer, IconChevronDown, IconClipboardCheck, IconFileCode, IconPlus, IconShieldLock, IconCube, IconTable, IconTableOptions, IconX } from '@tabler/icons-react'
 import { useQuery } from '@tanstack/react-query'
 import { Spin } from 'antd'
 import { Suspense, type WheelEvent, lazy, useEffect, useRef } from 'react'
@@ -107,7 +107,7 @@ function TabTitle({ tab, active, envClass, profileName, profile }: {
         ) : tab.compare ? (
           <IconArrowsDiff size={16} />
         ) : tab.design?.model ? (
-          <IconSchema size={16} />
+          <IconCube size={16} />
         ) : tab.design ? (
           <IconTableOptions size={16} />
         ) : tab.data ? (

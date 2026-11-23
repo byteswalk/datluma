@@ -2,7 +2,7 @@
 // 工具栏打开、新建、从库反向生成、重新加载；右键新建表、用设计器打开、改名、删除、与库比对。
 // 模型目录是服务所在机器上的路径：服务不允许时（监听其他地址的浏览器模式）只显示说明。
 
-import { IconAffiliate, IconDatabaseImport, IconFolderOpen, IconPlus, IconRefresh, IconSchema, IconTable } from '@tabler/icons-react'
+import { IconAffiliate, IconDatabaseImport, IconFolderOpen, IconPlus, IconRefresh, IconCube, IconTable } from '@tabler/icons-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Dropdown, Input, type MenuProps, Tree } from 'antd'
 import type { DataNode } from 'antd/es/tree'
@@ -42,7 +42,7 @@ function ModelTree({ model, onMenu }: { model: ModelSummary; onMenu(n: NodeRef, 
   const tree: DataNode[] = [
     node(model.id, { type: 'model', model }, {
       title: <span title={model.path}>{model.info.name}{model.read_only && <span className="err"> · {t('model.readOnly')}</span>}</span>,
-      icon: <IconSchema size={16} />,
+      icon: <IconCube size={16} />,
       children: schemas.map((s) =>
         node(`${model.id}/${s}`, { type: 'schema', model, schema: s }, {
           title: s,

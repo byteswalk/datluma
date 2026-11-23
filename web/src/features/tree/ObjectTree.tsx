@@ -16,7 +16,7 @@ import {
   IconKey,
   IconLink,
   IconListNumbers,
-  IconSchema,
+  IconCube,
   IconSearch,
   IconStack2,
   IconTable,
@@ -265,7 +265,7 @@ export default function ObjectTree() {
       return items.map((i) => {
         const k = decodeKey(i.key)
         const icon =
-          k.type === 'd' ? <IconDatabase size={16} /> : k.type === 's' ? <IconSchema size={16} className="ic-schema" /> : k.type === 'g' ? <IconFolder size={16} /> : k.type === 'k' || k.type === 'o' ? CATEGORY_ICON[k.kind] : i.pk ? <IconKey size={16} color="var(--warn)" /> : <IconColumns size={16} />
+          k.type === 'd' ? <IconDatabase size={16} /> : k.type === 's' ? <IconCube size={16} className="ic-schema" /> : k.type === 'g' ? <IconFolder size={16} /> : k.type === 'k' || k.type === 'o' ? CATEGORY_ICON[k.kind] : i.pk ? <IconKey size={16} color="var(--warn)" /> : <IconColumns size={16} />
         const label = k.type === 'k' ? categoryLabel(k.kind) : k.type === 'g' ? t('tree.node.system') : i.label
         const extra = i.routineKind ? routineKindLabel(i.routineKind) : i.extra === 'system' ? t('tree.node.system') : i.extra
         const count = k.type === 'k' && loaded[i.key] && !loaded[i.key].error ? loaded[i.key].items.length : null
