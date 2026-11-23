@@ -24,6 +24,7 @@ import ModelDialogs from '../features/model/ModelDialogs'
 import SearchDialog from '../features/tree/SearchDialog'
 import ModelsPanel from '../features/model/ModelsPanel'
 import OpsPanel from '../features/ops/OpsPanel'
+import LocateButton from '../features/tree/LocateButton'
 import ObjectTree from '../features/tree/ObjectTree'
 import { useHost } from '../shared/host'
 import { layoutStorage } from '../shared/settings'
@@ -153,7 +154,11 @@ export default function Shell() {
           <Panel id="side" panelRef={sidePanel} defaultSize={270} minSize={200} maxSize={600} collapsible>
             {current && (
               <div className="side">
-                <div className="row side-h">{t(`app.side.${current.key}` as const)}</div>
+                <div className="row side-h">
+                  <span className="grow">{t(`app.side.${current.key}` as const)}</span>
+                  {/* 各侧栏都放，点了切到对象树或模型面板 */}
+                  <LocateButton />
+                </div>
                 <div className="side-body">
                   <SideContent side={current.key} />
                 </div>

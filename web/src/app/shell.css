@@ -311,6 +311,21 @@ body {
   border-bottom: 1px solid var(--border);
   font-weight: 600;
 }
+/* 侧栏标题右侧的小图标按钮（在对象树中定位） */
+.side-act {
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.side-act:hover {
+  color: var(--text);
+  background: var(--hover);
+}
 .side-body {
   flex: 1;
   overflow: auto;

@@ -87,5 +87,14 @@
     "all": "All environments",
     "none": "No environment selected",
     "selectAll": "Select all"
+  },
+  "reveal": {
+    "button": "Locate in Tree",
+    "cleared": "Filters cleared",
+    "noProfile": "This tab has no connection",
+    "profileDeleted": "The connection was deleted",
+    "lintLibrary": "The rule library page has no tree object",
+    "notFound": "{{name}} was not found in the tree",
+    "modelNotOpen": "Model is not open: {{path}}"
   }
 }

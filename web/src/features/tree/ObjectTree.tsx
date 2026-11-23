@@ -22,7 +22,7 @@ import {
   IconTable,
 } from '@tabler/icons-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type Key, type ReactNode, Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
+import { type Key, type ReactNode, Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useHost, withoutHidden } from '../../shared/host'
 
@@ -44,6 +44,7 @@ import {
   exportSource,
   joinCatalog,
   schemaLabel,
+  splitCatalog,
 } from '../../shared/api'
 import DbIcon from '../../shared/DbIcon'
 import { hasCatalogs } from '../../shared/schemaOptions'
@@ -68,6 +69,7 @@ import {
   routineKindLabel,
 } from './nodes'
 import { ddlKind, generateChoice, generateMenu, targetKind } from './objectMenu'
+import { type RevealTarget, takeReveal, useReveal } from './reveal'
 
 // 预览用 Monaco：和工作区一样先加载它的语言包，第一次查看 DDL 时才加载
 const DdlDialog = lazy(async () => {
@@ -189,6 +191,7 @@ export default function ObjectTree() {
   const [expanded, setExpanded] = useState<Key[]>([])
   const [filter, setFilter] = useState('')
   const [envs, setEnvs] = useState<Environment[]>(ALL_ENVS)
+  const [selected, setSelected] = useState<Key[]>([])
   const [menuNode, setMenuNode] = useState<NodeKey | null>(null)
   const [ddl, setDdl] = useState<DdlTarget | null>(null)
 
@@ -206,19 +209,111 @@ export default function ObjectTree() {
   const load = useCallback(
     async (key: string) => {
       const k = decodeKey(key)
+      let result: Loaded
       try {
         const items = await withVault(api, () => loadChildren(api, profiles, k))
-        setLoaded((m) => ({ ...m, [key]: { items } }))
+        result = { items }
         // 第一次连上时后端记下了识别出的数据库变体：重新取连接列表，换成具体数据库的图标
         if (k.type === 'c' && !profiles.find((p) => p.id === k.profileId)?.variant) {
           void qc.invalidateQueries({ queryKey: ['profiles'] })
         }
       } catch (e) {
-        setLoaded((m) => ({ ...m, [key]: { items: [], error: (e as Error).message } }))
+        result = { items: [], error: (e as Error).message }
       }
+      setLoaded((m) => ({ ...m, [key]: result }))
+      return result
     },
     [api, profiles, qc],
   )
+
+  // 定位时逐层等加载：已加载的直接用
+  const loadedRef = useRef(loaded)
+  loadedRef.current = loaded
+  const ensure = async (key: string) => loadedRef.current[key] ?? (await load(key))
+  const treeBox = useRef<HTMLDivElement>(null)
+
+  /** 在树中定位：清掉过滤，逐层加载并展开到目标，选中它并滚到可见处。找不到的层停在上一层。 */
+  const reveal = async (target: Extract<RevealTarget, { panel: 'db' }>) => {
+    if (filter.trim() || envs.length !== ALL_ENVS.length) {
+      setFilter('')
+      setEnvs(ALL_ENVS)
+      message.info(t('tree.reveal.cleared'))
+    }
+    const { profileId } = target
+    const driver = driverOf(profileId)
+    const conn = encodeKey({ type: 'c', profileId })
+    const path: string[] = []
+    let at = conn
+    // 在一层子节点里找：先精确匹配，再忽略大小写
+    const find = async (parent: string, want: string, keyOf: (k: NodeKey) => string | undefined) => {
+      const l = await ensure(parent)
+      const hit = (eq: (a: string) => boolean) => l.items.find((i) => {
+        const v = keyOf(decodeKey(i.key))
+        return v !== undefined && eq(v)
+      })?.key
+      return hit((a) => a === want) ?? hit((a) => a.toLowerCase() === want.toLowerCase())
+    }
+    const catalog = target.catalog ?? (driver && hasCatalogs(driver) && target.schema ? splitCatalog(target.schema).catalog : undefined)
+    let missing: string | undefined
+    if (catalog !== undefined) {
+      const d = await find(at, catalog, (k) => (k.type === 'd' ? k.catalog : undefined))
+      if (d) {
+        path.push(at)
+        at = d
+      } else missing = catalog
+    }
+    if (!missing && target.schema) {
+      const want = target.schema
+      const schemaOf = (k: NodeKey) => (k.type === 's' ? k.schema : undefined)
+      let s = await find(at, want, schemaOf)
+      let parent = at
+      if (!s) {
+        // 系统 schema 在"系统"分组下
+        const g = (await ensure(at)).items.find((i) => decodeKey(i.key).type === 'g')?.key
+        if (g) {
+          s = await find(g, want, schemaOf)
+          if (s) {
+            path.push(at)
+            parent = g
+          }
+        }
+      }
+      if (s) {
+        path.push(parent)
+        at = s
+      } else missing = splitCatalog(want).schema
+    }
+    if (!missing && target.object) {
+      const schema = (decodeKey(at) as Extract<NodeKey, { type: 's' }>).schema
+      let found: string | undefined
+      for (const kind of target.object.kinds) {
+        const k = encodeKey({ type: 'k', profileId, schema, kind })
+        if (!(await ensure(at)).items.some((i) => i.key === k)) continue
+        found = await find(k, target.object.name, (x) => (x.type === 'o' ? x.name : undefined))
+        if (found) {
+          path.push(at, k)
+          at = found
+          break
+        }
+      }
+      if (!found) missing = target.object.name
+    }
+    if (missing) message.info(t('tree.reveal.notFound', { name: missing }))
+    setExpanded((e) => [...new Set([...e.map(String), ...path])])
+    setSelected([at])
+    selectProfile(profileId)
+    // 等展开的节点渲染出来再滚动
+    setTimeout(() => treeBox.current?.querySelector('.ant-tree-treenode-selected')?.scrollIntoView({ block: 'nearest' }), 60)
+  }
+
+  const revealRequest = useReveal((s) => s.request)
+  useEffect(() => {
+    // 侧栏刚切过来时连接列表可能还没取到；已处理过的请求不再执行（切换侧栏后组件会重新挂载）
+    if (!profiles.length) return
+    const target = takeReveal('db')
+    if (target?.panel === 'db') void reveal(target)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealRequest, profiles])
 
   /** 刷新一个节点：清后端元数据缓存，丢掉它下面已加载和已展开的内容，再重新取。系统分组按所在的连接或库刷新。 */
   const refresh = async (node: NodeKey) => {
@@ -488,7 +583,7 @@ export default function ObjectTree() {
       {profilesError && <div className="err" style={{ padding: 8 }}>{(profilesError as Error).message}</div>}
       <Dropdown trigger={['contextMenu']} menu={{ items: shownItems, onClick: (e) => onMenu(e.key) }}>
         {/* 左右留白和上面的过滤框一致 */}
-        <div className="grow" style={{ overflow: 'auto', padding: '0 6px' }}>
+        <div ref={treeBox} className="grow" style={{ overflow: 'auto', padding: '0 6px' }}>
           <Tree
             blockNode
             showIcon
@@ -497,7 +592,11 @@ export default function ObjectTree() {
             onExpand={(keys) => setExpanded(keys)}
             loadedKeys={Object.keys(loaded)}
             loadData={(node: EventDataNode<DataNode>) => load(String(node.key))}
-            onSelect={(_, { node }) => selectProfile(decodeKey(String(node.key)).profileId)}
+            selectedKeys={selected}
+            onSelect={(keys, { node }) => {
+              setSelected(keys)
+              selectProfile(decodeKey(String(node.key)).profileId)
+            }}
             onDoubleClick={(_, node) => {
               const key = String(node.key)
               if (!key.includes('\u0002')) openData(decodeKey(key))

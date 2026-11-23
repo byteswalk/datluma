@@ -87,5 +87,14 @@
     "all": "全部环境",
     "none": "未选环境",
     "selectAll": "全选"
+  },
+  "reveal": {
+    "button": "在对象树中定位",
+    "cleared": "已清除过滤",
+    "noProfile": "当前标签没有对应的连接",
+    "profileDeleted": "连接已删除",
+    "lintLibrary": "规范库页面不对应树中的对象",
+    "notFound": "树中没有找到 {{name}}",
+    "modelNotOpen": "模型没有打开：{{path}}"
   }
 }

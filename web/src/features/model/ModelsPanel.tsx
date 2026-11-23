@@ -6,7 +6,7 @@ import { IconAffiliate, IconDatabaseImport, IconFolderOpen, IconPlus, IconRefres
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { App, Dropdown, Input, type MenuProps, Tree } from 'antd'
 import type { DataNode } from 'antd/es/tree'
-import { useState } from 'react'
+import { type Key, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
@@ -15,6 +15,7 @@ import { desktop } from '../../shared/shell'
 import { useTabs } from '../editor/tabs'
 import { useDocExport } from '../document/dialog'
 import { useLintStart } from '../lint/dialog'
+import { takeReveal, useReveal } from '../tree/reveal'
 import { useModelDialogs } from './dialogs'
 
 type NodeRef =
@@ -24,8 +25,21 @@ type NodeRef =
   | { type: 'diagrams'; model: ModelSummary; schema: string }
   | { type: 'diagram'; model: ModelSummary; schema: string; name: string }
 
-function ModelTree({ model, onMenu }: { model: ModelSummary; onMenu(n: NodeRef, key: string): void }) {
+/** 定位到模型里的 schema 或表；`seq` 每次定位都不同。 */
+interface Focus { modelId: string; schema?: string; table?: string; seq: number }
+
+function ModelTree({ model, onMenu, focus }: { model: ModelSummary; onMenu(n: NodeRef, key: string): void; focus?: Focus }) {
   const api = useApi()
+  const [expanded, setExpanded] = useState<Key[]>([model.id])
+  const [selected, setSelected] = useState<Key[]>([])
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!focus || focus.modelId !== model.id) return
+    const schemaKey = focus.schema ? `${model.id}/${focus.schema}` : undefined
+    setExpanded((e) => [...new Set([...e, model.id, ...(schemaKey && focus.table ? [schemaKey] : [])])])
+    setSelected([focus.table && schemaKey ? `${schemaKey}/${focus.table}` : schemaKey ?? model.id])
+    setTimeout(() => box.current?.querySelector('.ant-tree-treenode-selected')?.scrollIntoView({ block: 'nearest' }), 60)
+  }, [focus, model.id])
   const { t } = useTranslation()
   const { data: tables = [] } = useQuery({ queryKey: ['model-tables', model.id], queryFn: () => api.modelTables(model.id) })
   const schemas = [...new Set([...model.info.schemas, ...tables.map((x) => x.schema)])]
@@ -130,11 +144,14 @@ function ModelTree({ model, onMenu }: { model: ModelSummary; onMenu(n: NodeRef, 
   }
   return (
     <Dropdown trigger={['contextMenu']} menu={{ items: items(menuNode), onClick: ({ key }) => menuNode && onMenu(menuNode, key) }}>
-      <div>
+      <div ref={box}>
         <Tree
           showIcon
           blockNode
-          defaultExpandedKeys={[model.id]}
+          expandedKeys={expanded}
+          onExpand={setExpanded}
+          selectedKeys={selected}
+          onSelect={setSelected}
           treeData={tree}
           onRightClick={({ node: n }) => setMenuNode(refs.get(String(n.key)) ?? null)}
           onDoubleClick={(_, n) => {
@@ -155,6 +172,23 @@ export default function ModelsPanel() {
   const qc = useQueryClient()
   const dialogs = useModelDialogs()
   const { data, error, refetch } = useQuery({ queryKey: ['models'], queryFn: () => api.models(), retry: false })
+
+  // 在模型面板中定位（侧栏标题的准星按钮）：模型按目录找，没打开就提示
+  const [focus, setFocus] = useState<Focus>()
+  const revealRequest = useReveal((s) => s.request)
+  useEffect(() => {
+    if (!data) return
+    const target = takeReveal('models')
+    if (target?.panel !== 'models') return
+    const norm = (p: string) => p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase()
+    const m = data.open.find((x) => norm(x.path) === norm(target.model))
+    if (!m) {
+      message.info(t('tree.reveal.modelNotOpen', { path: target.model }))
+      return
+    }
+    setFocus({ modelId: m.id, schema: target.schema, table: target.table, seq: Date.now() })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [revealRequest, data])
 
   if (error) {
     const forbidden = error instanceof ApiError && error.status === 403
@@ -287,7 +321,7 @@ export default function ModelsPanel() {
       </div>
       {open.length === 0 && <div className="muted" style={{ padding: '4px 12px' }}>{t('model.empty')}</div>}
       {open.map((m) => (
-        <ModelTree key={m.id} model={m} onMenu={(n, k) => void onMenu(n, k)} />
+        <ModelTree key={m.id} model={m} focus={focus} onMenu={(n, k) => void onMenu(n, k)} />
       ))}
       {recent.length > 0 && (
         <>
