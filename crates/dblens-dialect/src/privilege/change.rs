@@ -245,7 +245,9 @@ impl Dialect {
             write: family != Family::Sqlite,
             os_accounts: family == Family::Informix,
             lock: family != Family::Postgres || gauss,
-            roles: !(self.variant() == Variant::MySql && self.version().is_some_and(|v| v < 80000)),
+            // MySQL 8.0 起才有角色；GBase 8a 的权限体系同 MySQL 5.x，没有角色
+            roles: !(matches!(self.variant(), Variant::MySql | Variant::Gbase8a)
+                && self.version().is_some_and(|v| v < 80000)),
             role_password: gauss,
             host: family == Family::MySql,
             drop_cascade: matches!(family, Family::Postgres | Family::Oracle | Family::Dameng),

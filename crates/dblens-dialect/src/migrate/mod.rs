@@ -12,7 +12,7 @@ mod types;
 use std::collections::{BTreeMap, BTreeSet};
 
 use dblens_core::schema::{CheckConstraint, Column, ForeignKey, Index, Sequence, Table, UniqueConstraint};
-use dblens_core::{ColumnType, Msg, msg};
+use dblens_core::{ColumnType, LogicalType, Msg, msg};
 use serde::{Deserialize, Serialize};
 
 use crate::design::diff::{is_expression, text};
@@ -390,8 +390,14 @@ impl Context<'_> {
                 ),
             }
         }
+        // GBase 8a 没有唯一约束、外键，索引只能单列、非唯一
+        let g8a = self.tgt.variant() == Variant::Gbase8a;
         for u in &t.uniques {
             let item = item_name(&u.name, &u.columns);
+            if g8a {
+                n.push(None, Some(&item), NoteLevel::Lossy, msg!("gbase8a.design.no_unique"));
+                continue;
+            }
             match map_cols(&u.columns) {
                 Some(columns) if columns.iter().any(|c| lob(c)) => {
                     n.push(None, Some(&item), NoteLevel::Lossy, msg!("migrate.lob_index"))
@@ -403,11 +409,25 @@ impl Context<'_> {
             }
         }
         for x in t.indexes.iter().filter(|x| !self.fk_index(t, x)) {
+            if g8a && (x.unique || x.columns.len() > 1) {
+                let why = if x.unique {
+                    msg!("gbase8a.design.no_unique")
+                } else {
+                    msg!("gbase8a.design.index_one_column", index = x.name)
+                };
+                n.push(None, Some(&x.name), NoteLevel::Lossy, why);
+                continue;
+            }
             if let Some(i) = self.index(x, &cols, &lob, n) {
                 target.indexes.push(i);
             }
         }
         for f in &t.foreign_keys {
+            if g8a {
+                let item = item_name(&f.name, &f.columns);
+                n.push(None, Some(&item), NoteLevel::Lossy, msg!("gbase8a.design.no_foreign_key"));
+                continue;
+            }
             if let Some(f) = self.foreign_key(f, &cols, n) {
                 target.foreign_keys.push(f);
             }
@@ -451,7 +471,7 @@ impl Context<'_> {
         let to_int = c.auto_increment
             && ov.data_type.is_none()
             && types::identity_supported(self.tgt)
-            && self.tgt.variant() != Variant::OceanBaseOracle
+            && !matches!(self.tgt.variant(), Variant::OceanBaseOracle | Variant::Gbase8a)
             && types::identity_to_int(self.tgt, &c.data_type.logical);
         let (native, logical) =
             types::column_type(self.src, self.tgt, c, ov, &self.settings.type_rules, |l, m| {
@@ -459,6 +479,16 @@ impl Context<'_> {
                     n.push(at, None, l, m)
                 }
             });
+        // GBase 8a 的时间类型不带小数秒，写 DATETIME(0) 也报语法错误
+        let (native, logical) = match logical {
+            LogicalType::Timestamp { tz, precision: Some(_) } if self.tgt.variant() == Variant::Gbase8a => {
+                (strip_precision(&native), LogicalType::Timestamp { tz, precision: Some(0) })
+            }
+            LogicalType::Time { precision: Some(_) } if self.tgt.variant() == Variant::Gbase8a => {
+                (strip_precision(&native), LogicalType::Time { precision: Some(0) })
+            }
+            l => (native, l),
+        };
         let mut out = Column {
             name,
             ordinal,
@@ -491,6 +521,11 @@ impl Context<'_> {
             // 改不了起始值：留着标识列，迁完后新值会撞主键
             if self.tgt.variant() == Variant::OceanBaseOracle {
                 n.push(at, None, NoteLevel::Lossy, msg!("migrate.identity_plain"));
+                return out;
+            }
+            // GBase 8a 不接受往自增列写显式值，迁过去的主键值写不进
+            if self.tgt.variant() == Variant::Gbase8a {
+                n.push(at, None, NoteLevel::Lossy, msg!("gbase8a.migrate.identity_plain"));
                 return out;
             }
             if types::identity_supported(self.tgt) {
@@ -733,6 +768,11 @@ fn kingbase_number_casts(e: &str) -> String {
 }
 
 /// 索引、约束在提示中的名字：有名字用名字，否则用列清单。
+/// `DATETIME(6)` → `DATETIME`：去掉类型名后的括号部分。
+fn strip_precision(native: &str) -> String {
+    native.split('(').next().unwrap_or(native).trim().to_string()
+}
+
 fn item_name(name: &Option<String>, columns: &[String]) -> String {
     name.clone().unwrap_or_else(|| columns.join(", "))
 }

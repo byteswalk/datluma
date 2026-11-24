@@ -3,7 +3,7 @@
 import type { DriverId, Environment, Profile, ProfileInput, ServerSummary } from '../../shared/api'
 import { t } from '../../shared/i18n'
 import { variantName } from '../editor/dialect'
-import { type ProductId, baseProduct, product, productLabel, productOf } from './products'
+import { type ProductId, baseProduct, product, productLabel, productOf, productVariant } from './products'
 
 export type TlsMode = 'disable' | 'require' | 'verify'
 
@@ -279,6 +279,10 @@ export function validate(f: ConnectionForm): Partial<Record<keyof ConnectionForm
     if (!Number.isInteger(f.port) || f.port < 1 || f.port > 65535) e.port = t('connections.validate.portRange')
   }
   if (needsCredentials(f) && !f.user.trim()) e.user = t('connections.validate.userRequired')
+  // “本机”只给本机地址（后端保存时同样检查）
+  if (f.environment === 'none' && !isFileDb(f.driver) && f.host.trim() && !isLoopback(f.host)) {
+    e.environment = t('connections.validate.localNotLoopback', { host: f.host.trim() })
+  }
   if (f.driver === 'informix' && !f.serverName.trim()) e.serverName = t('connections.validate.serverNameRequired')
   if (f.driver === 'oracle' && f.product !== 'oceanbase_oracle' && !f.database.trim() && !f.oracleSid.trim()) {
     e.database = t('connections.validate.serviceOrSidRequired')
@@ -293,6 +297,12 @@ export function validate(f: ConnectionForm): Partial<Record<keyof ConnectionForm
     }
   }
   return e
+}
+
+/** 本机地址：127.0.0.0/8、::1、localhost（与后端 profile::is_loopback 相同）。 */
+export function isLoopback(host: string): boolean {
+  const h = host.trim().replace(/^\[|\]$/g, '').toLowerCase()
+  return h === 'localhost' || h === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)
 }
 
 /** 测试连接成功后显示的服务器版本：有的数据库（如 PostgreSQL）返回的版本字符串已经带产品名，不再重复。 */
@@ -316,7 +326,7 @@ export function serverNotes(s: ServerSummary, chosen: ProductId): { text: string
   }
   const detected = productOf(product(chosen).driver, s.variant)
   // 选的是标准库（如 PostgreSQL）而识别出兼容库时不算不一致：较早的连接都按驱动选的
-  if (chosen !== detected && chosen !== product(chosen).driver) {
+  if (productVariant(chosen) !== productVariant(detected) && chosen !== product(chosen).driver) {
     out.push({ text: t('connections.dialog.productMismatch', { chosen: productLabel(chosen), detected: s.variant_name }), warn: true })
   }
   return out

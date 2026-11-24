@@ -53,8 +53,11 @@ pub(super) const RULES: &[RuleDef] = &[
     },
     RuleDef {
         id: "db.engine",
-        // OceanBase 的 MySQL 模式报告的引擎是 oceanbase
-        params: &[ParamDef { key: "allowed", default: ParamDefault::List(&["InnoDB", "oceanbase"]) }],
+        // OceanBase 的 MySQL 模式报告的引擎是 oceanbase；GBase 8a 只有 EXPRESS
+        params: &[ParamDef {
+            key: "allowed",
+            default: ParamDefault::List(&["InnoDB", "oceanbase", "EXPRESS"]),
+        }],
         fix: None,
         check: engine,
     },

@@ -354,12 +354,12 @@ impl DriverRegistry {
 fn oceanbase_oracle_tenant(profile: &Profile, err: &Error) -> Option<Profile> {
     let i = &profile.input;
     let oracle_tenant = matches!(err, Error::Sql { code, .. } if code == "1235");
-    if !oracle_tenant || i.driver != DriverId::Mysql || i.product != Some(Variant::OceanBase) {
+    if !oracle_tenant || i.driver != DriverId::Mysql || i.product.as_deref() != Some("oceanbase") {
         return None;
     }
     let mut p = profile.clone();
     p.input.driver = DriverId::Oracle;
-    p.input.product = Some(Variant::OceanBaseOracle);
+    p.input.product = Some("oceanbase_oracle".into());
     // MySQL 的 TLS 选项对 JDBC 桥接无效，去掉免得混淆
     p.input.options.retain(|k, _| !k.starts_with("tls"));
     p.input.options.insert("client".into(), "jdbc".into());
@@ -418,7 +418,7 @@ mod tests {
     fn oceanbase(tls: bool) -> Profile {
         let mut input = input("ob");
         input.driver = DriverId::Mysql;
-        input.product = Some(Variant::OceanBase);
+        input.product = Some("oceanbase".into());
         input.options.clear();
         if tls {
             input.options.insert("tls".into(), "require".into());
@@ -434,7 +434,7 @@ mod tests {
     fn oceanbase_oracle_tenant_switches_to_jdbc() {
         let p = oceanbase_oracle_tenant(&oceanbase(true), &sql_error("1235")).unwrap();
         assert_eq!(p.input.driver, DriverId::Oracle);
-        assert_eq!(p.input.product, Some(Variant::OceanBaseOracle));
+        assert_eq!(p.input.product.as_deref(), Some("oceanbase_oracle"));
         assert_eq!(p.input.options.get("client").map(String::as_str), Some("jdbc"));
         assert_eq!(p.input.options.get("jdbc_kind").map(String::as_str), Some("oceanbase"));
         assert!(!p.input.options.contains_key("tls"), "MySQL 的 TLS 选项去掉");
@@ -450,7 +450,7 @@ mod tests {
         mysql.input.product = None;
         assert!(oceanbase_oracle_tenant(&mysql, &sql_error("1235")).is_none(), "只认选了 OceanBase 的连接");
         let mut tidb = oceanbase(false);
-        tidb.input.product = Some(Variant::TiDb);
+        tidb.input.product = Some("tidb".into());
         assert!(oceanbase_oracle_tenant(&tidb, &sql_error("1235")).is_none());
     }
 

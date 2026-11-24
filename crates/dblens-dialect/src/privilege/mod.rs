@@ -36,6 +36,7 @@ use crate::{Dialect, Family, Variant};
 const MYSQL: &str = include_str!("../../sql/privilege/mysql.sql");
 const MARIADB: &str = include_str!("../../sql/privilege/mariadb.sql");
 const TIDB: &str = include_str!("../../sql/privilege/tidb.sql");
+const GBASE8A: &str = include_str!("../../sql/privilege/gbase8a.sql");
 const OCEANBASE: &str = include_str!("../../sql/privilege/oceanbase.sql");
 const OCEANBASE_ORACLE: &str = include_str!("../../sql/privilege/oceanbase_oracle.sql");
 const POSTGRES: &str = include_str!("../../sql/privilege/postgres.sql");
@@ -197,6 +198,7 @@ fn override_file(variant: Variant) -> Option<&'static str> {
     match variant {
         Variant::MariaDb => Some(MARIADB),
         Variant::TiDb => Some(TIDB),
+        Variant::Gbase8a => Some(GBASE8A),
         Variant::OceanBase => Some(OCEANBASE),
         Variant::OceanBaseOracle => Some(OCEANBASE_ORACLE),
         Variant::OpenGauss | Variant::GaussDb => Some(OPENGAUSS),

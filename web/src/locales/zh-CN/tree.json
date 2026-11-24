@@ -29,13 +29,14 @@
     "system": "系统"
   },
   "env": {
-    "none": "未设环境",
+    "none": "本机环境",
     "dev": "开发环境",
     "test": "测试环境",
     "prod": "生产环境"
   },
   "filterPlaceholder": "按名称或注释过滤",
   "menu": {
+    "environment": "设置环境",
     "privileges": "用户与权限",
     "whoCanAccess": "谁能访问",
     "compareModel": "与模型比对…",
@@ -67,6 +68,14 @@
   "duplicate": {
     "name": "{{name}} 副本",
     "done": "已复制连接（密码未复制）"
+  },
+  "setEnv": {
+    "title": "修改「{{name}}」的环境？",
+    "content": "环境从「{{from}}」改为「{{to}}」。",
+    "toProd": "设为生产后，不带 WHERE 的修改、删除以及删表等语句执行前都要再确认一次。",
+    "fromProd": "不再是生产后，不带 WHERE 的修改、删除以及删表等语句执行前不再要求确认。",
+    "ok": "修改",
+    "done": "「{{name}}」的环境已改为「{{to}}」"
   },
   "delete": {
     "title": "删除连接「{{name}}」？",

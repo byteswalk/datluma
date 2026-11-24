@@ -179,6 +179,12 @@ impl Live {
                 "CONSTRAINT c2_fk FOREIGN KEY (parent_id) REFERENCES c2_parent (id)",
                 "FOREIGN KEY (parent_id) REFERENCES c2_parent (id) CONSTRAINT c2_fk",
             ),
+            // GBase 8a 建不了唯一约束，只有 EXPRESS 引擎
+            Variant::Gbase8a => sql
+                .replace(" NOT NULL UNIQUE", " NOT NULL")
+                .replace(" UNIQUE", "")
+                .replace(" ENGINE=InnoDB", "")
+                .replace(" ENGINE=MyISAM", ""),
             _ => sql.to_string(),
         }
     }
@@ -886,6 +892,12 @@ async fn export_flow(env: &str) {
             "WITH RECURSIVE t (n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM t WHERE n < 990) SELECT n FROM t",
             990,
         ),
+        // GBase 8a 的集群层不支持 UNION ALL 拼的派生表，取系统表的行
+        DriverId::Mysql if env.contains("GBASE8A") => (
+            "SELECT 1 AS id, '中文' AS name, REPEAT('数', 100000) AS txt, CHAR_LENGTH(REPEAT('数', 100000)) AS len",
+            "SELECT COLUMN_NAME AS n FROM information_schema.COLUMNS LIMIT 990",
+            990,
+        ),
         // MySQL 5.7 没有 WITH RECURSIVE，用三位数字交叉连接
         DriverId::Mysql => (
             "SELECT 1 AS id, '中文' AS name, REPEAT('数', 100000) AS txt, CHAR_LENGTH(REPEAT('数', 100000)) AS len",
@@ -982,6 +994,16 @@ async fn export_flow(env: &str) {
 #[tokio::test]
 async fn mysql_export() {
     export_flow("DBLENS_TEST_MYSQL_URL").await;
+}
+
+#[tokio::test]
+async fn gbase8a_export() {
+    export_flow("DBLENS_TEST_GBASE8A_URL").await;
+}
+
+#[tokio::test]
+async fn gbase8a_editing() {
+    editing_flow("DBLENS_TEST_GBASE8A_URL").await;
 }
 
 #[tokio::test]
@@ -1178,6 +1200,41 @@ async fn editing_flow(env: &str) {
     );
     let info = s.sessions.info(id).unwrap();
     assert!(info.autocommit && !info.in_transaction, "{env}：{info:?}");
+
+    // GBase 8a 不检查主键唯一：主键重复的行在写之前就被拦下，一行也不改
+    if live.variant == Variant::Gbase8a {
+        live.submit(id, ExecRequest::new("DROP TABLE IF EXISTS m2_dup")).await;
+        live.run(id, "CREATE TABLE m2_dup (id INT PRIMARY KEY, qty INT)").await;
+        live.run(id, "INSERT INTO m2_dup VALUES (1, 1), (1, 2), (2, 3)").await;
+        let dup = ChangeSet {
+            catalog: None,
+            schema: live.schema.clone(),
+            table: "m2_dup".into(),
+            changes: vec![
+                RowChange::Update {
+                    key: map(vec![("id", Value::Int(2))]),
+                    original: map(vec![]),
+                    values: map(vec![("qty", Value::Int(99))]),
+                },
+                RowChange::Update {
+                    key: map(vec![("id", Value::Int(1))]),
+                    original: map(vec![]),
+                    values: map(vec![("qty", Value::Int(99))]),
+                },
+            ],
+        };
+        let outcome = s.apply_changes(id, &dup).await.unwrap();
+        let failed = outcome.failed.expect("主键重复应当拦下");
+        assert_eq!(failed.index, 1);
+        assert!(format!("{:?}", failed.error).contains("changes.not_unique"), "{:?}", failed.error);
+        assert_eq!(outcome.applied, 0);
+        assert_eq!(
+            text(&one("SELECT COUNT(*) FROM m2_dup WHERE qty = 99".into()).await).as_deref(),
+            Some("0"),
+            "{env}：两条都没有写"
+        );
+        live.run(id, "DROP TABLE m2_dup").await;
+    }
 
     // 没有主键或唯一键的表不能编辑
     let nokey = ChangeSet {
@@ -2157,6 +2214,8 @@ async fn model_flow(env: &str) {
     };
     // 外键列另建索引：MySQL 家族不再自动建一个
     d.indexes = vec![ix("ix_m4_remark", "remark"), ix("ix_m4_cust", "cust_id")];
+    // GBase 8a 没有外键（同步时跳过，见 sync.rs 的单元测试）
+    let fks = live.variant != Variant::Gbase8a;
     d.foreign_keys = vec![ForeignKey {
         name: Some(n("fk_m4_cust")),
         columns: vec![n("cust_id")],
@@ -2166,6 +2225,9 @@ async fn model_flow(env: &str) {
         on_delete: None,
         on_update: None,
     }];
+    if !fks {
+        d.foreign_keys.clear();
+    }
     let req = ModelDesignRequest {
         schema: schema.clone(),
         name: Some(n("m4_ord")),
@@ -2177,8 +2239,10 @@ async fn model_flow(env: &str) {
     assert!(p.errors.is_empty() && !p.conflict, "{env}：{p:?}");
     s.save_model_design(&m, req).await.unwrap();
     s.models.rename_table(&m, &schema, &n("m4_cust"), &n("m4_customer")).unwrap();
-    let fk = &s.models.read_table(&m, &schema, &n("m4_ord")).unwrap().table.foreign_keys[0];
-    assert_eq!(fk.ref_table, n("m4_customer"), "{env}");
+    if fks {
+        let fk = &s.models.read_table(&m, &schema, &n("m4_ord")).unwrap().table.foreign_keys[0];
+        assert_eq!(fk.ref_table, n("m4_customer"), "{env}");
+    }
     assert_eq!(
         text_type,
         s.models.read_table(&m, &schema, &n("m4_ord")).unwrap().table.columns[3].data_type.native
@@ -2256,8 +2320,14 @@ async fn model_flow(env: &str) {
     let v = s.models.read_diagram(&m2, &schema, DEFAULT_DIAGRAM).unwrap();
     assert_eq!(v.fingerprint, None, "{env}");
     let ord = v.tables.iter().find(|t| t.table.name == n("m4_ord")).expect("m4_ord");
-    let fk = ord.table.foreign_keys.iter().find(|f| f.ref_table == n("m4_customer")).expect("外键");
-    assert_eq!((fk.columns.clone(), fk.ref_columns.clone()), (vec![n("cust_id")], vec![n("id")]), "{env}");
+    if fks {
+        let fk = ord.table.foreign_keys.iter().find(|f| f.ref_table == n("m4_customer")).expect("外键");
+        assert_eq!(
+            (fk.columns.clone(), fk.ref_columns.clone()),
+            (vec![n("cust_id")], vec![n("id")]),
+            "{env}"
+        );
+    }
     assert!(v.tables.iter().any(|t| t.table.name == n("m4_customer")), "{env}");
 
     // 文档导出（M4c）：库的这个 schema 导出 markdown 数据字典，表和外键（链接到被引用的表）都在
@@ -2283,7 +2353,9 @@ async fn model_flow(env: &str) {
     assert_eq!(st.state, TaskState::Done, "{env}：{st:?}");
     let md = std::fs::read_to_string(&out).unwrap();
     assert!(md.contains(&format!("</a>{schema}.{}", n("m4_ord"))), "{env}：{md}");
-    assert!(md.contains(&format!("[{schema}.{}](#t", n("m4_customer"))), "{env}：{md}");
+    if fks {
+        assert!(md.contains(&format!("[{schema}.{}](#t", n("m4_customer"))), "{env}：{md}");
+    }
 
     // 6. 库对库：同一个库中的第二个 schema
     let other: Option<&'static str> = match live.driver {
@@ -2330,6 +2402,11 @@ async fn model_flow(env: &str) {
 #[tokio::test]
 async fn mysql_model() {
     model_flow("DBLENS_TEST_MYSQL_URL").await;
+}
+
+#[tokio::test]
+async fn gbase8a_model() {
+    model_flow("DBLENS_TEST_GBASE8A_URL").await;
 }
 
 #[tokio::test]
@@ -2441,6 +2518,7 @@ async fn lint_tables_query_runs_on_every_database() {
         "DBLENS_TEST_OB_ORACLE_URL",
         "DBLENS_TEST_GOLDENDB_URL",
         "DBLENS_TEST_GOLDENDB_MY_URL",
+        "DBLENS_TEST_GBASE8A_URL",
         SQLITE,
     ];
     for env in envs {
@@ -2593,6 +2671,296 @@ async fn gbase8a_sql_file() {
     sql_file_flow("DBLENS_TEST_GBASE8A_URL").await;
 }
 
+/// GBase 8a 的表设计：做不到的设置在预览时报出；索引另起 CREATE INDEX；加列、加长 VARCHAR、改索引。
+#[tokio::test]
+async fn gbase8a_design() {
+    let Some(live) = setup("DBLENS_TEST_GBASE8A_URL").await else { return };
+    let live = &live;
+    let s = &live.service;
+    let id = s.open_session(&live.profile_id).await.unwrap().id;
+    live.submit(id, ExecRequest::new("DROP TABLE IF EXISTS g8_d")).await;
+    let col = |name: &str, native: &str| Column {
+        name: name.into(),
+        ordinal: 0,
+        data_type: ColumnType { native: native.into(), logical: LogicalType::Other },
+        nullable: true,
+        default: None,
+        comment: None,
+        auto_increment: false,
+        generated: None,
+    };
+    let index = |name: &str, cols: &[&str]| Index {
+        name: name.into(),
+        columns: cols.iter().map(|c| IndexColumn { name: c.to_string(), descending: false }).collect(),
+        unique: false,
+        method: None,
+    };
+    let mut id_col = col("id", "BIGINT");
+    (id_col.nullable, id_col.auto_increment) = (false, true);
+    let mut amount = col("amount", "DECIMAL(10,2)");
+    (amount.default, amount.comment) = (Some("0".into()), Some("金额".into()));
+    let good = Table {
+        name: "g8_d".into(),
+        comment: Some("设计器".into()),
+        columns: vec![id_col, col("code", "VARCHAR(20)"), amount, col("note", "VARCHAR(40)")],
+        primary_key: Some(PrimaryKey { name: None, columns: vec!["id".into()] }),
+        indexes: vec![index("ix_g8_code", &["code"])],
+        ..Default::default()
+    };
+    let request = |name: Option<&str>, draft: Table, fingerprint: Option<String>| DesignRequest {
+        catalog: None,
+        schema: live.schema.clone(),
+        name: name.map(String::from),
+        draft,
+        renames: Renames::default(),
+        rebuild: false,
+        fingerprint,
+    };
+
+    // 做不到的设置
+    let mut bad = good.clone();
+    bad.uniques = vec![UniqueConstraint { name: None, columns: vec!["code".into()] }];
+    bad.checks = vec![CheckConstraint { name: None, expression: "amount >= 0".into() }];
+    bad.indexes.push(index("ix_g8_two", &["code", "note"]));
+    let p = s.preview_design(&live.profile_id, &request(None, bad, None)).await.unwrap();
+    let keys: Vec<String> = p.errors.iter().map(|e| format!("{:?}", e.message)).collect();
+    for k in ["gbase8a.design.no_unique", "gbase8a.design.no_check", "gbase8a.design.index_one_column"] {
+        assert!(keys.iter().any(|m| m.contains(k)), "{k}：{keys:?}");
+    }
+
+    // 新建：索引单独一条 CREATE INDEX
+    let p = s.preview_design(&live.profile_id, &request(None, good.clone(), None)).await.unwrap();
+    assert!(p.errors.is_empty(), "{p:?}");
+    let sqls = format!("{:?}", p.statements);
+    assert!(sqls.contains("CREATE INDEX ix_g8_code ON"), "{sqls}");
+    let task = s.start_design(&live.profile_id, request(None, good.clone(), None)).await.unwrap();
+    let st = wait_task(s, &task).await;
+    assert_eq!(st.state, TaskState::Done, "{st:?}");
+
+    // 加列、加长 VARCHAR、换索引
+    live.run(id, "INSERT INTO g8_d (code) VALUES ('a'), ('b')").await;
+    let t = s.design_table(&live.profile_id, None, &live.schema, "g8_d").await.unwrap();
+    assert_eq!(t.table.indexes.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["ix_g8_code"]);
+    assert_eq!(t.storage.row_count, Some(2), "{:?}", t.storage);
+    let mut d = t.table.clone();
+    d.columns.push(col("extra", "VARCHAR(10)"));
+    d.columns[3].data_type.native = "varchar(80)".into();
+    d.indexes = vec![index("ix_g8_note", &["note"])];
+    let task = s.start_design(&live.profile_id, request(Some("g8_d"), d, Some(t.fingerprint))).await.unwrap();
+    let st = wait_task(s, &task).await;
+    assert_eq!(st.state, TaskState::Done, "{st:?}");
+    let after = s.design_table(&live.profile_id, None, &live.schema, "g8_d").await.unwrap().table;
+    assert_eq!(after.columns.last().map(|c| c.name.as_str()), Some("extra"));
+    assert_eq!(after.columns[3].data_type.native, "varchar(80)");
+    assert_eq!(after.indexes.iter().map(|x| x.name.as_str()).collect::<Vec<_>>(), ["ix_g8_note"]);
+    assert_eq!(after.columns[2].comment.as_deref(), Some("金额"));
+
+    live.run(id, "DROP TABLE g8_d").await;
+    s.sessions.close(id, false).await.unwrap();
+    s.delete_profile(&live.profile_id).await.unwrap();
+}
+
+/// GBase 8a 的导入：追加、跳过出错行、建新表；依赖回滚或主键唯一的方式提交时就拒绝。
+#[tokio::test]
+async fn gbase8a_import() {
+    let Some(live) = setup("DBLENS_TEST_GBASE8A_URL").await else { return };
+    let live = &live;
+    let s = &live.service;
+    let id = s.open_session(&live.profile_id).await.unwrap().id;
+    for t in ["g8_imp", "g8_imp_new", "g8_imp_id"] {
+        live.submit(id, ExecRequest::new(format!("DROP TABLE IF EXISTS {t}"))).await;
+    }
+    live.run(id, "CREATE TABLE g8_imp (id INT PRIMARY KEY, name VARCHAR(40), price DECIMAL(10, 2), on_day DATE, note VARCHAR(40))").await;
+    let one = |sql: String| async move { text(&first_value(&live.run(id, &sql).await)) };
+    let mapping = |cols: &[&str]| -> Vec<ColumnMapping> {
+        cols.iter().enumerate().map(|(k, c)| ColumnMapping { source: k, target: c.to_string() }).collect()
+    };
+    let request = |source: FileSource, mode: WriteMode| ImportRequest {
+        profile_id: live.profile_id.clone(),
+        catalog: None,
+        source,
+        file: FileOptions::csv(),
+        schema: live.schema.clone(),
+        table: "g8_imp".into(),
+        create: None,
+        mapping: mapping(&["id", "name", "price", "on_day", "note"]),
+        mode,
+        transaction: Transaction::Batch,
+        batch_size: DEFAULT_BATCH,
+        on_error: OnError::Stop,
+        empty_as_string: false,
+    };
+    let csv = |rows: std::ops::RangeInclusive<usize>| {
+        let mut t = String::from(
+            "编号,名称,价格,日期,备注
+",
+        );
+        for k in rows {
+            let price = if k % 7 == 0 { String::new() } else { format!("{k}.25") };
+            t += &format!(
+                "{k},名{k},{price},2026/1/{},\"含,逗号\"
+",
+                k % 28 + 1
+            );
+        }
+        t
+    };
+    let run = |req: ImportRequest| async move {
+        let task = s.start_import(req, false).await.unwrap();
+        wait_task(s, &task).await
+    };
+    let refused = |req: ImportRequest, key: &'static str| async move {
+        let err = s.start_import(req, false).await.unwrap_err();
+        assert!(format!("{err:?}").contains(key), "{key}：{err:?}");
+    };
+
+    // 追加 2500 行，每批 1000 行
+    let st = run(request(upload(s, "a.csv", &csv(1..=2500)), WriteMode::Append)).await;
+    assert_eq!((st.state, st.progress.rows_written), (TaskState::Done, 2500), "{st:?}");
+    assert_eq!(one("SELECT COUNT(*) FROM g8_imp".into()).await.as_deref(), Some("2500"));
+    assert_eq!(one("SELECT price FROM g8_imp WHERE id = 1234".into()).await.as_deref(), Some("1234.25"));
+    assert_eq!(one("SELECT note FROM g8_imp WHERE id = 1".into()).await.as_deref(), Some("含,逗号"));
+    assert_eq!(one("SELECT price FROM g8_imp WHERE id = 7".into()).await, None, "空单元格为 NULL");
+
+    // 依赖主键唯一或回滚的方式：提交时拒绝
+    refused(request(upload(s, "u.csv", &csv(1..=3)), WriteMode::Upsert), "import.upsert_unsupported").await;
+    refused(request(upload(s, "r.csv", &csv(1..=3)), WriteMode::Replace), "import.no_rollback").await;
+    let whole = ImportRequest {
+        transaction: Transaction::Whole,
+        ..request(upload(s, "w.csv", &csv(1..=3)), WriteMode::Append)
+    };
+    refused(whole, "import.no_rollback").await;
+    assert_eq!(one("SELECT COUNT(*) FROM g8_imp".into()).await.as_deref(), Some("2500"), "都没有写");
+
+    // 分批 + 跳过：编号不是整数的一行转换失败，跳过；8a 不检查主键重复，重复的行照样写入
+    let bad = csv(2501..=3000)
+        .replace(
+            "
+2600,", "
+abc,",
+        )
+        .replace(
+            "
+2700,", "
+1,",
+        );
+    let st = run(ImportRequest {
+        on_error: OnError::Skip,
+        ..request(upload(s, "b.csv", &bad), WriteMode::Append)
+    })
+    .await;
+    assert_eq!(st.state, TaskState::Done, "{st:?}");
+    assert_eq!((st.progress.rows_written, st.progress.rows_skipped), (499, 1), "{st:?}");
+    assert_eq!(one("SELECT COUNT(*) FROM g8_imp WHERE id = 1".into()).await.as_deref(), Some("2"));
+
+    // 导入到新表
+    let def = NewTable {
+        columns: [
+            ("id", LogicalType::Int { bits: 64 }),
+            ("name", LogicalType::VarChar { len: Some(50) }),
+            ("price", LogicalType::Decimal { precision: Some(10), scale: Some(2) }),
+            ("on_day", LogicalType::Date),
+            ("note", LogicalType::VarChar { len: Some(50) }),
+        ]
+        .into_iter()
+        .map(|(c, l)| NewColumn { name: c.into(), logical: l, nullable: true })
+        .collect(),
+        primary_key: vec!["id".into()],
+    };
+    let st = run(ImportRequest {
+        table: "g8_imp_new".into(),
+        create: Some(def),
+        ..request(upload(s, "n.csv", &csv(1..=10)), WriteMode::Append)
+    })
+    .await;
+    assert_eq!(st.state, TaskState::Done, "{st:?}");
+    assert_eq!(one("SELECT COUNT(*) FROM g8_imp_new".into()).await.as_deref(), Some("10"));
+
+    // 自增列：8a 不接受显式值（报服务器原文），不写这一列时由库生成
+    live.run(id, "CREATE TABLE g8_imp_id (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(40))").await;
+    let id_req = |source: FileSource, cols: &[&str]| ImportRequest {
+        table: "g8_imp_id".into(),
+        mapping: mapping(cols),
+        ..request(source, WriteMode::Append)
+    };
+    let st = run(id_req(
+        upload(
+            s,
+            "i.csv",
+            "编号,名称
+5,五
+",
+        ),
+        &["id", "name"],
+    ))
+    .await;
+    assert_eq!(st.state, TaskState::Failed, "{st:?}");
+    assert!(matches!(&st.error, Some(Error::Sql { code, .. }) if code == "1733"), "{:?}", st.error);
+    let st = run(id_req(
+        upload(
+            s,
+            "j.csv",
+            "名称
+五
+六
+",
+        ),
+        &["name"],
+    ))
+    .await;
+    assert_eq!((st.state, st.progress.rows_written), (TaskState::Done, 2), "{st:?}");
+
+    for t in ["g8_imp", "g8_imp_new", "g8_imp_id"] {
+        live.submit(id, ExecRequest::new(format!("DROP TABLE IF EXISTS {t}"))).await;
+    }
+    s.sessions.close(id, false).await.unwrap();
+}
+
+/// GBase 8a 的规范检查：存储信息读得出来；EXPRESS 引擎默认允许，utf8 字符集照常提示。
+/// 行数规则在 8a 上不起作用：information_schema 的 TABLE_ROWS 总是 0（单表的行数见 gbase8a_design）。
+#[tokio::test]
+async fn gbase8a_lint() {
+    let Some(live) = setup("DBLENS_TEST_GBASE8A_URL").await else { return };
+    let s = &live.service;
+    let id = s.open_session(&live.profile_id).await.unwrap().id;
+    live.run(id, "DROP TABLE IF EXISTS g8_lint").await;
+    live.run(id, "CREATE TABLE g8_lint (id INT AUTO_INCREMENT PRIMARY KEY, n INT) DEFAULT CHARSET=utf8")
+        .await;
+    live.run(id, "INSERT INTO g8_lint (n) VALUES (1), (2)").await;
+    let clause = |rule: &str, params: serde_json::Value| {
+        serde_json::json!({
+            "id": rule, "section": "table", "text": rule, "enabled": true, "severity": "warning",
+            "rules": [{ "id": rule, "params": params }]
+        })
+    };
+    let set: dblens_lint::Ruleset = serde_json::from_value(serde_json::json!({
+        "id": "", "name": "g8a", "clauses": [
+            clause("db.charset", serde_json::json!({})),
+            clause("db.engine", serde_json::json!({})),
+            clause("table.row_count", serde_json::json!({ "max": 1 })),
+        ]
+    }))
+    .unwrap();
+    let ruleset = s.create_lint_ruleset(set).unwrap();
+    let source = dblens_service::LintSource::Database {
+        profile: live.profile_id.clone(),
+        catalog: None,
+        schema: live.schema.clone(),
+    };
+    let task = s.start_lint(dblens_service::LintRequest { ruleset, source }).await.unwrap();
+    let st = wait_task(s, &task).await;
+    assert_eq!(st.state, TaskState::Done, "{st:?}");
+    let run = s.lint_run(st.lint_run.as_deref().expect("没有检查记录")).unwrap();
+    let flagged = |rule: &str| {
+        let r = run.results.iter().find(|r| r.clause == rule).unwrap();
+        r.issues.iter().any(|i| i.object == "g8_lint")
+    };
+    assert!(flagged("db.charset"), "utf8 应提示");
+    assert!(!flagged("db.engine"), "EXPRESS 是 8a 唯一的引擎");
+    assert!(!flagged("table.row_count"), "8a 读不到整个 schema 的行数");
+    live.run(id, "DROP TABLE g8_lint").await;
+}
+
 /// GBase 8a 的浏览：分布表、复制表、视图、存储过程，读回 DDL。8a 建不了唯一约束和普通索引，所以不跑通用的对象流程。
 #[tokio::test]
 async fn gbase8a_browse() {
@@ -2628,7 +2996,9 @@ async fn gbase8a_browse() {
     let t = &s.metadata.tables(&profile, sc, Some("g8_t")).await.unwrap()[0];
     let cols: Vec<_> = t.columns.iter().map(|c| c.name.as_str()).collect();
     assert_eq!(cols, ["id", "k", "name", "d", "amt"]);
-    assert!(t.columns[0].auto_increment && t.primary_key.is_some(), "{t:?}");
+    assert!(t.columns[0].auto_increment, "{t:?}");
+    // 8a 上带 LEFT JOIN 的约束查询会把系统表的主键列也带出来
+    assert_eq!(t.primary_key.as_ref().map(|k| k.columns.clone()), Some(vec!["id".to_string()]), "{t:?}");
     assert_eq!(t.columns[1].comment.as_deref(), Some("分布列"));
     assert_eq!(t.comment.as_deref(), Some("分布表"));
 

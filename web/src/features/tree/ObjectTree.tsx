@@ -16,6 +16,7 @@ import {
   IconKey,
   IconLink,
   IconListNumbers,
+  IconCheck,
   IconCube,
   IconSearch,
   IconStack2,
@@ -49,7 +50,7 @@ import {
 import DbIcon from '../../shared/DbIcon'
 import { hasCatalogs } from '../../shared/schemaOptions'
 import EnvTag from '../../shared/EnvTag'
-import { profileKind } from '../connections/form'
+import { isLoopback, profileKind } from '../connections/form'
 import { withVault } from '../connections/vault'
 import { metaKey } from '../sql/metadata'
 import ConnName, { connHost, connKind } from './ConnName'
@@ -416,6 +417,18 @@ export default function ObjectTree() {
           ...(driverOf(menuNode.profileId) === 'sqlite' ? [] : [{ key: 'privileges', label: t('tree.menu.privileges') }]),
           { type: 'divider' },
           { key: 'edit', label: t('tree.menu.editConnection') },
+          {
+            key: 'env',
+            label: t('tree.menu.environment'),
+            // 当前环境打勾；选别的环境要二次确认
+            children: (['none', 'dev', 'test', 'prod'] as Environment[]).map((e) => ({
+              key: `env:${e}`,
+              label: t(`connections.env.${e}`),
+              // “本机”只给本机地址
+              disabled: e === 'none' && !localAllowed(menuNode.profileId),
+              icon: envOf(menuNode.profileId) === e ? <IconCheck size={14} /> : <span style={{ width: 14 }} />,
+            })),
+          },
           { key: 'duplicate', label: t('tree.menu.duplicateConnection') },
           { key: 'delete', label: t('tree.menu.deleteConnection'), danger: true },
           { type: 'divider' },
@@ -438,6 +451,36 @@ export default function ObjectTree() {
 
   function driverOf(profileId: string) {
     return profiles.find((p) => p.id === profileId)?.driver
+  }
+
+  function localAllowed(profileId: string): boolean {
+    const p = profiles.find((x) => x.id === profileId)
+    return !p || p.driver === 'sqlite' || isLoopback(p.host)
+  }
+
+  function envOf(profileId: string): Environment {
+    return profiles.find((p) => p.id === profileId)?.environment ?? 'none'
+  }
+
+  /** 改连接的环境：二次确认，改成生产或从生产改掉时说明执行确认的变化。 */
+  function changeEnvironment(profileId: string, to: Environment) {
+    const p = profiles.find((x) => x.id === profileId)
+    const from = envOf(profileId)
+    if (!p || from === to) return
+    const label = (e: Environment) => t(`connections.env.${e}`)
+    const note = to === 'prod' ? t('tree.setEnv.toProd') : from === 'prod' ? t('tree.setEnv.fromProd') : ''
+    modal.confirm({
+      title: t('tree.setEnv.title', { name: p.name }),
+      content: [t('tree.setEnv.content', { from: label(from), to: label(to) }), note].filter(Boolean).join(' '),
+      okText: t('tree.setEnv.ok'),
+      okType: to === 'prod' || from === 'prod' ? 'danger' : 'primary',
+      onOk: async () => {
+        const { id: _, ...input } = await api.profile(profileId)
+        await api.updateProfile(profileId, { ...input, environment: to })
+        await qc.invalidateQueries({ queryKey: ['profiles'] })
+        message.success(t('tree.setEnv.done', { name: p.name, to: label(to) }))
+      },
+    })
   }
 
   /** schema 节点：新建表、导入到新表、执行 SQL 文件，后面接分隔线。 */
@@ -535,6 +578,7 @@ export default function ObjectTree() {
         if (kind && driver) setDdl({ profileId: k.profileId, driver, schema: k.schema, kind, name: k.name })
       } else if (key === 'new-query') newQuery(k.profileId)
       else if (key === 'edit' && k.type === 'c') openConnection(k.profileId)
+      else if (key.startsWith('env:') && k.type === 'c') changeEnvironment(k.profileId, key.slice(4) as Environment)
       else if (key === 'duplicate' && k.type === 'c') {
         const p = await api.profile(k.profileId)
         const { id: _, ...input } = p

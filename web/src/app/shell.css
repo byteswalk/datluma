@@ -871,6 +871,14 @@ body {
 .db-icon text {
   fill: #fff;
 }
+[data-tone='dark'] .db-icon-art path[data-dark] {
+  fill: var(--db-icon-dark);
+}
+.db-icon-img {
+  vertical-align: -2px;
+  flex: none;
+  object-fit: contain;
+}
 [data-tone='dark'] .db-icon path,
 [data-tone='dark'] .db-icon rect {
   fill: var(--db-icon-dark);

@@ -18,6 +18,9 @@ export default function DbIcon({
   title?: string
 }) {
   const icon = dbIcon(driver, variant)
+  if (icon.kind === 'image') {
+    return <img className="db-icon-img" src={icon.src} width={size} height={size} alt={title ?? ''} data-variant={variant ?? driver} />
+  }
   if (icon.kind === 'art') {
     const gradientId = `db-icon-${variant ?? driver}`
     return (
@@ -46,6 +49,9 @@ export default function DbIcon({
             fill={s.fill ?? (s.stroke ? 'none' : `url(#${gradientId})`)}
             stroke={s.stroke}
             strokeWidth={s.width}
+            // 暗色主题下换用 dark（见 app/shell.css 的 .db-icon-art path[data-dark]）
+            data-dark={s.dark ? '' : undefined}
+            style={s.dark ? ({ '--db-icon-dark': s.dark } as CSSProperties) : undefined}
           />
         ))}
       </svg>

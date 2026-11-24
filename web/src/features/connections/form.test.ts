@@ -148,6 +148,14 @@ describe('连接表单', () => {
     expect(serverNotes(b, 'kingbase')[1].text).toBe('选的是 人大金仓，实际识别为 openGauss，按识别结果处理')
     const pg = { ...s, variant: 'postgres', variant_name: 'PostgreSQL', compat: 'native' as const, mode: null, unadapted_mode: false }
     expect(serverNotes(pg, 'postgres')).toEqual([])
+    // GBase 8c 的内核是 openGauss：识别为 openGauss 不算不一致，识别成别的才提示
+    const og = { ...pg, variant: 'opengauss', variant_name: 'openGauss' }
+    expect(serverNotes(og, 'gbase8c')).toEqual([])
+    expect(serverNotes(pg, 'gbase8c').map((n) => n.warn)).toEqual([true])
+    // 提交时记所选的型号；编辑时选回 GBase 8c
+    const g8c = { ...switchProduct(emptyForm(), 'gbase8c'), name: 'c', host: 'h', user: 'u' }
+    expect(toProfileInput(g8c).product).toBe('gbase8c')
+    expect(fromProfile({ ...toProfileInput(g8c), id: 'x', variant: 'opengauss' } as Profile, false).product).toBe('gbase8c')
   })
 
   it('服务器版本说明不重复产品名', () => {

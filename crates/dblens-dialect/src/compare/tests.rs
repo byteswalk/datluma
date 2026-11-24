@@ -292,3 +292,31 @@ fn sync_script_mysql_keeps_one_alter_per_table_rules() {
         .collect();
     insta::assert_snapshot!("sync_mysql", text.join("\n"));
 }
+
+#[test]
+fn sync_script_gbase8a_skips_what_it_cannot_build() {
+    let g8a = Dialect::new(Variant::Gbase8a).with_version(Some(50100));
+    let (source, target) = sync_case();
+    let renames =
+        CompareRenames { tables: [("customers".into(), "cust".into())].into(), ..Default::default() };
+    let d = compare_schemas(
+        &g8a,
+        &side("app", &source),
+        &side("app", &target),
+        &renames,
+        &CompareOptions::default(),
+    )
+    .unwrap();
+    let all: BTreeSet<u32> = d.tables.iter().flat_map(|t| t.items.iter().map(|i| i.id)).collect();
+    let script = sync_script(&g8a, "app", &d, &all, &target, &BTreeMap::new()).unwrap();
+    let sqls: Vec<&str> = script
+        .steps
+        .iter()
+        .filter_map(|s| if let SyncStep::Sql { sql, .. } = s { Some(sql.as_str()) } else { None })
+        .collect();
+    assert!(!sqls.iter().any(|s| s.contains("REFERENCES")), "{sqls:#?}");
+    assert!(sqls.iter().any(|s| s.starts_with("CREATE INDEX ix_moved_phone ON app.moved")), "{sqls:#?}");
+    // 新表 items 的外键、orders 的新外键：各一条说明
+    let keys: Vec<String> = script.warnings.iter().map(|w| format!("{w:?}")).collect();
+    assert_eq!(keys.iter().filter(|k| k.contains("gbase8a.sync.skip_fk")).count(), 2, "{keys:?}");
+}

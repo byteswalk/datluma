@@ -310,6 +310,36 @@ fn source_ddl(end: &End, p: &str) -> Vec<String> {
                  (2, N'x''q', N'z', -0.01, NULL, 0, NULL, NULL, 0x), (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)"
             ),
         ],
+        // GBase 8a：没有检查约束、唯一约束、外键和小数秒；集群层不支持 UNION ALL 拼的派生表，数据直接写 VALUES
+        DriverId::Mysql if end.variant == Variant::Gbase8a => vec![
+            format!(
+                "CREATE TABLE {p}_cust (id BIGINT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(50) NOT NULL DEFAULT 'n/a' COMMENT 'name', \
+                 active TINYINT(1) DEFAULT 1, created DATETIME DEFAULT CURRENT_TIMESTAMP, amount DECIMAL(12,2) DEFAULT 0, note TEXT) \
+                 COMMENT = 'customers'"
+            ),
+            format!("CREATE INDEX {p}_ix_created ON {p}_cust (created)"),
+            format!(
+                "CREATE TABLE {p}_ord (id INT PRIMARY KEY, cust_id BIGINT, qty INT, status VARCHAR(10) DEFAULT 'new')"
+            ),
+            format!(
+                "CREATE TABLE {p}_types (id INT PRIMARY KEY, txt VARCHAR(100), big TEXT, amount DECIMAL(12,2), ratio DOUBLE, \
+                 flag TINYINT(1), day DATE, ts DATETIME, bin VARBINARY(16))"
+            ),
+            format!(
+                "INSERT INTO {p}_cust (name, amount, note) VALUES {}",
+                (1..=n)
+                    .map(|k| format!("('name{k}', {}, '备注{k}')", k as f64 * 1.5))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            format!(
+                "INSERT INTO {p}_ord (id, cust_id, qty, status) VALUES (1, 1, 2, 'paid'), (2, 3, 1, 'new')"
+            ),
+            format!(
+                "INSERT INTO {p}_types VALUES (1, '中文 abc', REPEAT('y', 3000), 1234.5, 0.25, 1, '2026-01-02', '2026-01-02 03:04:05', X'0102FF'), \
+                 (2, 'x''q', 'z', -0.01, NULL, 0, NULL, NULL, X''), (3, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL)"
+            ),
+        ],
         DriverId::Mysql => vec![
             format!(
                 "CREATE TABLE {p}_cust (id BIGINT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(50) NOT NULL DEFAULT 'n/a' COMMENT 'name', \
@@ -607,7 +637,7 @@ async fn migrate_flow(src_env: &str, tgt_env: &str, p: &str) {
         &preview.draft.tables.iter().find(|t| t.source.to_lowercase().ends_with("_cust")).unwrap().target;
     let (q, name) = (dialect.qualified(Some(&tgt.schema), &ct.name), dialect.ident(&ct.columns[1].name));
     // OceanBase 的 Oracle 模式迁完后改不了起始值、Oracle 12c 以前没有标识列：自增列迁成普通列
-    if tgt.variant == Variant::OceanBaseOracle || tgt.old_oracle() {
+    if matches!(tgt.variant, Variant::OceanBaseOracle | Variant::Gbase8a) || tgt.old_oracle() {
         assert!(ct.columns.iter().all(|c| !c.auto_increment), "{route}");
     } else if !src.old_oracle() {
         // Oracle 12c 以前的源表靠序列加触发器自增，列本身不是自增列，目标也就不是
@@ -785,6 +815,14 @@ routes! {
     ob_oracle_to_mysql: "DBLENS_TEST_OB_ORACLE_URL" => "DBLENS_TEST_MYSQL_URL", "m5ob";
     ob_oracle_to_oracle: "DBLENS_TEST_OB_ORACLE_URL" => "DBLENS_TEST_ORACLE_URL", "m5oc";
     mysql_to_pg: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_PG_URL", "m5my";
+    gbase8a_to_mysql: "DBLENS_TEST_GBASE8A_URL" => "DBLENS_TEST_MYSQL_URL", "m5g8";
+    gbase8a_to_pg: "DBLENS_TEST_GBASE8A_URL" => "DBLENS_TEST_PG_URL", "m5g8";
+    gbase8a_to_dameng: "DBLENS_TEST_GBASE8A_URL" => "DBLENS_TEST_DM_URL", "m5g8";
+    gbase8a_to_oracle: "DBLENS_TEST_GBASE8A_URL" => "DBLENS_TEST_ORACLE_URL", "m5g8";
+    mysql_to_gbase8a: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_GBASE8A_URL", "m5m8";
+    pg_to_gbase8a: "DBLENS_TEST_PG_URL" => "DBLENS_TEST_GBASE8A_URL", "m5p8";
+    dameng_to_gbase8a: "DBLENS_TEST_DM_URL" => "DBLENS_TEST_GBASE8A_URL", "m5d8";
+    oracle_to_gbase8a: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_GBASE8A_URL", "m5o8";
     mysql_to_oracle: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_ORACLE_URL", "m5my";
     mysql_to_dameng: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_DM_URL", "m5my";
     mysql_to_tidb: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_TIDB_URL", "m5my";

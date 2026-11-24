@@ -66,7 +66,7 @@ function hasEnv(p: Profile | undefined): p is Profile {
   return !!p?.environment && p.environment !== 'none'
 }
 
-/** 状态栏底色跟着连接的环境走（shell.css 的 .statusbar.env-*），未设环境和没有连接时用默认的浅灰。 */
+/** 状态栏底色跟着连接的环境走（shell.css 的 .statusbar.env-*），本机环境和没有连接时用默认的浅灰。 */
 function barClass(p: Profile | undefined): string {
   return hasEnv(p) ? `row statusbar env-${p.environment}` : 'row statusbar'
 }

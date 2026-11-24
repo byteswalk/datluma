@@ -20,6 +20,7 @@ export type ProductId =
   | 'sqlserver'
   | 'gbase8s'
   | 'gbase8a'
+  | 'gbase8c'
   | 'sqlite'
 
 export interface Product {
@@ -44,6 +45,8 @@ export const PRODUCTS: Product[] = [
   { id: 'sqlserver', driver: 'sqlserver', port: 1433 },
   { id: 'gbase8s', driver: 'informix', port: 9088 },
   { id: 'gbase8a', driver: 'mysql', port: 5258 },
+  // 内核是 openGauss，连上后按 openGauss 识别
+  { id: 'gbase8c', driver: 'postgres', port: 5432 },
   // 本机文件，没有端口；只有桌面版可用
   { id: 'sqlite', driver: 'sqlite', port: 0 },
 ]
@@ -53,13 +56,35 @@ export const PRODUCTS: Product[] = [
  * OceanBase 也只有一个入口：Oracle 模式租户先按 MySQL 连会被拒绝，后端随即改走 JDBC，并把连接配置改成 `oceanbase_oracle`。
  */
 export const PRODUCT_GROUPS: { key: 'domestic' | 'other'; products: ProductId[] }[] = [
-  { key: 'domestic', products: ['dameng', 'kingbase', 'gaussdb', 'opengauss', 'oceanbase', 'goldendb', 'tidb', 'gbase8s', 'gbase8a'] },
+  { key: 'domestic', products: ['dameng', 'kingbase', 'gaussdb', 'opengauss', 'oceanbase', 'goldendb', 'tidb', 'gbase8s'] },
   { key: 'other', products: ['mysql', 'mariadb', 'postgres', 'oracle', 'sqlserver', 'sqlite'] },
 ]
 
-/** 列表里对应的入口：OceanBase 的 Oracle 模式租户归在 OceanBase 下。 */
+/** 产品连上后识别出的变体：GBase 8c 是 openGauss，其他产品与变体同名。 */
+export function productVariant(id: ProductId): string {
+  return id === 'gbase8c' ? 'opengauss' : id
+}
+
+/** GBase 的三个型号：协议各不相同（8s 走 JDBC、8a 走 MySQL、8c 走 PG），列表里只有一个 GBase 入口，表单里选型号。 */
+export const GBASE_MODELS: ProductId[] = ['gbase8s', 'gbase8a', 'gbase8c']
+
+export function isGbase(id: ProductId): boolean {
+  return GBASE_MODELS.includes(id)
+}
+
+/** 列表里对应的入口：OceanBase 的 Oracle 模式租户归在 OceanBase 下，GBase 的型号都归在 GBase（用 8s 代表）下。 */
 export function listedProduct(id: ProductId): ProductId {
-  return id === 'oceanbase_oracle' ? 'oceanbase' : id
+  if (id === 'oceanbase_oracle') return 'oceanbase'
+  return isGbase(id) ? 'gbase8s' : id
+}
+
+/** 列表里显示的名称和图标：GBase 的入口不带型号。 */
+export function listLabel(id: ProductId): string {
+  return isGbase(id) ? t('connections.product.gbase.label') : productLabel(id)
+}
+
+export function listIcon(id: ProductId): string {
+  return isGbase(id) ? 'gbase' : id
 }
 
 export function product(id: ProductId): Product {

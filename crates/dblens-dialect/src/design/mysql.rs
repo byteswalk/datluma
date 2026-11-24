@@ -4,12 +4,12 @@
 
 use std::collections::HashMap;
 
-use dblens_core::Result;
 use dblens_core::schema::{Column, Index, Table};
+use dblens_core::{Result, msg};
 
-use super::TableChange as C;
 use super::diff::text;
 use super::sql::{DesignStatement, stmt};
+use super::{DesignIssue, IssueSection, TableChange as C};
 use crate::{Dialect, Variant};
 
 impl Dialect {
@@ -65,6 +65,45 @@ impl Dialect {
         format!("{kind}INDEX {} ({}){using}", self.ident(&x.name), self.index_items(x))
     }
 
+    /// GBase 8a 的索引只能用 `CREATE INDEX` 单独建（写在建表语句里或 `ALTER TABLE … ADD INDEX` 都报不支持），默认就是 HASH。
+    fn gbase8a_index(&self, q: &str, x: &Index) -> String {
+        format!("CREATE INDEX {} ON {q} ({})", self.ident(&x.name), self.index_items(x))
+    }
+
+    /// GBase 8a 做不到的设置：唯一约束、外键、检查约束、生成列、多列索引、唯一索引。
+    pub(crate) fn gbase8a_issues(&self, draft: &Table) -> Vec<DesignIssue> {
+        let mut out = Vec::new();
+        let mut push = |section, row, field, message| {
+            out.push(DesignIssue::new(section, Some(row), Some(field), message))
+        };
+        for (i, _) in draft.uniques.iter().enumerate() {
+            push(IssueSection::Uniques, i, "columns", msg!("gbase8a.design.no_unique"));
+        }
+        for (i, _) in draft.foreign_keys.iter().enumerate() {
+            push(IssueSection::ForeignKeys, i, "ref_table", msg!("gbase8a.design.no_foreign_key"));
+        }
+        for (i, _) in draft.checks.iter().enumerate() {
+            push(IssueSection::Checks, i, "expression", msg!("gbase8a.design.no_check"));
+        }
+        for (i, c) in draft.columns.iter().enumerate().filter(|(_, c)| text(&c.generated).is_some()) {
+            push(IssueSection::Columns, i, "generated", msg!("gbase8a.design.no_generated", column = c.name));
+        }
+        for (i, x) in draft.indexes.iter().enumerate() {
+            if x.unique {
+                push(IssueSection::Indexes, i, "unique", msg!("gbase8a.design.no_unique"));
+            }
+            if x.columns.len() > 1 {
+                push(
+                    IssueSection::Indexes,
+                    i,
+                    "columns",
+                    msg!("gbase8a.design.index_one_column", index = x.name),
+                );
+            }
+        }
+        out
+    }
+
     fn mysql_create(&self, schema: &str, t: &Table) -> Result<String> {
         let mut items = Vec::new();
         for c in &t.columns {
@@ -76,8 +115,11 @@ impl Dialect {
         for u in &t.uniques {
             items.push(format!("{}UNIQUE ({})", self.constraint_name(&u.name), self.idents(&u.columns)));
         }
-        for x in &t.indexes {
-            items.push(self.mysql_index(x));
+        // GBase 8a 的索引另起语句建（见 mysql_design）
+        if self.variant() != Variant::Gbase8a {
+            for x in &t.indexes {
+                items.push(self.mysql_index(x));
+            }
         }
         for f in &t.foreign_keys {
             items.push(format!("{}{}", self.constraint_name(&f.name), self.fk_clause(schema, f)));
@@ -118,8 +160,17 @@ impl Dialect {
         let drop_pk = changes.iter().position(|c| matches!(c, C::DropPrimaryKey { .. }));
         let mut out: Vec<DesignStatement> = Vec::new();
         let mut merged: HashMap<usize, usize> = HashMap::new();
+        let g8a = self.variant() == Variant::Gbase8a;
         for (i, ch) in changes.iter().enumerate() {
             let sql = match ch {
+                C::CreateTable { table } if g8a => {
+                    out.push(stmt(i, self.mysql_create(schema, table)?));
+                    let q = self.qualified(Some(schema), &table.name);
+                    for x in &table.indexes {
+                        out.push(stmt(i, self.gbase8a_index(&q, x)));
+                    }
+                    continue;
+                }
                 C::CreateTable { table } => self.mysql_create(schema, table)?,
                 C::SetTableComment { comment } => {
                     alter(format!("COMMENT = {}", self.text_literal(comment.as_deref().unwrap_or(""))?))
@@ -177,7 +228,12 @@ impl Dialect {
                     alter(format!("ADD {}{}", self.constraint_name(&key.name), self.fk_clause(schema, key)))
                 }
                 C::DropIndex { index } => alter(format!("DROP INDEX {}", self.ident(&index.name))),
+                C::AddIndex { index } if g8a => self.gbase8a_index(&q, index),
                 C::AddIndex { index } => alter(format!("ADD {}", self.mysql_index(index))),
+                C::RenameIndex { from, index } if g8a => {
+                    out.push(stmt(i, alter(format!("DROP INDEX {}", self.ident(from)))));
+                    self.gbase8a_index(&q, index)
+                }
                 C::RenameIndex { from, index } => {
                     if self.mysql_rename_index() {
                         alter(format!("RENAME INDEX {} TO {}", self.ident(from), self.ident(&index.name)))

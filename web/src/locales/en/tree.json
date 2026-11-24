@@ -29,13 +29,14 @@
     "system": "System"
   },
   "env": {
-    "none": "No env",
+    "none": "Local",
     "dev": "Dev",
     "test": "Test",
     "prod": "Prod"
   },
   "filterPlaceholder": "Filter by name or comment",
   "menu": {
+    "environment": "Set environment",
     "privileges": "Users & privileges",
     "whoCanAccess": "Who can access",
     "compareModel": "Compare with Model…",
@@ -67,6 +68,14 @@
   "duplicate": {
     "name": "{{name}} copy",
     "done": "Connection duplicated (password not copied)"
+  },
+  "setEnv": {
+    "title": "Change the environment of \"{{name}}\"?",
+    "content": "The environment changes from {{from}} to {{to}}.",
+    "toProd": "As production, UPDATE and DELETE without WHERE, dropping tables and similar statements ask for confirmation before they run.",
+    "fromProd": "Once it is no longer production, UPDATE and DELETE without WHERE, dropping tables and similar statements no longer ask for confirmation.",
+    "ok": "Change",
+    "done": "\"{{name}}\" is now {{to}}"
   },
   "delete": {
     "title": "Delete connection \"{{name}}\"?",

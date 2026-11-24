@@ -6,12 +6,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use dblens_core::schema::Table;
-use dblens_core::{Msg, Result};
+use dblens_core::{Msg, Result, msg};
 use serde::Serialize;
 
 use super::{SchemaChange, SchemaDiff, TableDiff, apply_changes};
-use crate::Dialect;
 use crate::design::{Diff, Rebuild, RebuildContext, RebuildOutcome, Renames, TableChange as C};
+use crate::{Dialect, Variant};
 
 /// 脚本的一段：一组语句，或一张表的重建。`items` 是这一段对应的变更编号。
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -43,6 +43,47 @@ fn picked<'a>(t: &'a TableDiff, selected: &BTreeSet<u32>) -> Picks<'a> {
             _ => None,
         })
         .collect()
+}
+
+/// GBase 8a 做不到、同步时跳过的变更（外键、唯一约束、检查约束、多列或唯一索引）及给用户的说明。
+fn gbase8a_skip(table: &str, c: &C) -> Option<Msg> {
+    let name = |n: &Option<String>, cols: &[String]| n.clone().unwrap_or_else(|| cols.join(", "));
+    match c {
+        C::AddForeignKey { key } => {
+            Some(msg!("gbase8a.sync.skip_fk", table = table, name = name(&key.name, &key.columns)))
+        }
+        C::AddUnique { unique } => {
+            Some(msg!("gbase8a.sync.skip_unique", table = table, name = name(&unique.name, &unique.columns)))
+        }
+        C::AddCheck { check } => Some(msg!(
+            "gbase8a.sync.skip_check",
+            table = table,
+            name = check.name.clone().unwrap_or_default()
+        )),
+        C::AddIndex { index } | C::RenameIndex { index, .. } if index.unique || index.columns.len() > 1 => {
+            Some(msg!("gbase8a.sync.skip_index", table = table, name = index.name))
+        }
+        _ => None,
+    }
+}
+
+/// 建表时去掉 GBase 8a 做不到的部分，每一项记一条说明。
+fn gbase8a_table(t: &Table, warnings: &mut Vec<Msg>) -> Table {
+    let mut out = t.clone();
+    let parts: Vec<C> = t
+        .foreign_keys
+        .iter()
+        .map(|k| C::AddForeignKey { key: k.clone() })
+        .chain(t.uniques.iter().map(|u| C::AddUnique { unique: u.clone() }))
+        .chain(t.checks.iter().map(|c| C::AddCheck { check: c.clone() }))
+        .chain(t.indexes.iter().map(|x| C::AddIndex { index: x.clone() }))
+        .collect();
+    warnings.extend(parts.iter().filter_map(|c| gbase8a_skip(&t.name, c)));
+    out.foreign_keys.clear();
+    out.uniques.clear();
+    out.checks.clear();
+    out.indexes.retain(|x| !x.unique && x.columns.len() <= 1);
+    out
 }
 
 fn is_fk(c: &C) -> bool {
@@ -90,6 +131,7 @@ pub fn sync_script(
     let mut add_fks = Vec::new();
     let mut refused = Vec::new();
     let mut warnings = Vec::new();
+    let g8a = d.variant() == Variant::Gbase8a;
     let q = |name: &str| d.qualified(Some(schema), name);
     let sql_of = |table: &str, changes: Vec<C>| -> Result<Vec<String>> {
         let diff = Diff { changes, appended: true };
@@ -105,6 +147,13 @@ pub fn sync_script(
                     .push(SyncStep::Sql { sql: d.rename_table_sql(schema, from, to)?, items: vec![item.id] }),
                 SchemaChange::Table { change } if matches!(change.as_ref(), C::CreateTable { .. }) => {
                     let C::CreateTable { table } = change.as_ref() else { unreachable!() };
+                    let stripped;
+                    let table = if g8a {
+                        stripped = gbase8a_table(table, &mut warnings);
+                        &stripped
+                    } else {
+                        table
+                    };
                     // 外键在所有表建好之后再加
                     let bare = Table { foreign_keys: vec![], ..table.clone() };
                     for sql in sql_of(&table.name, vec![C::CreateTable { table: bare }])? {
@@ -120,7 +169,16 @@ pub fn sync_script(
             }
         }
         let (Some(name), Some(target)) = (&t.source, &t.target) else { continue };
-        let picks = picked(t, selected);
+        let mut picks = picked(t, selected);
+        if g8a {
+            picks.retain(|(_, c)| match gbase8a_skip(name, c) {
+                Some(w) => {
+                    warnings.push(w);
+                    false
+                }
+                None => true,
+            });
+        }
         if picks.is_empty() {
             continue;
         }

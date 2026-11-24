@@ -208,6 +208,42 @@
     "zh-CN": "约束没有名字，无法删除",
     "en": "The constraint has no name and cannot be dropped"
   },
+  "gbase8a.design.no_unique": {
+    "zh-CN": "GBase 8a 不支持唯一约束和唯一索引",
+    "en": "GBase 8a does not support unique constraints or unique indexes"
+  },
+  "gbase8a.design.no_foreign_key": {
+    "zh-CN": "GBase 8a 不支持外键",
+    "en": "GBase 8a does not support foreign keys"
+  },
+  "gbase8a.design.no_check": {
+    "zh-CN": "GBase 8a 接受检查约束但不执行，请去掉",
+    "en": "GBase 8a accepts check constraints but does not enforce them; remove it"
+  },
+  "gbase8a.design.no_generated": {
+    "zh-CN": "GBase 8a 不支持生成列（%{column}）",
+    "en": "GBase 8a does not support generated columns (%{column})"
+  },
+  "gbase8a.design.index_one_column": {
+    "zh-CN": "GBase 8a 的索引只能建在一列上（%{index}）",
+    "en": "A GBase 8a index can cover only one column (%{index})"
+  },
+  "gbase8a.sync.skip_fk": {
+    "zh-CN": "GBase 8a 不支持外键，%{table} 的外键 %{name} 没有同步",
+    "en": "GBase 8a has no foreign keys; foreign key %{name} of %{table} was not synchronized"
+  },
+  "gbase8a.sync.skip_unique": {
+    "zh-CN": "GBase 8a 不支持唯一约束，%{table} 的唯一约束 %{name} 没有同步",
+    "en": "GBase 8a has no unique constraints; unique constraint %{name} of %{table} was not synchronized"
+  },
+  "gbase8a.sync.skip_check": {
+    "zh-CN": "GBase 8a 不执行检查约束，%{table} 的检查约束 %{name} 没有同步",
+    "en": "GBase 8a does not enforce check constraints; check %{name} of %{table} was not synchronized"
+  },
+  "gbase8a.sync.skip_index": {
+    "zh-CN": "GBase 8a 只有单列的普通索引，%{table} 的索引 %{name} 没有同步",
+    "en": "GBase 8a supports only single-column non-unique indexes; index %{name} of %{table} was not synchronized"
+  },
   "design.unsupported.clustered_pk": {
     "zh-CN": "TiDB 的聚簇主键不能直接删除或更换",
     "en": "TiDB cannot drop or replace a clustered primary key in place"
@@ -507,6 +543,14 @@
   "import.upload_failed": {
     "zh-CN": "保存上传的文件失败：%{error}",
     "en": "Failed to save the uploaded file: %{error}"
+  },
+  "import.no_rollback": {
+    "zh-CN": "%{product} 不支持回滚，不能整体一个事务导入，也不能清空后导入；请改为分批提交，需要清空时先手动清空再追加",
+    "en": "%{product} cannot roll back, so neither a single-transaction import nor empty-then-import is available; commit in batches, and empty the table yourself first if needed"
+  },
+  "import.upsert_unsupported": {
+    "zh-CN": "%{product} 不检查主键是否重复，按主键更新会插入重复的行，请改用追加或清空后导入",
+    "en": "%{product} does not enforce primary keys, so an upsert would insert duplicate rows; append, or empty the table and import"
   },
   "import.upsert_needs_key": {
     "zh-CN": "按主键更新要求表 %{table} 有主键，且主键列都已映射",
@@ -1316,6 +1360,10 @@
     "zh-CN": "目标库没有生成列，按普通列建，不带表达式 %{expression}",
     "en": "The target has no generated columns; created as a plain column without the expression %{expression}"
   },
+  "gbase8a.migrate.identity_plain": {
+    "zh-CN": "GBase 8a 不接受往自增列写指定的值，原有的主键值迁不进去，这一列改成普通列",
+    "en": "GBase 8a rejects explicit values for auto-increment columns, so the existing key values could not be loaded; this becomes a plain column"
+  },
   "migrate.identity_plain": {
     "zh-CN": "OceanBase 的 Oracle 模式迁完后改不了自增起始值，这一列改成普通列；要自增请迁移后自行建序列",
     "en": "OceanBase Oracle mode cannot restart an identity after the data is loaded, so this becomes a plain column; create a sequence yourself after the migration if you need one"
@@ -1923,6 +1971,14 @@
   "session.no_rollback": {
     "zh-CN": "%{product} 不支持回滚，修改会立即生效，所以不能切换到手动提交",
     "en": "%{product} cannot roll back: changes take effect immediately, so manual commit is not available"
+  },
+  "profile.local_not_loopback": {
+    "zh-CN": "“本机”环境只能用于本机地址（127.0.0.1、localhost、::1），这个连接的主机是 %{host}，请选开发、测试或生产",
+    "en": "The Local environment is only for this machine (127.0.0.1, localhost, ::1); this connection's host is %{host}, so choose Dev, Test or Prod"
+  },
+  "profile.unknown_product": {
+    "zh-CN": "不认识的产品：%{product}",
+    "en": "Unknown product: %{product}"
   },
   "session.disconnected": {
     "zh-CN": "连接已断开",

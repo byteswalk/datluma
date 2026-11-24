@@ -15,6 +15,7 @@ use crate::store::Store;
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Environment {
+    /// 本机：界面上叫“本机”，只允许本机地址（见 `is_loopback`）和本地文件库。存成 `none`，沿用旧值。
     #[default]
     None,
     Dev,
@@ -63,9 +64,9 @@ pub struct ProfileInput {
     #[serde(default = "default_timeout")]
     pub connect_timeout_secs: u64,
     /// 新建连接时选的产品（如人大金仓），只用于显示和默认值；连上后以识别出的变体为准。
-    /// 没有时按驱动显示。
+    /// 没有时按驱动显示。值是变体的代码，另有 `gbase8c`（GBase 8c，内核按 openGauss 识别），见 `is_product`。
     #[serde(default)]
-    pub product: Option<Variant>,
+    pub product: Option<String>,
 }
 
 /// `Profile::scope` 中连接配置 id 与库名的分隔符。
@@ -157,9 +158,17 @@ fn parse_driver(s: &str) -> rusqlite::Result<DriverId> {
     }
 }
 
+/// 认得的产品代码：各变体，加上只是产品、识别时按 openGauss 处理的 GBase 8c。
+pub fn is_product(code: &str) -> bool {
+    code == "gbase8c" || serde_json::from_value::<Variant>(serde_json::Value::String(code.into())).is_ok()
+}
+
 fn validate(p: &ProfileInput) -> Result<()> {
     if p.name.trim().is_empty() {
         return Err(Error::invalid(msg!("profile.name_required")));
+    }
+    if let Some(code) = p.product.as_deref().filter(|c| !is_product(c)) {
+        return Err(Error::invalid(msg!("profile.unknown_product", product = code)));
     }
     // SQLite 没有主机、端口，库就是文件
     if p.driver == DriverId::Sqlite {
@@ -177,7 +186,16 @@ fn validate(p: &ProfileInput) -> Result<()> {
     if p.connect_timeout_secs == 0 || p.connect_timeout_secs > 3600 {
         return Err(Error::invalid(msg!("profile.timeout_range")));
     }
+    if p.environment == Environment::None && p.driver != DriverId::Sqlite && !is_loopback(&p.host) {
+        return Err(Error::invalid(msg!("profile.local_not_loopback", host = p.host.trim())));
+    }
     Ok(())
+}
+
+/// 本机地址：127.0.0.0/8、::1、localhost（不分大小写，IPv6 可带方括号）。
+pub fn is_loopback(host: &str) -> bool {
+    let h = host.trim().trim_start_matches('[').trim_end_matches(']');
+    h.eq_ignore_ascii_case("localhost") || h.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback())
 }
 
 const COLUMNS: &str =
@@ -208,7 +226,7 @@ fn from_row(r: &Row) -> rusqlite::Result<Profile> {
             environment: Environment::parse(&environment),
             color: r.get(9)?,
             connect_timeout_secs: u64::try_from(r.get::<_, i64>(10)?).unwrap_or(0),
-            product: parse(product),
+            product,
         },
         variant: parse(variant),
     })
@@ -264,7 +282,7 @@ impl Store {
                     i.color,
                     i.connect_timeout_secs as i64,
                     ts,
-                    i.product.map(variant_code)
+                    i.product
                 ],
             )
         })?;
@@ -296,7 +314,7 @@ impl Store {
                     i.color,
                     i.connect_timeout_secs as i64,
                     now(),
-                    i.product.map(variant_code)
+                    i.product
                 ],
             )
         })?;
@@ -349,6 +367,48 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn local_environment_only_for_loopback_hosts() {
+        for h in ["127.0.0.1", "127.1.2.3", "localhost", "LocalHost", "::1", "[::1]", " 127.0.0.1 "] {
+            assert!(is_loopback(h), "{h}");
+        }
+        for h in ["192.168.139.106", "db.local", "10.0.0.1", "0.0.0.0", ""] {
+            assert!(!is_loopback(h), "{h}");
+        }
+        let s = Store::open_in_memory().unwrap();
+        let local =
+            |host: &str| ProfileInput { host: host.into(), environment: Environment::None, ..input("p") };
+        assert!(s.create_profile(local("127.0.0.1")).is_ok());
+        let err = s.create_profile(local("192.168.139.106")).unwrap_err();
+        assert!(format!("{err:?}").contains("profile.local_not_loopback"), "{err:?}");
+        // 远程地址选开发、测试、生产都可以
+        assert!(
+            s.create_profile(ProfileInput { environment: Environment::Dev, ..local("192.168.139.106") })
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn migration_moves_remote_unset_profiles_to_dev() {
+        let s = Store::open_in_memory().unwrap();
+        let p = s.create_profile(ProfileInput { environment: Environment::Dev, ..input("remote") }).unwrap();
+        let l = s
+            .create_profile(ProfileInput {
+                host: "localhost".into(),
+                environment: Environment::None,
+                ..input("local")
+            })
+            .unwrap();
+        // 模拟升级前的数据：远程连接的环境是“未设”，再执行版本 7 的迁移
+        s.with(|c| {
+            c.execute("UPDATE profiles SET environment = 'none' WHERE id = ?1", [&p.id])?;
+            c.execute_batch(crate::store::MIGRATIONS[6])
+        })
+        .unwrap();
+        assert_eq!(s.profile(&p.id).unwrap().input.environment, Environment::Dev);
+        assert_eq!(s.profile(&l.id).unwrap().input.environment, Environment::None);
+    }
+
+    #[test]
     fn crud() {
         let s = Store::open_in_memory().unwrap();
         let a = s.create_profile(input("b-生产库")).unwrap();
@@ -374,11 +434,12 @@ pub(crate) mod tests {
     #[test]
     fn product_is_stored_and_updated() {
         let s = Store::open_in_memory().unwrap();
-        let p = s.create_profile(ProfileInput { product: Some(Variant::OpenGauss), ..input("p") }).unwrap();
-        assert_eq!(s.profile(&p.id).unwrap().input.product, Some(Variant::OpenGauss));
+        let p = s.create_profile(ProfileInput { product: Some("gbase8c".into()), ..input("p") }).unwrap();
+        assert_eq!(s.profile(&p.id).unwrap().input.product.as_deref(), Some("gbase8c"));
+        assert!(s.create_profile(ProfileInput { product: Some("nosuch".into()), ..input("p") }).is_err());
         let q =
-            s.update_profile(&p.id, ProfileInput { product: Some(Variant::Kingbase), ..input("p") }).unwrap();
-        assert_eq!(q.input.product, Some(Variant::Kingbase));
+            s.update_profile(&p.id, ProfileInput { product: Some("kingbase".into()), ..input("p") }).unwrap();
+        assert_eq!(q.input.product.as_deref(), Some("kingbase"));
         assert_eq!(s.update_profile(&p.id, input("p")).unwrap().input.product, None);
         // 请求中没有 product 时按没有处理
         let json =

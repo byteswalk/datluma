@@ -110,6 +110,10 @@ impl Dialect {
                 Ok(c)
             })
             .collect::<Result<_>>()?;
+        // GBase 8a 不检查主键唯一，ON DUPLICATE KEY UPDATE 会照样插入，重复的行就留在表里
+        if mode == WriteMode::Upsert && self.variant() == Variant::Gbase8a {
+            return Err(Error::invalid(msg!("import.upsert_unsupported", product = "GBase 8a")));
+        }
         let key: Vec<usize> = if mode == WriteMode::Upsert {
             let pk = table.primary_key.as_ref().filter(|pk| !pk.columns.is_empty());
             let pos: Option<Vec<usize>> =

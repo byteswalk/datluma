@@ -56,6 +56,13 @@
       "label": "GBase 8a",
       "note": "南大通用 GBase 8a MPP，默认端口 5258，走 MySQL 协议；不支持回滚，只能自动提交；表设计器和迁移未适配"
     },
+    "gbase": {
+      "label": "GBase 南大通用"
+    },
+    "gbase8c": {
+      "label": "GBase 8c",
+      "note": "南大通用 GBase 8c，走 PG 协议，内核是 openGauss，连接后按 openGauss 识别；A（Oracle 兼容）与 PG 兼容模式按库自动识别"
+    },
     "goldendb": {
       "label": "GoldenDB",
       "note": "经官方 JDBC 驱动连接，端口是连接实例的端口；驱动 jar 要自己放到 JDBC 驱动目录"
@@ -106,6 +113,7 @@
     "sqlite": "数据库文件"
   },
   "validate": {
+    "localNotLoopback": "“本机”只能用于本机地址（127.0.0.1、localhost、::1），主机 {{host}} 请选开发、测试或生产",
     "nameRequired": "填写连接名称",
     "hostRequired": "填写主机地址",
     "portRange": "端口在 1–65535 之间",
@@ -117,7 +125,7 @@
     "fileRequired": "请选择数据库文件"
   },
   "env": {
-    "none": "无",
+    "none": "本机",
     "dev": "开发",
     "test": "测试",
     "prod": "生产"
@@ -208,6 +216,7 @@
     "trustCertHint": "信任服务器证书（不校验，同 SSMS 的同名选项）"
   },
   "gbase": {
+    "model": "型号",
     "serverName": "服务器名"
   },
   "client": {

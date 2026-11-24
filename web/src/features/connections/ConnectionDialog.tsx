@@ -33,7 +33,7 @@ import {
   usesJdbc,
 } from './form'
 import DatabaseInput, { supportsDatabaseList } from './DatabaseInput'
-import { PRODUCT_GROUPS, listedProduct, product, productLabel, productNote } from './products'
+import { GBASE_MODELS, PRODUCT_GROUPS, type ProductId, isGbase, listIcon, listLabel, listedProduct, product, productLabel, productNote } from './products'
 import { useAiConfig } from '../ai/store'
 import { withVault } from './vault'
 
@@ -124,8 +124,10 @@ export default function ConnectionDialog() {
   }, [connectionDialog, editingId, api, message])
 
   const set = <K extends keyof ConnectionForm>(k: K, v: ConnectionForm[K]) => setForm((f) => ({ ...f, [k]: v }))
-  const check = () => {
+  // 测试连接不看环境；保存时才要求“本机”只用于本机地址
+  const check = (saving = false) => {
     const e = validate(form)
+    if (!saving) delete e.environment
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -147,7 +149,7 @@ export default function ConnectionDialog() {
   }
 
   const save = async () => {
-    if (!check()) return
+    if (!check(true)) return
     setBusy('save')
     try {
       const input = toProfileInput(form)
@@ -205,7 +207,7 @@ export default function ConnectionDialog() {
           </Checkbox>
         </Space>
       </Field>
-      <Field label={t('connections.general.environment')}>
+      <Field label={t('connections.general.environment')} error={errors.environment}>
         <Radio.Group
           optionType="button"
           value={form.environment}
@@ -218,6 +220,16 @@ export default function ConnectionDialog() {
 
   const general = isFileDb(form.driver) ? fileGeneral : (
     <>
+      {/* 型号放在最前：8s 缺驱动时下面的提示很长 */}
+      {isGbase(form.product) && (
+        <Field label={t('connections.gbase.model')}>
+          <Segmented
+            value={form.product}
+            onChange={(v) => setForm((f) => switchProduct(f, v as ProductId))}
+            options={GBASE_MODELS.map((id) => ({ value: id, label: productLabel(id) }))}
+          />
+        </Field>
+      )}
       {!usesJdbc(form) && <NativeLibNotice driver={form.driver} />}
       <Field label={t('connections.general.name')} error={errors.name}>
         {/* 示例名称跟着所选的库变：prod-gaussdb、prod-oceanbase-oracle…… */}
@@ -293,7 +305,7 @@ export default function ConnectionDialog() {
           />
         )}
       </Field>
-      <Field label={t('connections.general.environment')}>
+      <Field label={t('connections.general.environment')} error={errors.environment}>
         <Radio.Group
           optionType="button"
           value={form.environment}
@@ -452,8 +464,8 @@ export default function ConnectionDialog() {
                     background: listedProduct(form.product) === p.id ? 'var(--sel)' : undefined,
                   }}
                 >
-                  <DbIcon driver={p.driver} variant={p.id} size={16} />
-                  {productLabel(p.id)}
+                  <DbIcon driver={p.driver} variant={listIcon(p.id)} size={16} />
+                  {listLabel(p.id)}
                 </div>
               ))}
             </div>

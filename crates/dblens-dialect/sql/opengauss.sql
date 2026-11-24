@@ -12,10 +12,12 @@ WHERE datname = current_database()
 
 -- [schemas]
 -- Built-in schemas besides pg_* and information_schema (dbe_*, pkg_*, db4ai, ...).
+-- GBase 8c adds Oracle compatibility packages to every A-mode database (dbms_*, utl_*, plv*, oracle, sys, ...).
 SELECT n.nspname AS name,
        (n.nspname LIKE 'pg!_%' ESCAPE '!' OR n.nspname LIKE 'dbe!_%' ESCAPE '!' OR n.nspname LIKE 'pkg!_%' ESCAPE '!'
+        OR n.nspname LIKE 'dbms!_%' ESCAPE '!' OR n.nspname LIKE 'utl!_%' ESCAPE '!' OR n.nspname LIKE 'plv%'
         OR n.nspname IN ('information_schema', 'blockchain', 'coverage', 'cstore', 'db4ai', 'snapshot',
-                         'sqladvisor', 'xmltype')) AS is_system
+                         'sqladvisor', 'xmltype', 'oracle', 'sys', 'wmsys', 'plunit', 'compat_tools')) AS is_system
 FROM pg_catalog.pg_namespace n
 ORDER BY n.nspname
 

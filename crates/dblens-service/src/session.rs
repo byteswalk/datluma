@@ -644,9 +644,29 @@ impl Actor {
         if state.in_transaction || !state.autocommit {
             return Err(Error::invalid(msg!("changes.in_transaction")));
         }
+        // GBase 8a 回滚不生效：不开事务，先逐条确认修改、删除只命中一行，都确认了才写
+        let no_rollback = self.ctx.dialect.variant() == Variant::Gbase8a;
         let Actor { conn, ctx, owner, policy, history, info: shared, .. } = self;
         let Some(conn) = conn.as_mut() else { return Err(Error::connect(msg!("session.disconnected"))) };
-        conn.set_autocommit(false).await?;
+        if no_rollback {
+            for st in &statements {
+                let Some((sql, params)) = &st.guard else { continue };
+                let n = count_rows(conn, sql, params).await?;
+                if n != 1 {
+                    let error = if n == 0 {
+                        Error::invalid(msg!("changes.conflict", n = st.index + 1))
+                    } else {
+                        Error::invalid(msg!("changes.not_unique", n = st.index + 1, count = n))
+                    };
+                    return Ok(ApplyOutcome {
+                        applied: 0,
+                        failed: Some(ApplyFailure { index: st.index, error }),
+                    });
+                }
+            }
+        } else {
+            conn.set_autocommit(false).await?;
+        }
         let schema = shared.lock().ok().and_then(|i| i.schema.clone());
         let ctx = &ExecContext { operation: Operation::DataEdit, schema, ..ctx.clone() };
         let mut done: Vec<NewHistory> = Vec::new();
@@ -696,6 +716,14 @@ impl Actor {
                 break;
             }
         }
+        if no_rollback {
+            // 出错前的语句已经生效，历史照实记
+            let applied = done.iter().filter(|h| h.error.is_none()).count();
+            for h in done {
+                history.record(h);
+            }
+            return Ok(ApplyOutcome { applied, failed });
+        }
         let end = if failed.is_none() { conn.commit().await } else { conn.rollback().await };
         // 恢复自动提交；提交或回滚已经结束了事务
         let restore = conn.set_autocommit(true).await;
@@ -723,6 +751,24 @@ impl Actor {
         }
         let closed = conn.close().await;
         result.and(closed)
+    }
+}
+
+/// 执行计数查询，取第一行第一列。
+async fn count_rows(conn: &mut Box<dyn Connection>, sql: &str, params: &[Value]) -> Result<u64> {
+    let mut stream = conn.execute(sql, params).await?;
+    let mut n = None;
+    while let Some(ev) = stream.next(10).await? {
+        if let ExecEvent::Rows(rows) = ev
+            && n.is_none()
+        {
+            n = rows.first().and_then(|r| r.first()).cloned();
+        }
+    }
+    match n {
+        Some(Value::Int(v)) => Ok(u64::try_from(v).unwrap_or(0)),
+        Some(Value::Decimal(d)) | Some(Value::String(d)) => Ok(d.parse().unwrap_or(0)),
+        _ => Err(Error::internal(msg!("driver.no_result", sql = sql))),
     }
 }
 
@@ -1048,6 +1094,7 @@ mod tests {
             sql: sql.into(),
             params: vec![],
             preview: format!("{sql} -- 预览"),
+            guard: None,
         };
         let ok = m
             .apply(id, vec![st(1, "DELETE FROM t WHERE id = 2"), st(0, "UPDATE t SET a = 1 WHERE id = 1")])

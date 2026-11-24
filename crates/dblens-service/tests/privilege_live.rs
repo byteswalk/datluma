@@ -723,7 +723,12 @@ async fn gbase_changes(service: &Service, admin: &str, owner: &str) {
 /// 没有角色的库（MySQL 5.7）：只用直接授权，角色操作要被拒绝。
 async fn flow_without_roles(env: &str, service: &Service, admin: &str) {
     let (u, t) = ("'dblens_priv_u'@'%'", "dblens_priv_t");
-    let drop: &[&str] = &["DROP USER IF EXISTS 'dblens_priv_u'@'%'", "DROP TABLE IF EXISTS dblens_priv_t"];
+    // GBase 8a 没有 DROP USER IF EXISTS：再写一条不带的，清理时忽略错误
+    let drop: &[&str] = &[
+        "DROP USER IF EXISTS 'dblens_priv_u'@'%'",
+        "DROP USER 'dblens_priv_u'@'%'",
+        "DROP TABLE IF EXISTS dblens_priv_t",
+    ];
     run(service, admin, drop, true).await;
     run(
         service,
@@ -787,6 +792,11 @@ async fn flow_without_roles(env: &str, service: &Service, admin: &str) {
 #[tokio::test]
 async fn mysql() {
     flow("DBLENS_TEST_MYSQL_URL", MYSQL).await;
+}
+
+#[tokio::test]
+async fn gbase8a() {
+    flow("DBLENS_TEST_GBASE8A_URL", MYSQL).await;
 }
 
 #[tokio::test]

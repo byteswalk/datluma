@@ -84,6 +84,36 @@ const MYSQL_TYPES: &[TypeEntry] = &[
     t("JSON", N),
 ];
 
+/// GBase 8a：没有 JSON、ENUM、SET、无符号和空间类型，时间类型不带小数秒。
+const GBASE8A_TYPES: &[TypeEntry] = &[
+    t("TINYINT", N),
+    t("SMALLINT", N),
+    t("MEDIUMINT", N),
+    t("INT", N),
+    t("BIGINT", N),
+    t("DECIMAL", P),
+    t("FLOAT", N),
+    t("DOUBLE", N),
+    t("BIT", L),
+    t("CHAR", L),
+    t("VARCHAR", L),
+    t("TINYTEXT", N),
+    t("TEXT", N),
+    t("MEDIUMTEXT", N),
+    t("LONGTEXT", N),
+    t("BINARY", L),
+    t("VARBINARY", L),
+    t("TINYBLOB", N),
+    t("BLOB", N),
+    t("MEDIUMBLOB", N),
+    t("LONGBLOB", N),
+    t("DATE", N),
+    t("TIME", N),
+    t("DATETIME", N),
+    t("TIMESTAMP", N),
+    t("YEAR", N),
+];
+
 const POSTGRES_TYPES: &[TypeEntry] = &[
     t("smallint", N),
     t("integer", N),
@@ -244,6 +274,21 @@ impl Dialect {
         let v = self.version().unwrap_or(u32::MAX);
         let auto_increment =
             !(self.family() == Family::Oracle && self.oracle_release().is_some_and(|r| r < 120100));
+        // GBase 8a：没有外键、检查约束（接受但不执行）、生成列，索引只有单列的 HASH 索引
+        if self.variant() == Variant::Gbase8a {
+            return DesignCaps {
+                reorder: true,
+                auto_increment,
+                checks: false,
+                comments: true,
+                generated: false,
+                descending_index: false,
+                on_delete: Vec::new(),
+                on_update: Vec::new(),
+                index_methods: vec!["HASH"],
+                types: GBASE8A_TYPES.to_vec(),
+            };
+        }
         match self.family() {
             Family::MySql => DesignCaps {
                 reorder: true,

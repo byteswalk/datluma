@@ -150,6 +150,10 @@ async fn flow(env: &str, tls: bool) {
             .unwrap();
     let sql = match driver {
         DriverId::Postgres => "SELECT g FROM generate_series(1, 900) AS g ORDER BY g",
+        // GBase 8a 的集群层不支持 UNION ALL 拼的派生表，取系统表的行
+        DriverId::Mysql if env.contains("GBASE8A") => {
+            "SELECT COLUMN_NAME FROM information_schema.COLUMNS LIMIT 900"
+        }
         // MySQL 5.7 没有 WITH RECURSIVE，用三位数字交叉连接
         DriverId::Mysql => {
             "SELECT a.d + 10 * b.d + 100 * c.d + 1 AS n \
@@ -267,6 +271,12 @@ async fn sqlserver_catalogs() {
 #[tokio::test]
 async fn mysql() {
     flow("DBLENS_TEST_MYSQL_URL", true).await;
+}
+
+// GBase 8a 不支持 SSL
+#[tokio::test]
+async fn gbase8a() {
+    flow("DBLENS_TEST_GBASE8A_URL", false).await;
 }
 
 #[tokio::test]

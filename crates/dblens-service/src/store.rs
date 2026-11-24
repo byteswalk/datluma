@@ -9,7 +9,7 @@ use dblens_core::{Error, Result, msg};
 use rusqlite::{Connection, OptionalExtension, params};
 
 /// 第 N 个元素把表结构从版本 N 升到 N+1。只能追加，不能修改已发布的迁移。
-const MIGRATIONS: &[&str] = &[
+pub(crate) const MIGRATIONS: &[&str] = &[
     // 版本 1：设置、连接配置、本地加密保存的密码
     "CREATE TABLE settings (
         key   TEXT PRIMARY KEY,
@@ -98,6 +98,10 @@ const MIGRATIONS: &[&str] = &[
         nonce  BLOB NOT NULL,
         cipher BLOB NOT NULL
     );",
+    // 版本 7：“未设”环境改成“本机”，只给本机地址用；原来未设、主机又不是本机的连接改成开发
+    "UPDATE profiles SET environment = 'dev'
+      WHERE environment NOT IN ('dev', 'test', 'prod') AND driver <> 'sqlite'
+        AND NOT (LOWER(TRIM(host)) IN ('localhost', '::1', '[::1]') OR TRIM(host) LIKE '127.%');",
 ];
 
 pub(crate) fn db_err(e: rusqlite::Error) -> Error {

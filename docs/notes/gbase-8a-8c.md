@@ -20,7 +20,7 @@
 1. 宿主机和容器都没有 bzip2，安装包里的 `.tar.bz2` 用 python3 `tarfile` 解开，程序放 `/opt/gbase8c`。
 2. 缺 `libaio.so.1`（从 `ora11204` 容器拷）和 `libedit.so.0`（CentOS 7 vault 的 `libedit-3.0-12.20121213cvs.el7` rpm 解出）。
 3. 以 OS 用户 `gbase` 初始化数据目录 `/home/gbase/data`；`pg_hba.conf` 加 `host all all 0.0.0.0/0 sha256`。
-4. 启动：`gs_ctl start -D /home/gbase/data -l /home/gbase/gbased.log`。容器重启后不会自动启动，要手动执行。
+4. 启动：容器里放了 `/home/gbase/start.sh`（设好 `GAUSSHOME`、`PATH`、`LD_LIBRARY_PATH` 后执行 `gs_ctl start -D /home/gbase/data -l /home/gbase/gbased.log`）。容器重启后不会自动启动，要以 gbase 用户执行它。
 5. 建库 `dblens_test`（A 模式）、`dblens_test_pg`（PG 模式），用户 `dblens` 给 SYSADMIN 和 MONADMIN（运维页的慢 SQL 要读 `dbe_perf`）。
 
 ### 改动
@@ -52,6 +52,7 @@ FREE 版 9.5.3.28.12，单节点集群（gcware、coordinator、data 各一个�
 5. `gcinstall.py --silent=/opt/pkg/gcinstall/single.options`，安装到 `/opt/gbase`，dba 用户 `gbase`。
 6. 以 `gbase` 用户建分布：`gcChangeInfo.xml` 只列本节点，`echo y | gcadmin distribution gcChangeInfo.xml p 1 d 0`（会问“没有副本是否继续”，不喂 `y` 会一直等）；然后 `gccli -uroot` 执行 `initnodedatamap;`。
 7. 建用户 `dblens`（`GRANT ALL ON *.* … WITH GRANT OPTION`）和库 `dblens_test`。
+8. 重启：容器重启后服务不会自动起来，IP 也可能变（集群按 172.17.0.4 安装）。以 root 执行容器里的 `/root/start8a.sh`：没有 172.17.0.4 时给 eth0 加这个别名，删掉 `/run/nologin`，起 sshd，再以 gbase 用户 `gcware_services all start`、`gcluster_services all start`。
 
 ### 连接
 
@@ -77,19 +78,39 @@ MySQL 协议能连。mysql_async（DBLENS 的 MySQL 驱动）和 MySQL 5.7 客�
 
 ### 适配
 
-按覆盖规则的第三层做：能连、能浏览、能执行 SQL、出错有提示。
+先按第三层（能连、能浏览、能执行 SQL、出错有提示）做，2026-11-24 用户要求“方方面面都测好”后，把依赖回滚、主键唯一的功能也一并处理了。
+
+识别和数据字典：
 
 - 识别：MySQL 驱动连上后读 `@@version_comment`，以 `GBase` 开头时把版本串写成 `GBase 8a 9.5.3…`（同 GoldenDB 的 JDBC 在版本号前补产品名），识别为 `Variant::Gbase8a`，家族仍是 MySQL。
-- 版本：方言版本固定按 MySQL 5.1（50100）处理。MySQL 模板加了版本分支：`GENERATION_EXPRESSION` 要 5.7.6，`PARAMETERS` 要 5.5；检查约束（8.0.16）、关键字表（8.0.13）原来就有分支。真 MySQL 5.7 以上不受影响。
-- 覆盖模板 `sql/gbase8a.sql`：系统库（gbase、gclusterdb、gctmpdb）；存储过程列表 `TRIM` 名字；存储过程源码用 `SHOW CREATE {{ kind_word }} 库.名`，`Dialect::adapt_rows` 转成 line、text 两列。为此模板上下文加了 `name_ident`（按标识符引用的对象名）和 `kind_word`（只放行 FUNCTION、PROCEDURE）。
-- 运维 `sql/ops/gbase8a.sql`：表锁读 `TABLE_LOCKS`（持锁会话可能有多个，没有 KILL 语句）；慢 SQL 读审计日志。
-- 手动提交：8a 回滚不生效，会话切到手动提交时直接报错（`session.no_rollback`），不让用户以为能回滚。
-- 新建连接：国产库分组加 GBase 8a，MySQL 驱动，默认端口 5258。
+- 版本：方言版本固定按 MySQL 5.1（50100）处理。MySQL 模板加了版本分支：`GENERATION_EXPRESSION` 要 5.7.6，`PARAMETERS` 要 5.5。真 MySQL 5.7 以上不受影响。
+- 覆盖模板 `sql/gbase8a.sql`：
+  - 系统库（gbase、gclusterdb、gctmpdb）。
+  - 约束查询去掉 `LEFT JOIN REFERENTIAL_CONSTRAINTS`：8a 上有这个连接时 `KEY_COLUMN_USAGE` 的连接条件失效，所有系统表的主键列都会带出来（表数据因此变成只读）。
+  - 索引的方法读成空（8a 只有 GLOBAL HASH，相当于默认方法），比对时不会把同一个索引当成改过。
+  - 存储过程名 `TRIM`（默认 sql_mode 带 `PAD_CHAR_TO_FULL_LENGTH`），源码用 `SHOW CREATE {{ kind_word }} 库.名`。为此模板上下文加了 `name_ident`、`kind_word`。
+  - 表的行数读 `performance_schema.TABLES`（`information_schema` 的 `TABLE_ROWS` 总是 0，而 `performance_schema` 只回答指定了单个库和表的查询）。
+- 运维 `sql/ops/gbase8a.sql`：表锁读 `TABLE_LOCKS`；慢 SQL 读审计日志（`audit_log` 打开后才有记录）。
+- 账号权限 `sql/privilege/gbase8a.sql`：账号读 `gbase.user`；没有角色。
 
-不做：表设计器、作为迁移目标、数据编辑里依赖事务的整批回滚、导入。
+回滚不生效、主键不检查唯一：
+
+- 手动提交：会话切到手动提交时报错（`session.no_rollback`）。执行 SQL 文件选“一个事务”同样拒绝。
+- 数据编辑：不开事务。写之前逐条用 `COUNT(*)` 确认修改、删除只命中一行，有一条不对就一行都不写；中途出错时如实报已生效的条数。
+- 导入：按主键更新、整体一个事务、清空后导入，提交时就拒绝（按主键更新会插入重复行；后两种失败时无法恢复）。
+- 自增列不接受显式值：导入、编辑里写自增列报服务器原文。
+
+建表和结构变更：
+
+- 表设计器：类型列表去掉 8a 没有的类型（JSON、ENUM、SET、无符号、小数秒、空间类型）；唯一约束、外键、检查约束、生成列、多列或唯一索引在预览时报出原因；索引单独用 `CREATE INDEX` 建。修改列只支持加长 VARCHAR 和改注释，其他改动报服务器原文，不走重建。
+- 结构同步、模型同步：外键、唯一约束、检查约束、多列或唯一索引跳过，每项一条说明。
+- 迁移到 8a：自增列改成普通列（迁来的主键值写不进自增列），唯一约束和外键跳过并说明，时间类型去掉小数秒。
+
+其他：
+
+- 规范检查：EXPRESS 引擎默认允许；行数规则读不到整个 schema 的行数，在 8a 上不起作用。
+- 新建连接：GBase 一个入口，表单里选型号 8s / 8a / 8c。
 
 ### 测试
 
-服务层 `gbase8a_*`（`DBLENS_TEST_GBASE8A_URL`）：完整流程（回滚一段换成断言手动提交被拒绝）、工作台、取消、SQL 文件、运维、浏览（分布表、复制表、视图、存储过程源码、读回 DDL）共 6 个，全部通过。
-
-通用的 MySQL 流程里，对象、编辑、设计器、导入、规范检查、模型的夹具用了 `UNIQUE`、InnoDB、MyISAM，8a 上跑不了；导出的夹具用了集群层不支持的派生表。这些没有为 8a 改。
+服务层 `gbase8a_*`（`DBLENS_TEST_GBASE8A_URL`）12 个全部通过：完整流程、工作台、取消、SQL 文件、运维、浏览、表设计、数据编辑、导出、导入、规范检查、模型（反向、同步、写回、ER 图、数据字典、库对库）。权限、API 各 1 个通过。迁移 8 条路线通过：8a 和 MySQL、PostgreSQL、达梦、Oracle 23ai 互迁，数据校验一致、读回结构一致。

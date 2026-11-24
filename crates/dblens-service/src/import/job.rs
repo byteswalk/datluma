@@ -7,7 +7,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use dblens_core::schema::{Column, PrimaryKey, Table};
 use dblens_core::{ColumnType, Error, LogicalType, Result, Value, msg};
 use dblens_dialect::migrate::data::identity_insert_sql;
-use dblens_dialect::{Dialect, ImportStatement, WriteMode};
+use dblens_dialect::{Dialect, ImportStatement, Variant, WriteMode};
 use dblens_driver::{Connection, ExecEvent};
 use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
@@ -294,6 +294,15 @@ impl Service {
         let profile = self.scoped_profile(&req.profile_id, req.catalog.as_deref())?;
         let password = self.password(&profile.id).await?;
         let dialect = self.metadata.dialect(&profile).await?;
+        // GBase 8a 回滚不生效：整体一个事务失败时前面的行已经写入；清空后导入失败时原数据已经删掉
+        if dialect.variant() == Variant::Gbase8a {
+            if req.mode == WriteMode::Replace || req.transaction == Transaction::Whole {
+                return Err(Error::invalid(msg!("import.no_rollback", product = "GBase 8a")));
+            }
+            if req.mode == WriteMode::Upsert {
+                return Err(Error::invalid(msg!("import.upsert_unsupported", product = "GBase 8a")));
+            }
+        }
         let (table, create_sql) = match &req.create {
             Some(def) => {
                 let t = new_table(&dialect, &req.table, def)?;

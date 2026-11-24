@@ -13,7 +13,7 @@ import { type Compat, type TaskStatus, errorText } from '../../shared/api'
 import { schemaOptions } from '../../shared/schemaOptions'
 import { desktop } from '../../shared/shell'
 import { withVault } from '../connections/vault'
-import { PRODUCTS, type ProductId, productLabel } from '../connections/products'
+import { PRODUCTS, type ProductId, productLabel, productVariant } from '../connections/products'
 import { baseName, useModelDialogs } from './dialogs'
 
 function PathField({ value, onChange }: { value?: string; onChange?(v: string): void }) {
@@ -75,7 +75,7 @@ function OpenDialog() {
 }
 
 /** 新建模型时可选的产品：有兼容模式的（人大金仓、openGauss）另选模式。 */
-const COMPAT_PRODUCTS: ProductId[] = ['kingbase', 'opengauss']
+const COMPAT_PRODUCTS: ProductId[] = ['kingbase', 'opengauss', 'gbase8c']
 
 function CreateDialog() {
   const api = useApi()
@@ -97,7 +97,7 @@ function CreateDialog() {
     setBusy(true)
     try {
       const withCompat = COMPAT_PRODUCTS.includes(product)
-      await api.createModel(path.trim(), name.trim() || baseName(path), { variant: product, compat: withCompat ? compat : 'native' })
+      await api.createModel(path.trim(), name.trim() || baseName(path), { variant: productVariant(product), compat: withCompat ? compat : 'native' })
       opened()
       close()
     } catch (e) {

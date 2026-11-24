@@ -7,7 +7,7 @@ use dblens_core::schema::{Column, Table};
 use dblens_core::{Error, LogicalType, Result, Value, msg};
 use serde::{Deserialize, Serialize};
 
-use crate::{Dialect, Family};
+use crate::{Dialect, Family, Variant};
 
 /// 一行的改动。列名 → 值；`key` 是行标识列的原值。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -36,6 +36,10 @@ pub struct ChangeStatement {
     pub params: Vec<Value>,
     /// 值写成字面量的 SQL，预览和执行历史用。
     pub preview: String,
+    /// 执行前确认改动只命中一行的计数查询（SQL 和参数）。只有不能回滚的库（GBase 8a）的修改、删除才有：
+    /// 别的库靠影响行数不是 1 时整体回滚。
+    #[serde(skip)]
+    pub guard: Option<(String, Vec<Value>)>,
 }
 
 /// 标识一行用的列：主键；没有主键时取第一个所有列都 NOT NULL 的唯一键。都没有时为 None（整张表只读）。
@@ -67,6 +71,9 @@ fn comparable(col: &Column, original: &Value) -> bool {
     );
     by_type && !matches!(original, Value::Lob(_))
 }
+
+/// 修改的改动列：（原值，新值）。删除时没有。
+type Changed<'a> = Option<(&'a BTreeMap<String, Value>, &'a BTreeMap<String, Value>)>;
 
 /// 语句的两种形式一起拼：执行用占位符，预览用字面量。
 struct Builder<'a> {
@@ -118,7 +125,7 @@ impl<'a> Builder<'a> {
     }
 
     fn finish(self, index: usize) -> ChangeStatement {
-        ChangeStatement { index, sql: self.sql, params: self.params, preview: self.preview }
+        ChangeStatement { index, sql: self.sql, params: self.params, preview: self.preview, guard: None }
     }
 }
 
@@ -160,19 +167,49 @@ impl Dialect {
         let mut indexed: Vec<(usize, &RowChange)> = changes.iter().enumerate().collect();
         indexed.sort_by_key(|(i, c)| (order(c), *i));
 
+        let guarded = self.variant() == Variant::Gbase8a;
+        // 修改、删除的 WHERE：行标识，修改时再加改动列的原值（别人在此期间改过同一字段时一行也不命中）
+        let condition = |b: &mut Builder, k: &BTreeMap<String, Value>, changed: Changed| -> Result<()> {
+            for (i, c) in key.iter().enumerate() {
+                if i > 0 {
+                    b.text(" AND ");
+                }
+                b.equals(&c.name, &k[&c.name])?;
+            }
+            if let Some((original, values)) = changed {
+                for (name, old) in original {
+                    let c = column(table, name)?;
+                    if values.contains_key(name)
+                        && !key.iter().any(|k| k.name == c.name)
+                        && comparable(c, old)
+                    {
+                        b.text(" AND ");
+                        b.equals(name, old)?;
+                    }
+                }
+            }
+            Ok(())
+        };
+        let guard = |k: &BTreeMap<String, Value>, changed| -> Result<Option<(String, Vec<Value>)>> {
+            if !guarded {
+                return Ok(None);
+            }
+            let mut g = Builder::new(self);
+            g.text(&format!("SELECT COUNT(*) FROM {target} WHERE "));
+            condition(&mut g, k, changed)?;
+            Ok(Some((g.sql, g.params)))
+        };
+
         let mut out = Vec::with_capacity(changes.len());
         for (index, change) in indexed {
             let mut b = Builder::new(self);
+            let mut check = None;
             match change {
                 RowChange::Delete { key: k } => {
                     check_key(k)?;
                     b.text(&format!("DELETE FROM {target} WHERE "));
-                    for (i, c) in key.iter().enumerate() {
-                        if i > 0 {
-                            b.text(" AND ");
-                        }
-                        b.equals(&c.name, &k[&c.name])?;
-                    }
+                    condition(&mut b, k, None)?;
+                    check = guard(k, None)?;
                 }
                 RowChange::Update { key: k, original, values } => {
                     check_key(k)?;
@@ -189,23 +226,8 @@ impl Dialect {
                         b.value(v)?;
                     }
                     b.text(" WHERE ");
-                    for (i, c) in key.iter().enumerate() {
-                        if i > 0 {
-                            b.text(" AND ");
-                        }
-                        b.equals(&c.name, &k[&c.name])?;
-                    }
-                    // 改动列的原值：别人在此期间改过同一字段时影响行数为 0
-                    for (name, old) in original {
-                        let c = column(table, name)?;
-                        if values.contains_key(name)
-                            && !key.iter().any(|k| k.name == c.name)
-                            && comparable(c, old)
-                        {
-                            b.text(" AND ");
-                            b.equals(name, old)?;
-                        }
-                    }
+                    condition(&mut b, k, Some((original, values)))?;
+                    check = guard(k, Some((original, values)))?;
                 }
                 RowChange::Insert { values } => {
                     // 自增列和有默认值的列留空（NULL）时不写，交给数据库
@@ -244,7 +266,7 @@ impl Dialect {
                     }
                 }
             }
-            out.push(b.finish(index));
+            out.push(ChangeStatement { guard: check, ..b.finish(index) });
         }
         Ok(out)
     }

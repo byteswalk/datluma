@@ -56,6 +56,13 @@
       "label": "GBase 8a",
       "note": "GBase 8a MPP, default port 5258, over the MySQL protocol. No rollback, so autocommit only; the table designer and migration are not adapted"
     },
+    "gbase": {
+      "label": "GBase"
+    },
+    "gbase8c": {
+      "label": "GBase 8c",
+      "note": "GBase 8c over the PG protocol; its kernel is openGauss, so it is detected as openGauss. A (Oracle) and PG compatibility are detected per database"
+    },
     "goldendb": {
       "label": "GoldenDB",
       "note": "Connects through the official JDBC driver; the port is that of the connection instance. Put the driver jar in the JDBC driver folder yourself"
@@ -106,6 +113,7 @@
     "sqlite": "Database file"
   },
   "validate": {
+    "localNotLoopback": "Local is only for this machine (127.0.0.1, localhost, ::1); for host {{host}} choose Dev, Test or Prod",
     "nameRequired": "Enter a connection name",
     "hostRequired": "Enter a host",
     "portRange": "Port must be between 1 and 65535",
@@ -117,7 +125,7 @@
     "fileRequired": "Choose the database file"
   },
   "env": {
-    "none": "None",
+    "none": "Local",
     "dev": "Dev",
     "test": "Test",
     "prod": "Prod"
@@ -208,6 +216,7 @@
     "trustCertHint": "Trust the server certificate (no validation, like the SSMS option)"
   },
   "gbase": {
+    "model": "Model",
     "serverName": "Server name"
   },
   "client": {

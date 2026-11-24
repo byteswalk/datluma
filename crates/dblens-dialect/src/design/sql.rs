@@ -44,6 +44,9 @@ impl Dialect {
         if self.family() == Family::Sqlite {
             out.extend(self.sqlite_issues(draft));
         }
+        if self.variant() == Variant::Gbase8a {
+            out.extend(self.gbase8a_issues(draft));
+        }
         if !self.design_caps().auto_increment {
             for (i, c) in draft.columns.iter().enumerate().filter(|(_, c)| c.auto_increment) {
                 out.push(DesignIssue::new(

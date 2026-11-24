@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use dblens_core::{Error, Result, msg};
-use dblens_dialect::{Dialect, SqlStatement, StreamSplitter};
+use dblens_dialect::{Dialect, SqlStatement, StreamSplitter, Variant};
 use serde::Deserialize;
 use tokio::sync::mpsc;
 
@@ -161,6 +161,9 @@ impl Service {
         let profile = self.profile(&req.profile_id)?;
         let password = self.password(&profile.id).await?;
         let dialect = self.metadata.dialect(&profile).await?;
+        if req.transaction && dialect.variant() == Variant::Gbase8a {
+            return Err(Error::invalid(msg!("session.no_rollback", product = "GBase 8a")));
+        }
         self.tasks.resolve(&req.source, allow_path, false)?;
         let task = self.tasks.create(TaskKind::SqlFile)?;
         let file = self.tasks.resolve(&req.source, allow_path, true)?;
