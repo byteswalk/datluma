@@ -1582,6 +1582,11 @@ export function createApi(token: string, fetchFn: FetchFn = (i, o) => fetch(i, o
       request<DesignTableResult>('GET', `${p(id)}/design/table${q({ ...withCatalog({ schema }), name })}`),
     previewDesign: (id: string, req: DesignRequest) =>
       request<DesignPreview>('POST', `${p(id)}/design/preview`, withCatalog(req)),
+    /** 删除表：语句由后端生成，执行前过执行策略。 */
+    dropTable: (id: string, schema: string, name: string) => {
+      const s = splitCatalog(schema)
+      return request<null>('POST', `${p(id)}/design/drop`, { catalog: s.catalog ?? null, schema: s.schema, name })
+    },
     applyDesign: async (id: string, req: DesignRequest) =>
       (await request<{ id: string }>('POST', `${p(id)}/design/apply`, withCatalog(req))).id,
     models: () => request<{ open: ModelSummary[]; recent: string[] }>('GET', '/models'),

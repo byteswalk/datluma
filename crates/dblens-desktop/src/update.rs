@@ -14,10 +14,10 @@ use dblens_core::{Lang, default_lang, msg};
 use serde::{Deserialize, Serialize};
 use tauri::menu::{CheckMenuItem, CheckMenuItemBuilder, MenuItemBuilder, Submenu, SubmenuBuilder};
 use tauri::{App, AppHandle, Manager, Wry};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::json_file;
+use crate::notice::{self, Kind};
 
 /// 发布页，Linux 的 deb、rpm 包从这里手动下载新版本。
 pub const RELEASES_PAGE: &str = "https://github.com/byteswalk/dblens/releases";
@@ -98,23 +98,13 @@ struct UpdateState {
     auto_item: CheckMenuItem<Wry>,
 }
 
-/// 弹出消息框，等用户关闭后返回是否点了确认按钮。
-async fn dialog(
-    app: &AppHandle,
-    kind: MessageDialogKind,
-    text: String,
-    buttons: MessageDialogButtons,
-) -> bool {
-    let (tx, rx) = tokio::sync::oneshot::channel();
-    let title = msg!("app.name").render(default_lang());
-    app.dialog().message(text).title(title).kind(kind).buttons(buttons).show(move |ok| {
-        let _ = tx.send(ok);
-    });
-    rx.await.unwrap_or(false)
+/// 页面绘制的提示框（见 [`notice`]）。
+async fn info(app: &AppHandle, text: String) {
+    notice::show(app, Kind::Info, text, None).await;
 }
 
-async fn info(app: &AppHandle, text: String) {
-    dialog(app, MessageDialogKind::Info, text, MessageDialogButtons::Ok).await;
+async fn error(app: &AppHandle, text: String) {
+    notice::show(app, Kind::Error, text, None).await;
 }
 
 async fn find_update(app: &AppHandle) -> Result<Option<Update>, String> {
@@ -157,12 +147,10 @@ pub async fn check(app: AppHandle, manual: bool) {
         Err(e) => {
             tracing::warn!("检查更新失败：{e}");
             if manual {
-                dialog(
+                error(
                     &app,
-                    MessageDialogKind::Error,
                     msg!("update.check_failed", error = error_text(default_lang(), &e))
                         .render(default_lang()),
-                    MessageDialogButtons::Ok,
                 )
                 .await;
             }
@@ -186,17 +174,14 @@ pub async fn check(app: AppHandle, manual: bool) {
         info(&app, text).await;
         return;
     }
-    let buttons = MessageDialogButtons::OkCancelCustom(
-        msg!("update.install_button").render(lang),
-        msg!("update.later_button").render(lang),
-    );
-    if !dialog(&app, MessageDialogKind::Info, text, buttons).await {
+    let buttons = (msg!("update.install_button").render(lang), msg!("update.later_button").render(lang));
+    if !notice::show(&app, Kind::Info, text, Some(buttons)).await {
         return;
     }
     if let Err(e) = install(&app, update).await {
         tracing::error!("安装更新失败：{e}");
         let text = msg!("update.install_failed", error = error_text(lang, &e)).render(lang);
-        dialog(&app, MessageDialogKind::Error, text, MessageDialogButtons::Ok).await;
+        error(&app, text).await;
     }
 }
 

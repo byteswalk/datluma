@@ -82,6 +82,7 @@ export default function DdlDialog({ target, onClose }: { target: DdlTarget; onCl
             value={data ?? ''}
             theme={`dblens-${theme}`}
             options={{
+              useShadowDOM: false,
               readOnly: true,
               domReadOnly: true,
               fontFamily: "'JetBrains Mono', 'Cascadia Mono', Consolas, 'Noto Sans Mono CJK SC', monospace",

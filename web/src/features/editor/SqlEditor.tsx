@@ -142,6 +142,8 @@ export default function SqlEditor({ path, language, defaultValue, marks, sql, on
         automaticLayout: true,
         tabSize: 2,
         fixedOverflowWidgets: true,
+        // 右键菜单默认放在 Shadow DOM 里，拿不到主题的颜色变量，背景是透明的
+        useShadowDOM: false,
         renderLineHighlight: 'none',
         // 只用 SQL 补全，不补文中出现过的词
         wordBasedSuggestions: 'off',

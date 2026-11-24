@@ -1,5 +1,5 @@
-// 设置里的 MCP 配置片段：把 DBLENS 作为工具接给本机的智能体（Claude Code、Codex、Cursor 等）。
-// 只暴露连接高级选项里打开了“允许 MCP 访问”的连接，查询只允许一条只读语句。
+// 设置里单独的 MCP 标签页：把 DBLENS 作为工具接给本机的智能体（Claude Code、Codex、Cursor 等）。
+// 和 AI 设置无关：不启用 AI 也能用。只暴露连接高级选项里打开了“允许 MCP 访问”的连接，查询只允许一条只读语句。
 
 import { App, Button, Form } from 'antd'
 import { useTranslation } from 'react-i18next'
@@ -20,7 +20,8 @@ export default function McpSnippet() {
   const info = useShellInfo()
   const text = mcpConfig(info?.exe, !!desktop)
   return (
-    <Form.Item label="MCP" extra={t('ai.mcp.hint')}>
+    <Form layout="vertical" style={{ marginTop: 8 }}>
+    <Form.Item label={t('ai.mcp.label')} extra={t('ai.mcp.hint')}>
       <div className="ai-code">
         <Button
           size="small"
@@ -38,5 +39,6 @@ export default function McpSnippet() {
         <pre>{text}</pre>
       </div>
     </Form.Item>
+    </Form>
   )
 }

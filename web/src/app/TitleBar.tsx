@@ -19,6 +19,7 @@ import {
   IconFileImport,
   IconFilePlus,
   IconFlower,
+  IconFocusCentered,
   IconFolderOpen,
   IconGitCompare,
   IconHistory,
@@ -269,6 +270,9 @@ export default function TitleBar() {
             onClick={() => act('toggle_always_on_top')}
           >
             <IconPin size={16} />
+          </span>
+          <span className="tb-btn" title={t('app.titleBar.resetWindow')} onClick={() => act('reset_position')}>
+            <IconFocusCentered size={16} />
           </span>
           {!mac && (
             <>

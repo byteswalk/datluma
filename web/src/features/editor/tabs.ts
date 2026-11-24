@@ -231,6 +231,17 @@ interface TabsState extends Persisted {
   restore(raw: string | undefined): void
 }
 
+/** 和某张表绑定的标签：它的数据页、设计器页（不含模型里的表）、定位到它的"谁能访问"页。查询页不算。 */
+export function tabsOfTable(tabs: QueryTab[], profileId: string, schema: string, table: string): QueryTab[] {
+  return tabs.filter(
+    (x) =>
+      x.profileId === profileId &&
+      ((x.data?.objectKind === 'table' && x.data.schema === schema && x.data.object === table) ||
+        (x.design !== undefined && x.design.model === undefined && x.design.schema === schema && x.design.table === table) ||
+        (x.privileges?.focus?.schema === schema && x.privileges.focus.object === table)),
+  )
+}
+
 let ids = 0
 const newId = () => `t${Date.now().toString(36)}${(ids++).toString(36)}`
 

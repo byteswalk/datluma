@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import i18n from '../../shared/i18n'
 import { useSettings } from '../../shared/settings'
-import { TABS_KEY, markRun, parseTabs, persistTabs, takeRun, useTabs, wheelTarget } from './tabs'
+import { type QueryTab, TABS_KEY, markRun, parseTabs, persistTabs, tabsOfTable, takeRun, useTabs, wheelTarget } from './tabs'
 
 describe('标签换位', () => {
   it('移到目标位置，顺序保持', () => {
@@ -253,5 +253,24 @@ describe('账号权限标签', () => {
     expect(parseTabs(JSON.stringify({ tabs: [tab] })).tabs).toHaveLength(1)
     const bad = { ...tab, privileges: { focus: { schema: 1 } } }
     expect(parseTabs(JSON.stringify({ tabs: [bad] })).tabs).toHaveLength(0)
+  })
+})
+
+describe('删表后要关的标签', () => {
+  it('只挑这张表的数据页、设计器页和定位到它的权限页', () => {
+    const base = { title: 't', sql: '', profileId: 'p1' }
+    const tabs: QueryTab[] = [
+      { ...base, id: 'query' },
+      { ...base, id: 'data', data: { schema: 's', object: 'a', objectKind: 'table' } },
+      { ...base, id: 'view', data: { schema: 's', object: 'a', objectKind: 'view' } },
+      { ...base, id: 'other', data: { schema: 's', object: 'b', objectKind: 'table' } },
+      { ...base, id: 'otherSchema', data: { schema: 's2', object: 'a', objectKind: 'table' } },
+      { ...base, id: 'otherProfile', profileId: 'p2', data: { schema: 's', object: 'a', objectKind: 'table' } },
+      { ...base, id: 'design', design: { schema: 's', table: 'a' } },
+      { ...base, id: 'model', design: { schema: 's', table: 'a', model: 'm' } },
+      { ...base, id: 'priv', privileges: { focus: { schema: 's', object: 'a' } } },
+      { ...base, id: 'privAll', privileges: {} },
+    ]
+    expect(tabsOfTable(tabs, 'p1', 's', 'a').map((x) => x.id)).toEqual(['data', 'design', 'priv'])
   })
 })

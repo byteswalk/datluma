@@ -83,7 +83,7 @@ fn default_rect(win: &WebviewWindow) -> tauri::Result<Option<Rect>> {
     };
     Ok(monitor.map(|m| {
         let a = m.work_area();
-        geometry::default_rect(to_rect(a.position, a.size), m.scale_factor())
+        geometry::default_rect(to_rect(*m.position(), *m.size()), to_rect(a.position, a.size))
     }))
 }
 
@@ -105,7 +105,7 @@ fn remember(win: &WebviewWindow, tracked: &Tracked) -> tauri::Result<()> {
     Ok(())
 }
 
-/// 移动、缩放后延迟记录位置，连续的事件只记最后一次。
+/// 移动、缩放后延迟记录位置并立即写入文件（进程被强制结束时也不丢），连续的事件只记最后一次。
 fn remember_later(win: &WebviewWindow) {
     let generation = win.state::<Tracked>().generation.fetch_add(1, Ordering::SeqCst) + 1;
     let win = win.clone();
@@ -113,13 +113,13 @@ fn remember_later(win: &WebviewWindow) {
         tokio::time::sleep(SETTLE).await;
         let tracked = win.state::<Tracked>();
         if tracked.generation.load(Ordering::SeqCst) == generation {
-            let _ = remember(&win, &tracked);
+            save(&win, &tracked);
         }
     });
 }
 
 fn save(win: &WebviewWindow, tracked: &Tracked) {
-    // 退出时状态已稳定，补记一次，免得最后一次移动还没来得及记录
+    // 先记下当前位置：退出时最后一次移动可能还没来得及记录
     let _ = remember(win, tracked);
     let mut s = *tracked.state.lock().unwrap();
     s.maximized = win.is_maximized().unwrap_or(false);
@@ -139,6 +139,9 @@ fn set_always_on_top(app: &AppHandle, on: bool) -> tauri::Result<()> {
     }
     let tracked = app.state::<Tracked>();
     tracked.state.lock().unwrap().always_on_top = on;
+    if let Some(win) = app.get_webview_window(MAIN) {
+        save(&win, &tracked);
+    }
     if let Some(item) = &tracked.on_top_item {
         item.set_checked(on)?;
     }

@@ -388,14 +388,30 @@ fn databases_sql(driver: DriverId) -> Option<&'static str> {
 impl DriverRegistry {
     /// 新建连接时的"数据库"下拉：用（可能尚未保存的）连接配置临时连一次，列出能连的库，随即断开。
     /// 不支持的驱动返回空列表。
+    /// 连接对话框里"数据库"一栏的候选。达梦和 OceanBase 的 Oracle 租户这一栏填的是模式，列非系统模式。
     pub async fn list_databases(&self, profile: &Profile, password: String) -> Result<Vec<String>> {
-        let Some(sql) = databases_sql(profile.input.driver) else { return Ok(vec![]) };
-        let (mut conn, dialect, _) = self.connect_probed(profile, password).await?;
-        // OceanBase 连上的是 Oracle 模式租户（已改走 JDBC）：这一栏填的是模式名，不列库
-        if dialect.variant() == Variant::OceanBaseOracle {
-            conn.close().await?;
+        let schema_field = profile.input.driver == DriverId::Dameng
+            || profile.input.product.as_deref() == Some("oceanbase_oracle");
+        if !schema_field && databases_sql(profile.input.driver).is_none() {
             return Ok(vec![]);
         }
+        // 模式填错时达梦连上就会 SET SCHEMA 失败，列模式时不带它
+        let mut bare = profile.clone();
+        if schema_field {
+            bare.input.database = None;
+        }
+        let (mut conn, dialect, _) = self.connect_probed(&bare, password).await?;
+        if schema_field || dialect.variant() == Variant::OceanBaseOracle {
+            let rows = match dialect.meta_query(MetaKey::Schemas, &MetaArgs::default()) {
+                Ok(Some(q)) => probe(conn.as_mut(), &q.sql, &q.params).await,
+                Ok(None) => Ok(MetaRows::default()),
+                Err(e) => Err(e),
+            };
+            conn.close().await?;
+            let schemas = dblens_dialect::meta::schemas(&rows?)?;
+            return Ok(schemas.into_iter().filter(|s| !s.is_system).map(|s| s.name).collect());
+        }
+        let Some(sql) = databases_sql(profile.input.driver) else { return Ok(vec![]) };
         let rows = probe(conn.as_mut(), sql, &[]).await;
         conn.close().await?;
         let rows = rows?;

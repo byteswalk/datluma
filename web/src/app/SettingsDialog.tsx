@@ -6,6 +6,7 @@ import { App, Button, Form, InputNumber, Modal, Radio, Switch, Tabs } from 'antd
 import { useTranslation } from 'react-i18next'
 
 import AiSettings from '../features/ai/AiSettings'
+import McpSnippet from '../features/ai/McpSnippet'
 import { DEFAULT_ROW_CAP, ROW_CAP_KEY, rowCap } from '../features/editor/runner'
 import { SYNTAX_KEY, syntaxEnabled } from '../features/sql/syntax'
 import { LANG_KEY, parseLangPref } from '../shared/i18n'
@@ -124,6 +125,7 @@ export default function SettingsDialog() {
         items={[
           { key: 'general', label: t('app.settings.tabGeneral'), children: general },
           { key: 'ai', label: 'AI', children: <AiSettings /> },
+          { key: 'mcp', label: 'MCP', children: <McpSnippet /> },
         ]}
       />
     </Modal>

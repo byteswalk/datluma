@@ -1,5 +1,5 @@
 // 新建/编辑连接时的"数据库"栏：可以直接输入，也可以点开下拉，用当前填的主机、用户、密码临时连一次，从服务器读出库列表。
-// 只用于 MySQL 系、PG 系、SQL Server（见 supportsDatabaseList）；连接信息没变时不重复读取。
+// 用于 MySQL 系、PG 系、SQL Server 的库，以及达梦、OceanBase Oracle 租户的模式（见 supportsDatabaseList）；连接信息没变时不重复读取。
 
 import { AutoComplete, Spin } from 'antd'
 import { useState } from 'react'
@@ -8,9 +8,14 @@ import { useTranslation } from 'react-i18next'
 import { useApi } from '../../app/context'
 import { type ConnectionForm, toProfileInput } from './form'
 
-/** 这一栏能从服务器列出库：一个连接下有多个库、要选一个连的数据库。OceanBase 的 Oracle 租户填的是 schema，不列。 */
+/** 这一栏填的是模式（达梦、OceanBase 的 Oracle 租户）：填了以后对象树只显示这个模式。 */
+export function isSchemaField(f: { driver: string; product?: string | null }): boolean {
+  return f.driver === 'dameng' || f.product === 'oceanbase_oracle'
+}
+
+/** 这一栏能从服务器列出候选：MySQL 系、PG 系、SQL Server 列库，达梦和 OceanBase 的 Oracle 租户列模式。 */
 export function supportsDatabaseList(f: Pick<ConnectionForm, 'driver' | 'product'>): boolean {
-  return (f.driver === 'mysql' || f.driver === 'postgres' || f.driver === 'sqlserver') && f.product !== 'oceanbase_oracle'
+  return f.driver === 'mysql' || f.driver === 'postgres' || f.driver === 'sqlserver' || isSchemaField(f)
 }
 
 type ListState = { key: string; loading: boolean; names: string[]; error: string | null }
@@ -43,6 +48,7 @@ export default function DatabaseInput({
     }
   }
 
+  const schema = isSchemaField(form)
   const typed = form.database.trim().toLowerCase()
   const names = list?.key === key ? list.names : []
   const options = names.filter((n) => !typed || n.toLowerCase().includes(typed)).map((n) => ({ value: n }))
@@ -50,9 +56,9 @@ export default function DatabaseInput({
     list?.key !== key || list.loading ? (
       <Spin size="small" />
     ) : list.error ? (
-      <span className="err">{t('connections.general.databasesFailed', { error: list.error })}</span>
+      <span className="err">{t(schema ? 'connections.general.schemasFailed' : 'connections.general.databasesFailed', { error: list.error })}</span>
     ) : (
-      <span className="muted">{t('connections.general.databasesEmpty')}</span>
+      <span className="muted">{t(schema ? 'connections.general.schemasEmpty' : 'connections.general.databasesEmpty')}</span>
     )
 
   return (
@@ -62,7 +68,7 @@ export default function DatabaseInput({
       options={options}
       onOpenChange={(open) => open && void load()}
       notFoundContent={empty}
-      placeholder={t('connections.general.databasePickPlaceholder')}
+      placeholder={t(schema ? 'connections.general.schemaPickPlaceholder' : 'connections.general.databasePickPlaceholder')}
       allowClear
     />
   )

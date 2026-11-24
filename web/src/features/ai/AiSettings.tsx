@@ -8,7 +8,6 @@ import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
 import { type AiProviderConfig, ApiError, errorText } from '../../shared/api'
-import McpSnippet from './McpSnippet'
 import { AI_CONFIG_KEY, useAiConfig } from './store'
 
 /** 常用的 OpenAI 兼容接口地址。 */
@@ -177,7 +176,6 @@ export default function AiSettings() {
           {t('ai.settings.boundary')}
         </div>
       </Form.Item>
-      <McpSnippet />
     </Form>
   )
 }

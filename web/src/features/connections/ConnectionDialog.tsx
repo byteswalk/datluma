@@ -4,7 +4,7 @@
 import { Alert, App, Button, Checkbox, Form, Input, InputNumber, Modal, Radio, Segmented, Space, Tabs } from 'antd'
 import { IconCircleCheck, IconPlug } from '@tabler/icons-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { type ReactNode, useEffect, useState } from 'react'
+import { type ReactNode, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
@@ -100,6 +100,8 @@ export default function ConnectionDialog() {
   const { connectionDialog, closeConnection } = useUi()
   const editingId = connectionDialog?.profileId ?? null
   const [form, setForm] = useState<ConnectionForm>(emptyForm())
+  // 编辑时打开对话框那一刻的连接配置：保存时对比，改了才刷新对象树里这个连接
+  const opened = useRef<string | null>(null)
   const [errors, setErrors] = useState<Errors>({})
   const [result, setResult] = useState<{ ok: ServerSummary } | { error: string } | null>(null)
   const [busy, setBusy] = useState<'test' | 'save' | null>(null)
@@ -118,7 +120,11 @@ export default function ConnectionDialog() {
       return
     }
     api.profile(editingId).then(
-      (p) => setForm(fromProfile(p, true)),
+      (p) => {
+        const f = fromProfile(p, true)
+        opened.current = JSON.stringify([toProfileInput(f), f.savePassword])
+        setForm(f)
+      },
       (e: Error) => message.error(e.message),
     )
   }, [connectionDialog, editingId, api, message])
@@ -161,6 +167,9 @@ export default function ConnectionDialog() {
         // 编辑时密码留空表示沿用已保存的密码
         if (!form.savePassword) await withVault(api, () => api.setPassword(editingId, null))
         else if (form.password) await withVault(api, () => api.setPassword(editingId, form.password))
+        if (form.password || JSON.stringify([input, form.savePassword]) !== opened.current) {
+          useUi.getState().refreshTree(editingId, null)
+        }
       }
       await qc.invalidateQueries({ queryKey: ['profiles'] })
       message.success(editingId === null ? t('connections.dialog.created') : t('connections.dialog.saved'))

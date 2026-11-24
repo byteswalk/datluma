@@ -30,6 +30,7 @@ import { useHost } from '../shared/host'
 import { layoutStorage } from '../shared/settings'
 import StatusBar from './StatusBar'
 import TitleBar from './TitleBar'
+import NoticeHost from './NoticeHost'
 import { type SideKey, useUi } from './ui'
 
 // Monaco 自带文字的语言要在它加载前设定，所以先加载语言包再加载工作区
@@ -131,6 +132,7 @@ export default function Shell() {
   return (
     <div className="shell">
       <TitleBar />
+      <NoticeHost />
       <div className="row grow" style={{ alignItems: 'stretch', minHeight: 0 }}>
         <div className="activity">
           {SIDES.filter(({ key }) => !hidden?.(`side:${key}`)).map(({ key, icon: Icon }) => (

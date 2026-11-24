@@ -169,6 +169,9 @@
     "databasesFailed": "读不到数据库列表：{{error}}",
     "databasesEmpty": "没有可选的数据库，可以直接输入",
     "databasePickPlaceholder": "可选，点开下拉从服务器读取",
+    "schemaPickPlaceholder": "可选，点开下拉选择；填了以后对象树只显示这个模式",
+    "schemasFailed": "读不到模式列表：{{error}}",
+    "schemasEmpty": "没有可选的模式，可以直接输入",
     "environment": "环境",
     "prodHint": "生产连接：标签页标红；不带 WHERE 的 UPDATE/DELETE、DROP、TRUNCATE 执行前要确认"
   },

@@ -8,6 +8,7 @@
 mod geometry;
 mod json_file;
 mod logging;
+mod notice;
 mod shell;
 mod update;
 #[cfg(windows)]
@@ -80,7 +81,9 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
             shell::save_dialog,
             shell::open_dialog,
             shell::folder_dialog,
-            shell::reveal_in_folder
+            shell::reveal_in_folder,
+            notice::notice_pending,
+            notice::notice_reply
         ])
         .setup(move |app| {
             let mut api = router(
@@ -108,6 +111,7 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
                     tracing::error!("接口服务异常退出：{e}");
                 }
             });
+            notice::init(app);
             let help = update::init(app, data_dir.join("update.json"))?;
             window::create_main(app, &base, &token, data_dir.join("window.json"), &help)?;
             Ok(())

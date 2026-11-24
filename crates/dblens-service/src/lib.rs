@@ -37,7 +37,9 @@ pub use changes::ChangeSet;
 pub use compare::{
     CompareRequest, CompareResult, CompareSideRef, ModelWriteInfo, SyncPreview, SyncRequest, SyncStarted,
 };
-pub use design::{DesignPreview, DesignRequest, DesignTable, PreviewStatement, RebuildInfo};
+pub use design::{
+    DesignPreview, DesignRequest, DesignTable, DropTableRequest, PreviewStatement, RebuildInfo,
+};
 pub use export::{
     EXPORT_LOB_LIMIT, ExportFormat, ExportManager, ExportOptions, ExportRequest, ExportSource, ExportState,
     ExportStatus, ExportWarnings, MAX_RUNNING_EXPORTS,

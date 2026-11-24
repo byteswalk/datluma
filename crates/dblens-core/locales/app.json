@@ -140,6 +140,10 @@
     "zh-CN": "名称不能为空",
     "en": "Name is required"
   },
+  "design.drop_system": {
+    "zh-CN": "%{schema} 是系统模式，不能删除其中的表",
+    "en": "%{schema} is a system schema; its tables cannot be dropped"
+  },
   "design.no_changes": {
     "zh-CN": "没有改动",
     "en": "There are no changes"

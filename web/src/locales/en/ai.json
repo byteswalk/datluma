@@ -58,6 +58,7 @@
     "boundary": "By default only the structure (table names, columns, types, comments, indexes) and your statements are sent to the provider, never data. Sample rows for comment inference must be enabled per connection in its advanced options. AI results are suggestions and never run automatically."
   },
   "mcp": {
-    "hint": "Add this to your agent's MCP settings (Claude Code, Codex, Cursor…) to let it read structure and run read-only queries. Only connections with \"Allow MCP access\" in their advanced options are visible."
+    "label": "Agent configuration",
+    "hint": "Add this to your agent's MCP settings (Claude Code, Codex, Cursor…) to let it read structure and run read-only queries. Independent of the AI settings: works with AI turned off. Only connections with \"Allow MCP access\" in their advanced options are visible."
   }
 }

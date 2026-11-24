@@ -2,9 +2,12 @@
 
 use serde::{Deserialize, Serialize};
 
-/// 默认大小与最小大小（逻辑像素）。
-pub const DEFAULT_SIZE: (f64, f64) = (1440.0, 900.0);
+/// 最小大小（逻辑像素）。
 pub const MIN_SIZE: (f64, f64) = (1024.0, 640.0);
+
+/// 默认窗口占屏幕面积的比例（黄金比例），宽高比 16:9。
+const AREA_RATIO: f64 = 0.618;
+const ASPECT: f64 = 16.0 / 9.0;
 
 /// 窗口顶部这么高的条带算作标题栏。
 const TITLE_BAR: i64 = 40;
@@ -19,20 +22,24 @@ pub struct Rect {
     pub height: u32,
 }
 
-/// 默认位置和大小：在 `work_area`（显示器去掉任务栏后的区域）中居中，默认 1440×900；
-/// 某个方向上放不下时，这个方向取工作区的 90%。`scale` 是显示器的缩放比例。
-pub fn default_rect(work_area: Rect, scale: f64) -> Rect {
-    let fit = |logical: f64, available: u32| {
-        let want = (logical * scale).round();
-        if want <= f64::from(available) { want as u32 } else { (f64::from(available) * 0.9).round() as u32 }
+/// 默认位置和大小：宽高比 16:9，面积是 `screen`（整个显示器）的 61.8%，中心对准屏幕中心。
+/// 超出 `work_area`（去掉任务栏后的区域）时按比例缩小，再挪进工作区。
+pub fn default_rect(screen: Rect, work_area: Rect) -> Rect {
+    let area = f64::from(screen.width) * f64::from(screen.height) * AREA_RATIO;
+    let mut height = (area / ASPECT).sqrt();
+    let mut width = height * ASPECT;
+    let shrink = (f64::from(work_area.width) / width).min(f64::from(work_area.height) / height).min(1.0);
+    width = (width * shrink).round();
+    height = (height * shrink).round();
+    let center = |start: i32, len: u32, size: f64| f64::from(start) + (f64::from(len) - size) / 2.0;
+    let clamp = |v: f64, start: i32, len: u32, size: f64| {
+        v.min(f64::from(start) + f64::from(len) - size).max(f64::from(start)).round() as i32
     };
-    let width = fit(DEFAULT_SIZE.0, work_area.width);
-    let height = fit(DEFAULT_SIZE.1, work_area.height);
     Rect {
-        x: work_area.x + ((work_area.width - width) / 2) as i32,
-        y: work_area.y + ((work_area.height - height) / 2) as i32,
-        width,
-        height,
+        x: clamp(center(screen.x, screen.width, width), work_area.x, work_area.width, width),
+        y: clamp(center(screen.y, screen.height, height), work_area.y, work_area.height, height),
+        width: width as u32,
+        height: height as u32,
     }
 }
 
@@ -59,25 +66,34 @@ mod tests {
     }
 
     #[test]
-    fn default_is_centered_1440x900() {
-        // 1920×1080 的屏幕，任务栏 40 像素
-        assert_eq!(default_rect(r(0, 0, 1920, 1040), 1.0), r(240, 70, 1440, 900));
-        // 副屏在主屏右边
-        assert_eq!(default_rect(r(1920, 0, 2560, 1400), 1.0), r(1920 + 560, 250, 1440, 900));
+    fn default_is_16_9_golden_area_centered_on_screen() {
+        // 1920×1080，任务栏在底部 40 像素：1509×849，面积约 61.8%，中心在屏幕中心
+        let d = default_rect(r(0, 0, 1920, 1080), r(0, 0, 1920, 1040));
+        assert_eq!(d, r(206, 116, 1509, 849));
+        let ratio = f64::from(d.width * d.height) / f64::from(1920 * 1080);
+        assert!((ratio - 0.618).abs() < 0.001, "{ratio}");
+        // 副屏在主屏右边，2560×1440
+        assert_eq!(
+            default_rect(r(1920, 0, 2560, 1440), r(1920, 0, 2560, 1400)),
+            r(1920 + 274, 154, 2012, 1132)
+        );
     }
 
     #[test]
-    fn default_follows_display_scale() {
-        // 2560×1600、150% 缩放：1440×900 逻辑像素 = 2160×1350 物理像素
-        assert_eq!(default_rect(r(0, 0, 2560, 1552), 1.5), r(200, 101, 2160, 1350));
+    fn default_keeps_16_9_on_other_screen_shapes() {
+        // 16:10 的 2560×1600
+        let d = default_rect(r(0, 0, 2560, 1600), r(0, 0, 2560, 1552));
+        assert_eq!((d.width, d.height), (2121, 1193));
+        assert_eq!((d.x, d.y), (220, 204));
     }
 
     #[test]
-    fn small_screen_uses_90_percent_of_work_area() {
-        // 1366×768 的屏幕：两个方向都放不下
-        assert_eq!(default_rect(r(0, 0, 1366, 728), 1.0), r(68, 36, 1229, 655));
-        // 1600×900：宽度放得下，高度放不下
-        assert_eq!(default_rect(r(0, 0, 1600, 860), 1.0), r(80, 43, 1440, 774));
+    fn default_shrinks_into_a_short_work_area() {
+        // 超宽屏 3440×1440，但任务栏很高（工作区只剩 1000 高）：按比例缩小并挪进工作区
+        let d = default_rect(r(0, 0, 3440, 1440), r(0, 0, 3440, 1000));
+        assert_eq!(d.height, 1000);
+        assert_eq!(d.width, 1778);
+        assert_eq!(d.y, 0);
     }
 
     #[test]

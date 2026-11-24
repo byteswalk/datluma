@@ -112,6 +112,7 @@ pub fn api_routes() -> Router<AppState> {
         .route("/profiles/{id}/design/table", get(design::table))
         .route("/profiles/{id}/design/preview", post(design::preview))
         .route("/profiles/{id}/design/apply", post(design::apply))
+        .route("/profiles/{id}/design/drop", post(design::drop_table))
         .route("/sessions/{id}/changes", post(routes::apply_changes))
         .route("/models", get(models::list).post(models::create))
         .route("/models/open", post(models::open))

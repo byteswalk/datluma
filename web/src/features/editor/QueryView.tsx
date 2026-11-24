@@ -373,6 +373,10 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
             onExport={(i) => {
               // 导出这条语句的原文（取自执行时的全文）
               const s = rt.exec.statements[i]
+              // 结果已取完且一行都没有：导出只会得到空文件
+              if (s.results.length > 0 && s.results.every((r) => r.complete && r.rows.length === 0)) {
+                return void message.info(t('editor.query.exportEmpty'))
+              }
               useExportDialog.getState().open({
                 profileId: tab.profileId,
                 source: { sql: rt.source.slice(s.start, s.end) },

@@ -30,7 +30,7 @@ import { useHost, withoutHidden } from '../../shared/host'
 import { useApi } from '../../app/context'
 import { useUi } from '../../app/ui'
 import { useQueryActions } from '../editor/actions'
-import { useTabs } from '../editor/tabs'
+import { tabsOfTable, useTabs } from '../editor/tabs'
 import { useExportDialog } from '../export/dialog'
 import { useImportDialogs } from '../import/dialog'
 import { useDocExport } from '../document/dialog'
@@ -52,6 +52,7 @@ import { hasCatalogs } from '../../shared/schemaOptions'
 import EnvTag from '../../shared/EnvTag'
 import { isLoopback, profileKind } from '../connections/form'
 import { withVault } from '../connections/vault'
+import { isSchemaField } from '../connections/DatabaseInput'
 import { metaKey } from '../sql/metadata'
 import ConnName, { connHost, connKind } from './ConnName'
 import EnvFilter, { ALL_ENVS } from './EnvFilter'
@@ -111,7 +112,8 @@ async function loadChildren(api: Api, profiles: Profile[], k: NodeKey): Promise<
     case 'c':
     case 'd':
     case 'g': {
-      const driver = profiles.find((p) => p.id === k.profileId)?.driver
+      const profile = profiles.find((p) => p.id === k.profileId)
+      const driver = profile?.driver
       // SQL Server：连接下是库（系统库排在后面），库下才是架构
       if (k.type === 'c' && driver && hasCatalogs(driver)) {
         return (await api.catalogs(k.profileId)).map((c) => ({
@@ -123,13 +125,17 @@ async function loadChildren(api: Api, profiles: Profile[], k: NodeKey): Promise<
       }
       const catalog = k.type === 'd' || k.type === 'g' ? k.catalog : undefined
       const schemas = await api.schemas(k.profileId, undefined, catalog)
-      const pick = schemas.filter((s) => s.is_system === (k.type === 'g'))
+      // 达梦等连接填了模式：只显示这一个模式（不分大小写，系统模式也不列）
+      const only = k.type === 'c' && profile && isSchemaField(profile) ? profile.database?.trim().toLowerCase() : undefined
+      const pick = only
+        ? schemas.filter((s) => s.name.toLowerCase() === only)
+        : schemas.filter((s) => s.is_system === (k.type === 'g'))
       const items: Loaded['items'] = pick.map((s) => ({
         key: encodeKey({ type: 's', profileId: k.profileId, schema: catalog === undefined ? s.name : joinCatalog(catalog, s.name) }),
         label: s.name,
         leaf: false,
       }))
-      if (k.type !== 'g' && schemas.some((s) => s.is_system)) {
+      if (!only && k.type !== 'g' && schemas.some((s) => s.is_system)) {
         items.push({ key: encodeKey({ type: 'g', profileId: k.profileId, catalog }), label: '', leaf: false })
       }
       return items
@@ -440,6 +446,9 @@ export default function ObjectTree() {
             ...objectItems(menuNode),
             ...(qualifiedName(menuNode) ? [{ key: 'copy', label: t('tree.menu.copyName') }] : []),
             { key: 'refresh', label: t('tree.menu.refresh') },
+            ...(menuNode.type === 'o' && menuNode.kind === 'tables' && !inSystemSchema(menuNode.profileId, menuNode.schema)
+              ? [{ type: 'divider' as const }, { key: 'drop-table', label: t('tree.menu.dropTable'), danger: true }]
+              : []),
           ]
         : []
 
@@ -483,6 +492,45 @@ export default function ObjectTree() {
     })
   }
 
+  /** 删除表：二次确认；生产环境还要输入表名。删除后刷新"表"分类。 */
+  function dropTable(profileId: string, schema: string, name: string) {
+    const prod = envOf(profileId) === 'prod'
+    const full = `${schemaLabel(schema)}.${name}`
+    const dialog = modal.confirm({
+      title: t('tree.dropTable.title', { name: full }),
+      content: (
+        <div>
+          <div>{t('tree.dropTable.content')}</div>
+          {prod && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{ marginBottom: 4 }}>{t('tree.dropTable.typeName', { name })}</div>
+              <Input
+                autoFocus
+                onChange={(e) => dialog.update({ okButtonProps: { danger: true, disabled: e.target.value !== name } })}
+              />
+            </div>
+          )}
+        </div>
+      ),
+      okText: t('tree.dropTable.ok'),
+      okType: 'danger',
+      okButtonProps: { disabled: prod },
+      onOk: async () => {
+        try {
+          await api.dropTable(profileId, schema, name)
+        } catch (e) {
+          message.error((e as Error).message)
+          throw e
+        }
+        message.success(t('tree.dropTable.done', { name: full }))
+        // 这张表的数据页、设计器页、权限定位页一并关掉；查询页不动
+        const tabs = useTabs.getState()
+        for (const x of tabsOfTable(tabs.tabs, profileId, schema, name)) tabs.close(x.id)
+        await refresh({ type: 'k', profileId, schema, kind: 'tables' })
+      },
+    })
+  }
+
   /** schema 节点：新建表、导入到新表、执行 SQL 文件，后面接分隔线。 */
   function schemaItems(k: NodeKey): NonNullable<MenuProps['items']> {
     if (k.type !== 's') return []
@@ -502,13 +550,24 @@ export default function ObjectTree() {
   }
 
   /** 对象节点的查看数据、设计表、导入导出、查看 DDL、生成 SQL，后面接分隔线；其他节点没有。 */
+  /** 这个模式列在"系统"分组下（看已加载的系统分组）。 */
+  function inSystemSchema(profileId: string, schema: string): boolean {
+    const key = encodeKey({ type: 's', profileId, schema })
+    return Object.entries(loaded).some(([x, l]) => {
+      const g = decodeKey(x)
+      return g.type === 'g' && g.profileId === profileId && l.items.some((i) => i.key === key)
+    })
+  }
+
   function objectItems(k: NodeKey): NonNullable<MenuProps['items']> {
     if (k.type !== 'o') return []
     const items: NonNullable<MenuProps['items']> = []
     const target = targetKind(k.kind)
     if (target) items.push({ key: 'view-data', label: t('tree.menu.viewData') })
-    if (target === 'table') items.push({ key: 'design', label: t('tree.menu.design') })
-    if (target === 'table') items.push({ key: 'import', label: t('tree.menu.import') })
+    // 系统模式下的表只看不改：不给设计、导入、删除
+    const writable = target === 'table' && !inSystemSchema(k.profileId, k.schema)
+    if (writable) items.push({ key: 'design', label: t('tree.menu.design') })
+    if (writable) items.push({ key: 'import', label: t('tree.menu.import') })
     if (target) items.push({ key: 'export-data', label: t('tree.menu.exportData') })
     if (ddlKind(k.kind, k.routineKind)) items.push({ key: 'ddl', label: t('tree.menu.viewDdl') })
     if (target) {
@@ -597,6 +656,8 @@ export default function ObjectTree() {
             await qc.invalidateQueries({ queryKey: ['profiles'] })
           },
         })
+      } else if (key === 'drop-table' && k.type === 'o') {
+        dropTable(k.profileId, k.schema, k.name)
       } else if (key === 'copy') {
         await navigator.clipboard.writeText(qualifiedName(k))
         message.success(t('tree.copied'))

@@ -9,6 +9,8 @@ fn main() {
         "open_dialog",
         "folder_dialog",
         "reveal_in_folder",
+        "notice_pending",
+        "notice_reply",
     ]);
     tauri_build::try_build(tauri_build::Attributes::new().app_manifest(manifest)).expect("tauri-build 失败");
 }

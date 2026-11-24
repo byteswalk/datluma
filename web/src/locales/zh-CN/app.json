@@ -1,4 +1,7 @@
 {
+  "notice": {
+    "ok": "确定"
+  },
   "crash": {
     "title": "界面出错了",
     "hint": "错误已写入日志。重新加载后，未保存的内容可能丢失。",
@@ -58,6 +61,7 @@
     "windowTitle": "{{tab}} · {{connection}} — {{app}}",
     "windowTitlePlain": "{{tab}} — {{app}}",
     "pin": "窗口置顶（Ctrl+Shift+T）",
+    "resetWindow": "恢复初始大小和位置（屏幕居中）",
     "minimize": "最小化",
     "maximize": "最大化",
     "restore": "还原",

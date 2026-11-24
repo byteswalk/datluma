@@ -17,6 +17,7 @@ export default function SqlBox({ sql, driver, height }: { sql: string; driver: D
         value={sql}
         theme={`dblens-${theme}`}
         options={{
+          useShadowDOM: false,
           readOnly: true,
           domReadOnly: true,
           fontFamily: "'JetBrains Mono', 'Cascadia Mono', Consolas, 'Noto Sans Mono CJK SC', monospace",

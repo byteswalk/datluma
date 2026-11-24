@@ -1,4 +1,7 @@
 {
+  "notice": {
+    "ok": "OK"
+  },
   "crash": {
     "title": "Something went wrong",
     "hint": "The error has been logged. Unsaved work may be lost after reloading.",
@@ -59,6 +62,7 @@
     "windowTitle": "{{tab}} · {{connection}} — {{app}}",
     "windowTitlePlain": "{{tab}} — {{app}}",
     "pin": "Always on Top (Ctrl+Shift+T)",
+    "resetWindow": "Restore initial size and position (centered)",
     "minimize": "Minimize",
     "maximize": "Maximize",
     "restore": "Restore",

@@ -4,7 +4,7 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use dblens_dialect::design::DesignCaps;
-use dblens_service::{DesignPreview, DesignRequest, DesignTable};
+use dblens_service::{DesignPreview, DesignRequest, DesignTable, DropTableRequest};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -48,4 +48,14 @@ pub async fn apply(
 ) -> ApiResult<(StatusCode, Json<Value>)> {
     let task = s.service.start_design(&id, req).await?;
     Ok((StatusCode::CREATED, Json(json!({ "id": task }))))
+}
+
+/// 删除表（对象树右键，界面先二次确认）。
+pub async fn drop_table(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Json(req): Json<DropTableRequest>,
+) -> ApiResult<StatusCode> {
+    s.service.drop_table(&id, &req).await?;
+    Ok(StatusCode::NO_CONTENT)
 }

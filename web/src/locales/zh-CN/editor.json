@@ -51,6 +51,7 @@
   },
   "query": {
     "prodWatermark": "生产环境 · {{name}}",
+    "exportEmpty": "查询结果没有数据，无需导出",
     "profileDeleted": "这个标签页的连接已被删除，请在工具栏中换一个连接",
     "disconnected": "与数据库的连接已断开，未提交的修改已丢失",
     "reconnect": "重新连接",

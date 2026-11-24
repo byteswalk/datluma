@@ -17,6 +17,8 @@
     "allow-save-dialog",
     "allow-open-dialog",
     "allow-folder-dialog",
-    "allow-reveal-in-folder"
+    "allow-reveal-in-folder",
+    "allow-notice-pending",
+    "allow-notice-reply"
   ]
 }

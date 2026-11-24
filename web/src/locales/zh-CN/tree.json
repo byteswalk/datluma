@@ -47,6 +47,7 @@
     "duplicateConnection": "复制连接",
     "deleteConnection": "删除连接",
     "copyName": "复制名称",
+    "dropTable": "删除表…",
     "refresh": "刷新",
     "viewData": "查看数据",
     "design": "设计表",
@@ -76,6 +77,13 @@
     "fromProd": "不再是生产后，不带 WHERE 的修改、删除以及删表等语句执行前不再要求确认。",
     "ok": "修改",
     "done": "「{{name}}」的环境已改为「{{to}}」"
+  },
+  "dropTable": {
+    "title": "删除表「{{name}}」？",
+    "content": "表结构和全部数据都会被删除，无法撤销。",
+    "typeName": "这是生产环境，输入表名 {{name}} 确认：",
+    "ok": "删除表",
+    "done": "已删除表 {{name}}"
   },
   "delete": {
     "title": "删除连接「{{name}}」？",

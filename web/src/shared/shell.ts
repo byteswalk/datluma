@@ -29,6 +29,18 @@ export type WindowAction =
 /** 与 Rust 端 `shell::EVENT` 一致。 */
 export const SHELL_EVENT = 'dblens://shell'
 
+/** 与 Rust 端 `notice::EVENT` 一致。 */
+export const NOTICE_EVENT = 'dblens://notice'
+
+/** 原生这边要页面显示的提示（检查更新、关于）。`ok`/`cancel` 有值时是二选一的确认框。 */
+export interface Notice {
+  id: number
+  kind: 'info' | 'error'
+  text: string
+  ok: string | null
+  cancel: string | null
+}
+
 export interface OpenDialogOptions {
   directory?: string
   fileName?: string
@@ -53,6 +65,12 @@ export interface DesktopShell {
   openDialog(filters: { name: string; extensions: string[] }[], options?: OpenDialogOptions): Promise<string | null>
   /** 系统"选择文件夹"对话框（模型目录）；用户取消时为 null。 */
   folderDialog(): Promise<string | null>
+  /** 还没处理的提示（页面启动前推出的）。 */
+  pendingNotices(): Promise<Notice[]>
+  /** 订阅新提示，返回取消订阅的函数。 */
+  onNotice(cb: (n: Notice) => void): Promise<() => void>
+  /** 回传用户的选择。 */
+  replyNotice(id: number, ok: boolean): Promise<void>
 }
 
 /** 页面是否运行在桌面程序里：Tauri 会在页面脚本运行前注入 `__TAURI_INTERNALS__`。 */
@@ -71,6 +89,9 @@ function createDesktopShell(): DesktopShell {
     revealInFolder: (path) => invoke('reveal_in_folder', { path }),
     openDialog: (filters, options) => invoke<string | null>('open_dialog', { filters, ...options }),
     folderDialog: () => invoke<string | null>('folder_dialog'),
+    pendingNotices: () => invoke<Notice[]>('notice_pending'),
+    onNotice: async (cb) => listen<Notice>(NOTICE_EVENT, (e) => cb(e.payload)),
+    replyNotice: (id, ok) => invoke('notice_reply', { id, ok }),
   }
 }
 

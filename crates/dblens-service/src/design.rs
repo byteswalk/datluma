@@ -415,6 +415,55 @@ impl Service {
     }
 }
 
+/// 删除表（对象树右键）：语句由后端生成，不接受前端的 SQL。
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct DropTableRequest {
+    #[serde(default)]
+    pub catalog: Option<String>,
+    pub schema: String,
+    pub name: String,
+}
+
+impl Service {
+    /// 删除一张表：先问执行策略（被拒绝时报错；需要确认的由界面在调用前确认），执行后记入历史并清掉这个模式的元数据缓存。
+    pub async fn drop_table(&self, profile_id: &str, req: &DropTableRequest) -> Result<()> {
+        let profile = self.scoped_profile(profile_id, req.catalog.as_deref())?;
+        let dialect = self.metadata.dialect(&profile).await?;
+        // 系统模式下的表不能删（界面也不给这一项）
+        let schemas = self.metadata.schemas(&profile, None).await?;
+        if schemas.iter().any(|s| s.is_system && s.name == req.schema) {
+            return Err(Error::invalid(msg!("design.drop_system", schema = req.schema.as_str())));
+        }
+        let sql = format!("DROP TABLE {}", dialect.qualified(Some(&req.schema), &req.name));
+        let (denied, _) =
+            self.check_policy(&profile, dialect, Operation::Design, std::slice::from_ref(&sql)).await;
+        if let Some(reason) = denied {
+            return Err(Error::Denied { reason });
+        }
+        let password = self.password(&profile.id).await?;
+        let (mut conn, _) = self.registry.connect(&profile, password).await?;
+        let (at, started) = (now_ms(), Instant::now());
+        let result = exec(&mut conn, &sql, &[]).await;
+        let _ = conn.close().await;
+        self.history.record(NewHistory {
+            at,
+            profile_id: profile.id.clone(),
+            profile_name: profile.input.name.clone(),
+            driver: driver_name(profile.input.driver).to_string(),
+            variant: Some(variant_code(dialect.variant())),
+            schema: Some(req.schema.clone()),
+            sql: sql.clone(),
+            elapsed_ms: Some(started.elapsed().as_millis() as u64),
+            rows: result.as_ref().ok().copied(),
+            error: result.as_ref().err().map(ToString::to_string),
+        });
+        let ctx = ExecContext::new(&profile, dialect, Operation::Design);
+        report(&self.sessions.policy(), &ctx, &sql, &result).await;
+        self.metadata.cache().invalidate(&profile.id, Some(&req.schema));
+        result.map(|_| ())
+    }
+}
+
 /// 一次执行：表设计器的改动、比对后的同步脚本。
 pub(crate) struct Run<'a> {
     pub service: &'a Service,

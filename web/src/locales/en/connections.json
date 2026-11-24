@@ -169,6 +169,9 @@
     "databasesFailed": "Could not list databases: {{error}}",
     "databasesEmpty": "No databases to pick; type a name instead",
     "databasePickPlaceholder": "Optional; open the list to read it from the server",
+    "schemaPickPlaceholder": "Optional; pick from the list. When set, the object tree shows only this schema",
+    "schemasFailed": "Could not list schemas: {{error}}",
+    "schemasEmpty": "No schemas to pick; type a name instead",
     "environment": "Environment",
     "prodHint": "Production connection: tabs are marked red; UPDATE/DELETE without WHERE, DROP and TRUNCATE require confirmation"
   },

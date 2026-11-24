@@ -47,6 +47,7 @@
     "duplicateConnection": "Duplicate Connection",
     "deleteConnection": "Delete Connection",
     "copyName": "Copy Name",
+    "dropTable": "Drop Table…",
     "refresh": "Refresh",
     "viewData": "View Data",
     "design": "Design table",
@@ -76,6 +77,13 @@
     "fromProd": "Once it is no longer production, UPDATE and DELETE without WHERE, dropping tables and similar statements no longer ask for confirmation.",
     "ok": "Change",
     "done": "\"{{name}}\" is now {{to}}"
+  },
+  "dropTable": {
+    "title": "Drop table \"{{name}}\"?",
+    "content": "The table and all its data will be deleted. This cannot be undone.",
+    "typeName": "This is a production connection. Type the table name {{name}} to confirm:",
+    "ok": "Drop table",
+    "done": "Dropped table {{name}}"
   },
   "delete": {
     "title": "Delete connection \"{{name}}\"?",
