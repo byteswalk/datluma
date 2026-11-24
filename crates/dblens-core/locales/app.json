@@ -2136,6 +2136,14 @@
     "zh-CN": "TLS 配置错误：%{error}",
     "en": "TLS configuration error: %{error}"
   },
+  "tray.quit": {
+    "zh-CN": "退出",
+    "en": "Quit"
+  },
+  "tray.show": {
+    "zh-CN": "显示 DBLENS",
+    "en": "Show DBLENS"
+  },
   "update.ask_install": {
     "zh-CN": "现在下载并安装吗？安装完成后程序会自动重启。",
     "en": "Download and install it now? The program restarts when done."

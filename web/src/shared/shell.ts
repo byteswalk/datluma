@@ -11,6 +11,8 @@ export interface ShellInfo {
   maximized: boolean
   always_on_top: boolean
   auto_check_update: boolean
+  /** 点关闭按钮时做什么；null 表示还没选，第一次关闭时询问。 */
+  close_action?: CloseAction | null
   /** 本程序的完整路径（MCP 配置用）。 */
   exe?: string | null
 }
@@ -28,6 +30,11 @@ export type WindowAction =
 
 /** 与 Rust 端 `shell::EVENT` 一致。 */
 export const SHELL_EVENT = 'dblens://shell'
+
+export type CloseAction = 'tray' | 'quit'
+
+/** 与 Rust 端 `window::CLOSE_EVENT` 一致：关闭方式没设置时，原生这边请页面询问。 */
+export const CLOSE_EVENT = 'dblens://close-requested'
 
 /** 与 Rust 端 `notice::EVENT` 一致。 */
 export const NOTICE_EVENT = 'dblens://notice'
@@ -51,6 +58,10 @@ export interface DesktopShell {
   info(): Promise<ShellInfo>
   action(a: WindowAction): Promise<void>
   setAutoCheckUpdate(on: boolean): Promise<void>
+  /** 设置点关闭按钮时的行为。 */
+  setCloseAction(action: CloseAction | null): Promise<void>
+  /** 订阅"关闭方式还没设置"的请求，返回取消订阅的函数。 */
+  onCloseRequested(cb: () => void): Promise<() => void>
   /** 原生窗口标题（任务栏、Alt+Tab 里显示的）。 */
   setTitle(title: string): Promise<void>
   /** 订阅状态变化，返回取消订阅的函数。 */
@@ -83,6 +94,8 @@ function createDesktopShell(): DesktopShell {
     info: () => invoke<ShellInfo>('shell_info'),
     action: (action) => invoke('window_action', { action }),
     setAutoCheckUpdate: (on) => invoke('set_auto_check_update', { on }),
+    setCloseAction: (action) => invoke('set_close_action', { action }),
+    onCloseRequested: async (cb) => listen(CLOSE_EVENT, () => cb()),
     setTitle: (title) => invoke('set_title', { title }),
     onChange: async (cb) => listen<ShellInfo>(SHELL_EVENT, (e) => cb(e.payload)),
     saveDialog: (defaultName, filters) => invoke<string | null>('save_dialog', { defaultName, filters }),

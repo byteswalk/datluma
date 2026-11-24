@@ -70,6 +70,8 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
     tracing::info!("接口服务地址 {base}，数据目录 {}", data_dir.display());
 
     tauri::Builder::default()
+        // 单实例：程序已在运行（可能在托盘里）时，再次启动只唤出已有窗口，新进程随即退出。要最先注册
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| window::show_main(app)))
         .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(window::on_shortcut).build())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -77,6 +79,7 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
             shell::shell_info,
             shell::window_action,
             shell::set_auto_check_update,
+            shell::set_close_action,
             shell::set_title,
             shell::save_dialog,
             shell::open_dialog,

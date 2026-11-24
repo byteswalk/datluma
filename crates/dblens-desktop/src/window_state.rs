@@ -7,6 +7,16 @@ use serde::{Deserialize, Serialize};
 use crate::geometry::Rect;
 use crate::json_file;
 
+/// 点关闭按钮时做什么。没设置时第一次关闭由页面询问。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CloseAction {
+    /// 隐藏窗口，留在系统托盘。
+    Tray,
+    /// 退出程序。
+    Quit,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WindowState {
@@ -14,6 +24,7 @@ pub struct WindowState {
     pub rect: Option<Rect>,
     pub maximized: bool,
     pub always_on_top: bool,
+    pub close_action: Option<CloseAction>,
 }
 
 /// 读取保存的状态。文件不存在或内容损坏时用默认状态，见 `json_file::load`。
@@ -39,6 +50,7 @@ mod tests {
             rect: Some(Rect { x: -1200, y: 50, width: 1440, height: 900 }),
             maximized: true,
             always_on_top: true,
+            close_action: Some(CloseAction::Tray),
         };
         save(&path, &s).unwrap();
         assert_eq!(load(&path), s);

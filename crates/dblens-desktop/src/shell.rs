@@ -13,6 +13,7 @@ use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_dialog::DialogExt;
 
+use crate::window_state::CloseAction;
 use crate::{update, window};
 
 /// 状态变化事件名，载荷为 [`ShellInfo`]。
@@ -27,6 +28,8 @@ pub struct ShellInfo {
     pub maximized: bool,
     pub always_on_top: bool,
     pub auto_check_update: bool,
+    /// 点关闭按钮时做什么；None 表示还没选，第一次关闭时询问。
+    pub close_action: Option<CloseAction>,
     /// 本程序的完整路径，设置里给 AI 智能体的 MCP 配置用。
     pub exe: Option<String>,
 }
@@ -56,6 +59,7 @@ pub fn info(app: &AppHandle) -> ShellInfo {
         maximized,
         always_on_top: window::always_on_top(app),
         auto_check_update: update::auto_check(app),
+        close_action: window::close_action(app),
         exe: std::env::current_exe().ok().map(|p| p.display().to_string()),
     }
 }
@@ -84,7 +88,10 @@ pub fn window_action(app: AppHandle, action: WindowAction) -> Result<(), String>
                 win.maximize()
             }
         }
-        WindowAction::Close => win.close(),
+        WindowAction::Close => {
+            window::request_close(&app);
+            Ok(())
+        }
         WindowAction::StartDragging => win.start_dragging(),
         WindowAction::ToggleAlwaysOnTop => window::toggle_always_on_top(&app),
         WindowAction::ResetPosition => window::reset(&win),
@@ -109,6 +116,11 @@ pub fn window_action(app: AppHandle, action: WindowAction) -> Result<(), String>
 pub fn set_title(app: AppHandle, title: String) -> Result<(), String> {
     let win = app.get_webview_window(window::MAIN).ok_or_else(|| msg!("desktop.no_main_window").current())?;
     win.set_title(&title).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn set_close_action(app: AppHandle, action: Option<CloseAction>) {
+    window::set_close_action(&app, action);
 }
 
 #[tauri::command]
@@ -235,11 +247,12 @@ mod tests {
             maximized: false,
             always_on_top: true,
             auto_check_update: true,
+            close_action: None,
             exe: None,
         };
         assert_eq!(
             serde_json::to_value(&i).unwrap(),
-            serde_json::json!({"platform":"windows","version":"0.1.0","maximized":false,"always_on_top":true,"auto_check_update":true,"exe":null})
+            serde_json::json!({"platform":"windows","version":"0.1.0","maximized":false,"always_on_top":true,"auto_check_update":true,"close_action":null,"exe":null})
         );
     }
 }

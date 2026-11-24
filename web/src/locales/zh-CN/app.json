@@ -1,4 +1,10 @@
 {
+  "closeAsk": {
+    "title": "关闭 DBLENS",
+    "content": "最小化到托盘时程序在后台运行，点托盘图标可以恢复窗口。这次的选择会被记住，以后可在 设置 → 常规 中修改。",
+    "tray": "最小化到托盘",
+    "quit": "退出程序"
+  },
   "notice": {
     "ok": "确定"
   },
@@ -21,6 +27,10 @@
     "rowCap": "结果行数上限",
     "rowCapHint": "一个结果集读到这么多行后停止读取",
     "autoCheckUpdate": "启动时自动检查更新",
+    "closeAction": "点关闭按钮时",
+    "closeTray": "最小化到托盘",
+    "closeQuit": "退出程序",
+    "closeActionUnset": "还没选择，第一次关闭时会询问",
     "syntaxCheck": "语法检查",
     "syntaxCheckHint": "编辑时标出语法问题；兼容 MySQL / PostgreSQL / Oracle 的国产库只标黄色提示。不影响执行",
     "history": "执行历史",

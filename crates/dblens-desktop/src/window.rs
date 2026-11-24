@@ -17,9 +17,11 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
+use tauri::Emitter;
 use tauri::menu::{
     CheckMenuItem, CheckMenuItemBuilder, MenuBuilder, MenuItemBuilder, Submenu, SubmenuBuilder,
 };
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{
     App, AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder,
     WindowEvent, Wry,
@@ -29,10 +31,15 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutEvent, S
 use dblens_core::{default_lang, msg};
 
 use crate::geometry::{self, MIN_SIZE, Rect};
-use crate::window_state::{self, WindowState};
+use crate::window_state::{self, CloseAction, WindowState};
 use crate::{shell, update};
 
 pub const MAIN: &str = "main";
+/// 关闭方式没设置时通知页面询问。
+pub const CLOSE_EVENT: &str = "dblens://close-requested";
+const TRAY: &str = "main";
+const TRAY_SHOW: &str = "tray_show";
+const TRAY_QUIT: &str = "tray_quit";
 const MENU_ON_TOP: &str = "always_on_top";
 const MENU_RESET: &str = "reset_window";
 const MENU_QUIT: &str = "quit";
@@ -151,6 +158,88 @@ fn set_always_on_top(app: &AppHandle, on: bool) -> tauri::Result<()> {
 
 pub fn toggle_always_on_top(app: &AppHandle) -> tauri::Result<()> {
     set_always_on_top(app, !always_on_top(app))
+}
+
+pub fn close_action(app: &AppHandle) -> Option<CloseAction> {
+    app.state::<Tracked>().state.lock().unwrap().close_action
+}
+
+/// 设置点关闭按钮时的行为并立即保存。
+pub fn set_close_action(app: &AppHandle, action: Option<CloseAction>) {
+    let tracked = app.state::<Tracked>();
+    tracked.state.lock().unwrap().close_action = action;
+    if let Some(win) = app.get_webview_window(MAIN) {
+        save(&win, &tracked);
+    }
+    shell::notify(app);
+}
+
+/// 关闭主窗口（标题栏按钮、Alt+F4、任务栏、macOS 红色按钮）：按设置隐藏到托盘或退出；没设置时让页面询问。
+pub fn request_close(app: &AppHandle) {
+    match close_action(app) {
+        Some(CloseAction::Tray) => {
+            if let Err(e) = hide_to_tray(app) {
+                tracing::warn!("隐藏到托盘失败，直接退出：{e}");
+                quit(app);
+            }
+        }
+        Some(CloseAction::Quit) => quit(app),
+        None => {
+            if let Err(e) = app.emit(CLOSE_EVENT, ()) {
+                tracing::warn!("通知页面询问关闭方式失败：{e}");
+                quit(app);
+            }
+        }
+    }
+}
+
+/// 隐藏主窗口，托盘图标第一次用到时创建：左键单击或菜单"显示"恢复窗口，菜单"退出"退出程序。
+fn hide_to_tray(app: &AppHandle) -> tauri::Result<()> {
+    if app.tray_by_id(TRAY).is_none() {
+        let lang = default_lang();
+        let menu = MenuBuilder::new(app)
+            .item(&MenuItemBuilder::with_id(TRAY_SHOW, msg!("tray.show").render(lang)).build(app)?)
+            .separator()
+            .item(&MenuItemBuilder::with_id(TRAY_QUIT, msg!("tray.quit").render(lang)).build(app)?)
+            .build()?;
+        let mut tray = TrayIconBuilder::with_id(TRAY)
+            .tooltip(msg!("app.name").render(lang))
+            .menu(&menu)
+            .show_menu_on_left_click(false)
+            .on_menu_event(|app, event| match event.id().as_ref() {
+                TRAY_SHOW => show_main(app),
+                TRAY_QUIT => quit(app),
+                _ => {}
+            })
+            .on_tray_icon_event(|tray, event| {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } = event
+                {
+                    show_main(tray.app_handle());
+                }
+            });
+        if let Some(icon) = app.default_window_icon() {
+            tray = tray.icon(icon.clone());
+        }
+        tray.build(app)?;
+    }
+    if let Some(win) = app.get_webview_window(MAIN) {
+        save(&win, &app.state::<Tracked>());
+        win.hide()?;
+    }
+    Ok(())
+}
+
+/// 从托盘恢复主窗口；再次启动程序时（单实例）也调用它。
+pub fn show_main(app: &AppHandle) {
+    if let Some(win) = app.get_webview_window(MAIN) {
+        let _ = win.show();
+        let _ = win.unminimize();
+        let _ = win.set_focus();
+    }
 }
 
 /// 保存窗口状态后退出。
@@ -294,7 +383,6 @@ pub fn create_main(
     });
     let w = win.clone();
     win.on_window_event(move |event| {
-        let tracked = w.state::<Tracked>();
         match event {
             WindowEvent::Moved(_) => remember_later(&w),
             WindowEvent::Resized(_) => {
@@ -303,7 +391,11 @@ pub fn create_main(
                 shell::notify(w.app_handle());
             }
             WindowEvent::Focused(focused) => focus_changed(w.app_handle(), *focused),
-            WindowEvent::CloseRequested { .. } => save(&w, &tracked),
+            WindowEvent::CloseRequested { api, .. } => {
+                // 不直接关：按设置隐藏到托盘或退出（退出时保存状态）
+                api.prevent_close();
+                request_close(w.app_handle());
+            }
             _ => {}
         }
     });

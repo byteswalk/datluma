@@ -50,7 +50,7 @@
     "cancel": "Cancel"
   },
   "query": {
-    "prodWatermark": "Production · {{name}}",
+    "prodWatermark": "PRODUCTION",
     "exportEmpty": "The result has no rows, nothing to export",
     "profileDeleted": "The connection of this tab has been deleted. Choose another connection in the toolbar.",
     "disconnected": "The connection to the database was lost; uncommitted changes have been lost",

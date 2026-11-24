@@ -1,4 +1,10 @@
 {
+  "closeAsk": {
+    "title": "Close DBLENS",
+    "content": "Minimized to the tray, DBLENS keeps running; click the tray icon to bring the window back. Your choice is remembered and can be changed in Settings → General.",
+    "tray": "Minimize to tray",
+    "quit": "Quit"
+  },
   "notice": {
     "ok": "OK"
   },
@@ -21,6 +27,10 @@
     "rowCap": "Max result rows",
     "rowCapHint": "Stop reading a result set after this many rows",
     "autoCheckUpdate": "Check for updates at startup",
+    "closeAction": "Close button",
+    "closeTray": "Minimize to tray",
+    "closeQuit": "Quit",
+    "closeActionUnset": "Not chosen yet; you will be asked the first time you close",
     "syntaxCheck": "Syntax check",
     "syntaxCheckHint": "Mark syntax problems while editing; databases compatible with MySQL / PostgreSQL / Oracle get yellow hints only. Does not affect execution",
     "history": "Query history",

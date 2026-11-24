@@ -358,7 +358,7 @@ export default function QueryView({ tab, profiles }: { tab: QueryTab; profiles: 
             {profile?.environment === 'prod' && (
               <div
                 className="prod-watermark"
-                style={{ backgroundImage: watermarkImage(t('editor.query.prodWatermark', { name: profile.name })) }}
+                style={{ backgroundImage: watermarkImage(t('editor.query.prodWatermark'), profile.name) }}
               />
             )}
           </div>

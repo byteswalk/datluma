@@ -614,6 +614,33 @@ body {
   justify-content: center;
   gap: 12px;
   color: var(--text-2);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+/* 空白工作区的底纹：细网格（每 5 格一条稍深的线），中间最清楚、向四周淡出；中心一点很淡的主色光晕。颜色都取自主题变量 */
+.welcome::before,
+.welcome::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+.welcome::before {
+  --minor: color-mix(in srgb, var(--border) 55%, transparent);
+  --major: color-mix(in srgb, var(--border-strong) 45%, transparent);
+  background-image:
+    linear-gradient(to right, var(--major) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--major) 1px, transparent 1px),
+    linear-gradient(to right, var(--minor) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--minor) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px;
+  background-position: center;
+  mask-image: radial-gradient(ellipse 60% 55% at 50% 50%, #000 20%, transparent 75%);
+}
+.welcome::after {
+  background: radial-gradient(circle 320px at 50% 50%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 70%);
 }
 .statusbar {
   height: 28px;

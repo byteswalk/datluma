@@ -108,6 +108,18 @@ export default function SettingsDialog() {
         </div>
       </Form.Item>
       {desktop && (
+        <Form.Item label={t('app.settings.closeAction')} extra={info?.close_action ? undefined : t('app.settings.closeActionUnset')}>
+          <Radio.Group
+            value={info?.close_action ?? null}
+            onChange={(e) => desktop?.setCloseAction(e.target.value).catch(console.warn)}
+            options={[
+              { value: 'tray', label: t('app.settings.closeTray') },
+              { value: 'quit', label: t('app.settings.closeQuit') },
+            ]}
+          />
+        </Form.Item>
+      )}
+      {desktop && (
         <Form.Item label={t('app.settings.autoCheckUpdate')}>
           <Switch
             checked={info?.auto_check_update ?? true}
