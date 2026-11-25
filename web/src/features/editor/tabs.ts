@@ -79,11 +79,14 @@ export type LintTab =
 /** 账号权限标签。`focus` 有值时显示这个对象的访问者。schema 是合成值，SQL Server 含库名。 */
 export interface PrivilegesTab {
   focus?: { schema: string; object: string }
+  /** 打开时选中这个主体（Principal.id，从对象树的"服务器对象"进来）；选中后清掉。 */
+  principal?: string
 }
 
 function isPrivilegesTab(v: unknown): v is PrivilegesTab {
   const p = v as PrivilegesTab | null
   if (typeof p !== 'object' || p === null) return false
+  if (p.principal !== undefined && typeof p.principal !== 'string') return false
   return p.focus === undefined || (typeof p.focus?.schema === 'string' && typeof p.focus.object === 'string')
 }
 
@@ -219,7 +222,7 @@ interface TabsState extends Persisted {
   /** 打开两次检查的对比标签：已打开时切换过去。返回标签的 id。 */
   openLintDiff(before: string, after: string, title: string): string
   /** 打开连接的账号权限标签：已打开时切换过去。`focus` 有值时定位到对象。返回标签的 id。 */
-  openPrivileges(profileId: string, title: string, focus?: PrivilegesTab['focus']): string
+  openPrivileges(profileId: string, title: string, focus?: PrivilegesTab['focus'], principal?: string): string
   /** 修改定位：undefined 回到按主体浏览。 */
   setPrivilegesFocus(id: string, focus: PrivilegesTab['focus']): void
   /** 修改数据标签的过滤条件和排序。 */
@@ -239,6 +242,16 @@ export function tabsOfTable(tabs: QueryTab[], profileId: string, schema: string,
       ((x.data?.objectKind === 'table' && x.data.schema === schema && x.data.object === table) ||
         (x.design !== undefined && x.design.model === undefined && x.design.schema === schema && x.design.table === table) ||
         (x.privileges?.focus?.schema === schema && x.privileges.focus.object === table)),
+  )
+}
+
+/** 删除库或模式后要关的标签：其中对象的数据页、设计器页（不含模型）。`inside` 判断 schema（SQL Server 含库名）是否在被删的范围里。 */
+export function tabsInSchemas(tabs: QueryTab[], profileId: string, inside: (schema: string) => boolean): QueryTab[] {
+  return tabs.filter(
+    (x) =>
+      x.profileId === profileId &&
+      ((x.data !== undefined && inside(x.data.schema)) ||
+        (x.design !== undefined && x.design.model === undefined && inside(x.design.schema))),
   )
 }
 
@@ -368,17 +381,18 @@ export const useTabs = create<TabsState>()((set, get) => ({
     set({ tabs: [...tabs, tab], active: tab.id })
     return tab.id
   },
-  openPrivileges: (profileId, title, focus) => {
+  openPrivileges: (profileId, title, focus, principal) => {
     const { tabs } = get()
     const same = tabs.find((x) => x.privileges && x.profileId === profileId)
+    const privileges: PrivilegesTab = { ...(focus ? { focus } : {}), ...(principal ? { principal } : {}) }
     if (same) {
       set({
         active: same.id,
-        tabs: focus ? tabs.map((x) => (x.id === same.id ? { ...x, privileges: { focus } } : x)) : tabs,
+        tabs: focus || principal ? tabs.map((x) => (x.id === same.id ? { ...x, privileges } : x)) : tabs,
       })
       return same.id
     }
-    const tab: QueryTab = { id: newId(), title, profileId, sql: '', privileges: focus ? { focus } : {} }
+    const tab: QueryTab = { id: newId(), title, profileId, sql: '', privileges }
     set({ tabs: [...tabs, tab], active: tab.id })
     return tab.id
   },

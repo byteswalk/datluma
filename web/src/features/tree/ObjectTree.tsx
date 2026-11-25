@@ -18,6 +18,10 @@ import {
   IconListNumbers,
   IconCheck,
   IconCube,
+  IconCylinder,
+  IconServer2,
+  IconUser,
+  IconUsers,
   IconSearch,
   IconStack2,
   IconTable,
@@ -30,7 +34,7 @@ import { useHost, withoutHidden } from '../../shared/host'
 import { useApi } from '../../app/context'
 import { useUi } from '../../app/ui'
 import { useQueryActions } from '../editor/actions'
-import { tabsOfTable, useTabs } from '../editor/tabs'
+import { tabsInSchemas, tabsOfTable, useTabs } from '../editor/tabs'
 import { useExportDialog } from '../export/dialog'
 import { useImportDialogs } from '../import/dialog'
 import { useDocExport } from '../document/dialog'
@@ -40,6 +44,8 @@ import { useModelDialogs } from '../model/dialogs'
 import {
   type Api,
   type Environment,
+  type NamespaceCaps,
+  type NamespaceChange,
   type Profile,
   type RoutineInfo,
   exportSource,
@@ -53,6 +59,8 @@ import EnvTag from '../../shared/EnvTag'
 import { isLoopback, profileKind } from '../connections/form'
 import { withVault } from '../connections/vault'
 import { isSchemaField } from '../connections/DatabaseInput'
+import { NamespaceDialog, PrincipalDialog } from './ServerDialogs'
+import { hasServerObjects, hasTablespaces, namespaceCaps, tablespaceExtra } from './serverObjects'
 import { metaKey } from '../sql/metadata'
 import ConnName, { connHost, connKind } from './ConnName'
 import EnvFilter, { ALL_ENVS } from './EnvFilter'
@@ -60,6 +68,7 @@ import type { DdlTarget } from './DdlDialog'
 import {
   type CategoryKind,
   type NodeKey,
+  type ServerFolder,
   categoriesFor,
   categoryLabel,
   decodeKey,
@@ -114,31 +123,62 @@ async function loadChildren(api: Api, profiles: Profile[], k: NodeKey): Promise<
     case 'g': {
       const profile = profiles.find((p) => p.id === k.profileId)
       const driver = profile?.driver
-      // SQL Server：连接下是库（系统库排在后面），库下才是架构
+      // SQL Server：连接下是库，库下才是架构；master、msdb 等系统库不进树
+      // 连接下最后是"服务器对象"（用户、角色、表空间），SQLite 没有
+      const server: Loaded['items'] =
+        k.type === 'c' && hasServerObjects(driver)
+          ? [{ key: encodeKey({ type: 'v', profileId: k.profileId }), label: '', leaf: false }]
+          : []
       if (k.type === 'c' && driver && hasCatalogs(driver)) {
-        return (await api.catalogs(k.profileId)).map((c) => ({
-          key: encodeKey({ type: 'd', profileId: k.profileId, catalog: c.name }),
-          label: c.name,
-          extra: c.is_system ? 'system' : undefined,
-          leaf: false,
-        }))
+        const dbs = (await api.catalogs(k.profileId))
+          .filter((c) => !c.is_system)
+          .map((c) => ({
+            key: encodeKey({ type: 'd', profileId: k.profileId, catalog: c.name }),
+            label: c.name,
+            leaf: false,
+          }))
+        return [...dbs, ...server]
       }
       const catalog = k.type === 'd' || k.type === 'g' ? k.catalog : undefined
       const schemas = await api.schemas(k.profileId, undefined, catalog)
-      // 达梦等连接填了模式：只显示这一个模式（不分大小写，系统模式也不列）
+      // 系统模式不进树（要查系统视图就写语句）；达梦等连接填了模式时只显示这一个模式（不分大小写）
       const only = k.type === 'c' && profile && isSchemaField(profile) ? profile.database?.trim().toLowerCase() : undefined
-      const pick = only
-        ? schemas.filter((s) => s.name.toLowerCase() === only)
-        : schemas.filter((s) => s.is_system === (k.type === 'g'))
+      const pick = only ? schemas.filter((s) => s.name.toLowerCase() === only) : schemas.filter((s) => !s.is_system)
       const items: Loaded['items'] = pick.map((s) => ({
         key: encodeKey({ type: 's', profileId: k.profileId, schema: catalog === undefined ? s.name : joinCatalog(catalog, s.name) }),
         label: s.name,
         leaf: false,
       }))
-      if (!only && k.type !== 'g' && schemas.some((s) => s.is_system)) {
-        items.push({ key: encodeKey({ type: 'g', profileId: k.profileId, catalog }), label: '', leaf: false })
+      return [...items, ...server]
+    }
+    case 'v': {
+      const driver = profiles.find((p) => p.id === k.profileId)?.driver
+      const { caps } = await api.privilegeOverview(k.profileId)
+      const folders: ServerFolder[] = [
+        'users',
+        ...(caps.roles ? (['roles'] as const) : []),
+        ...(hasTablespaces(driver) ? (['tablespaces'] as const) : []),
+      ]
+      return folders.map((folder) => ({ key: encodeKey({ type: 'f', profileId: k.profileId, folder }), label: '', leaf: false }))
+    }
+    case 'f': {
+      if (k.folder === 'tablespaces') {
+        return (await api.tablespaces(k.profileId)).map((ts) => ({
+          key: encodeKey({ type: 't', profileId: k.profileId, name: ts.name }),
+          label: ts.name,
+          extra: tablespaceExtra(ts),
+          leaf: true,
+        }))
       }
-      return items
+      // 内置的系统用户、角色不列（和系统模式一样）
+      const kind = k.folder === 'users' ? 'user' : 'role'
+      return (await api.privilegeOverview(k.profileId)).principals
+        .filter((p) => p.kind === kind && !p.builtin)
+        .map((p) => ({
+          key: encodeKey({ type: 'p', profileId: k.profileId, kind, id: p.id }),
+          label: p.host ? `${p.name}@${p.host}` : p.name,
+          leaf: true,
+        }))
     }
     case 's': {
       const driver = profiles.find((p) => p.id === k.profileId)?.driver ?? 'mysql'
@@ -181,6 +221,8 @@ async function loadChildren(api: Api, profiles: Profile[], k: NodeKey): Promise<
       }))
     }
     case 'l':
+    case 'p':
+    case 't':
       return []
   }
 }
@@ -201,6 +243,20 @@ export default function ObjectTree() {
   const [selected, setSelected] = useState<Key[]>([])
   const [menuNode, setMenuNode] = useState<NodeKey | null>(null)
   const [ddl, setDdl] = useState<DdlTarget | null>(null)
+  // 新建、删除库或模式：`after` 是完成后要刷新的节点，`inside` 判断标签页里的 schema 是否在被删的库或模式里
+  const [nsDialog, setNsDialog] = useState<{
+    profileId: string
+    catalog?: string
+    caps: NamespaceCaps
+    create?: 'database' | 'schema'
+    drop?: NamespaceChange
+    after: NodeKey
+    inside?: (schema: string) => boolean
+  } | null>(null)
+  const [principalDialog, setPrincipalDialog] = useState<{
+    profileId: string
+    action: { kind: 'create-user' | 'create-role' } | { kind: 'drop'; principalId: string }
+  } | null>(null)
 
   // 右键表时取它的外键关系，组装"关联查询"子菜单；取不到时当作没有外键
   const relTable = menuNode?.type === 'o' && menuNode.kind === 'tables' ? menuNode : null
@@ -272,21 +328,9 @@ export default function ObjectTree() {
     if (!missing && target.schema) {
       const want = target.schema
       const schemaOf = (k: NodeKey) => (k.type === 's' ? k.schema : undefined)
-      let s = await find(at, want, schemaOf)
-      let parent = at
-      if (!s) {
-        // 系统 schema 在"系统"分组下
-        const g = (await ensure(at)).items.find((i) => decodeKey(i.key).type === 'g')?.key
-        if (g) {
-          s = await find(g, want, schemaOf)
-          if (s) {
-            path.push(at)
-            parent = g
-          }
-        }
-      }
+      const s = await find(at, want, schemaOf)
       if (s) {
-        path.push(parent)
+        path.push(at)
         at = s
       } else missing = splitCatalog(want).schema
     }
@@ -367,10 +411,10 @@ export default function ObjectTree() {
       return items.map((i) => {
         const k = decodeKey(i.key)
         const icon =
-          k.type === 'd' ? <IconDatabase size={16} /> : k.type === 's' ? <IconCube size={16} className="ic-schema" /> : k.type === 'g' ? <IconFolder size={16} /> : k.type === 'k' || k.type === 'o' ? CATEGORY_ICON[k.kind] : i.pk ? <IconKey size={16} color="var(--warn)" /> : <IconColumns size={16} />
-        const label = k.type === 'k' ? categoryLabel(k.kind) : k.type === 'g' ? t('tree.node.system') : i.label
-        const extra = i.routineKind ? routineKindLabel(i.routineKind) : i.extra === 'system' ? t('tree.node.system') : i.extra
-        const count = k.type === 'k' && loaded[i.key] && !loaded[i.key].error ? loaded[i.key].items.length : null
+          k.type === 'v' ? <IconServer2 size={16} /> : k.type === 'f' ? <IconFolder size={16} /> : k.type === 'p' ? (k.kind === 'user' ? <IconUser size={16} /> : <IconUsers size={16} />) : k.type === 't' ? <IconCylinder size={16} /> : k.type === 'd' ? <IconDatabase size={16} /> : k.type === 's' ? <IconCube size={16} className="ic-schema" /> : k.type === 'g' ? <IconFolder size={16} /> : k.type === 'k' || k.type === 'o' ? CATEGORY_ICON[k.kind] : i.pk ? <IconKey size={16} color="var(--warn)" /> : <IconColumns size={16} />
+        const label = k.type === 'k' ? categoryLabel(k.kind) : k.type === 'v' ? t('tree.server.title') : k.type === 'f' ? t(`tree.server.${k.folder}`) : k.type === 'g' ? t('tree.node.system') : i.label
+        const extra = i.routineKind ? routineKindLabel(i.routineKind) : i.extra
+        const count = (k.type === 'k' || k.type === 'f') && loaded[i.key] && !loaded[i.key].error ? loaded[i.key].items.length : null
         return {
           key: i.key,
           isLeaf: i.leaf,
@@ -421,6 +465,7 @@ export default function ObjectTree() {
           { key: 'sql-file', label: t('tree.menu.sqlFile') },
           // SQLite 没有账号和权限
           ...(driverOf(menuNode.profileId) === 'sqlite' ? [] : [{ key: 'privileges', label: t('tree.menu.privileges') }]),
+          ...createNamespaceItems(menuNode),
           { type: 'divider' },
           { key: 'edit', label: t('tree.menu.editConnection') },
           {
@@ -442,12 +487,18 @@ export default function ObjectTree() {
         ]
       : menuNode
         ? [
+            ...createNamespaceItems(menuNode),
+            ...serverItems(menuNode),
             ...schemaItems(menuNode),
             ...objectItems(menuNode),
             ...(qualifiedName(menuNode) ? [{ key: 'copy', label: t('tree.menu.copyName') }] : []),
             { key: 'refresh', label: t('tree.menu.refresh') },
-            ...(menuNode.type === 'o' && menuNode.kind === 'tables' && !inSystemSchema(menuNode.profileId, menuNode.schema)
+            ...(menuNode.type === 'o' && menuNode.kind === 'tables'
               ? [{ type: 'divider' as const }, { key: 'drop-table', label: t('tree.menu.dropTable'), danger: true }]
+              : []),
+            ...dropNamespaceItems(menuNode),
+            ...(menuNode.type === 'p'
+              ? [{ type: 'divider' as const }, { key: 'srv:drop', label: t(menuNode.kind === 'user' ? 'tree.server.dropUser' : 'tree.server.dropRole'), danger: true }]
               : []),
           ]
         : []
@@ -531,6 +582,62 @@ export default function ObjectTree() {
     })
   }
 
+  function nsCapsOf(profileId: string) {
+    const p = profiles.find((x) => x.id === profileId)
+    return namespaceCaps(p?.driver, p?.variant ?? p?.product)
+  }
+
+  /** 连接上新建库或模式；SQL Server 在连接上建库、在库上建架构。 */
+  function createNamespaceItems(k: NodeKey): NonNullable<MenuProps['items']> {
+    const caps = nsCapsOf(k.profileId)
+    const sqlServer = driverOf(k.profileId) === 'sqlserver'
+    if (k.type === 'c') {
+      return [
+        ...(caps.database ? [{ key: 'ns:create-database', label: t('tree.menu.newDatabase') }] : []),
+        ...(caps.schema && !sqlServer ? [{ key: 'ns:create-schema', label: t('tree.menu.newSchema') }] : []),
+      ]
+    }
+    if (k.type === 'd' && caps.schema) return [{ key: 'ns:create-schema', label: t('tree.menu.newSqlServerSchema') }, { type: 'divider' }]
+    return []
+  }
+
+  /** 删除库或模式（放在菜单最后，红色）。MySQL 系的库就是模式。 */
+  function dropNamespaceItems(k: NodeKey): NonNullable<MenuProps['items']> {
+    const caps = nsCapsOf(k.profileId)
+    const sqlServer = driverOf(k.profileId) === 'sqlserver'
+    if (k.type === 'd' && caps.database) return [{ type: 'divider' }, { key: 'ns:drop-database', label: t('tree.menu.dropDatabase'), danger: true }]
+    if (k.type !== 's') return []
+    if (caps.database && !sqlServer) return [{ type: 'divider' }, { key: 'ns:drop-database', label: t('tree.menu.dropDatabase'), danger: true }]
+    if (caps.schema) return [{ type: 'divider' }, { key: 'ns:drop-schema', label: t(sqlServer ? 'tree.menu.dropSqlServerSchema' : 'tree.menu.dropSchema'), danger: true }]
+    return []
+  }
+
+  /** 服务器对象：用户、角色文件夹上新建，某个用户、角色上查看权限。 */
+  function serverItems(k: NodeKey): NonNullable<MenuProps['items']> {
+    if (k.type === 'f' && k.folder === 'users') return [{ key: 'srv:new-user', label: t('tree.server.newUser') }, { type: 'divider' }]
+    if (k.type === 'f' && k.folder === 'roles') return [{ key: 'srv:new-role', label: t('tree.server.newRole') }, { type: 'divider' }]
+    if (k.type === 'p') return [{ key: 'srv:open', label: t('tree.server.openPrivileges') }]
+    return []
+  }
+
+  /** 打开新建、删除库或模式的对话框；完成后刷新上一级，删除时关掉里面对象的数据页、设计器页。 */
+  function openNamespace(k: NodeKey, action: string) {
+    const caps = nsCapsOf(k.profileId)
+    const conn: NodeKey = { type: 'c', profileId: k.profileId }
+    if (action === 'create-database') setNsDialog({ profileId: k.profileId, caps, create: 'database', after: conn })
+    else if (action === 'create-schema' && k.type === 'd') setNsDialog({ profileId: k.profileId, catalog: k.catalog, caps, create: 'schema', after: k })
+    else if (action === 'create-schema') setNsDialog({ profileId: k.profileId, caps, create: 'schema', after: conn })
+    else if (action === 'drop-database' && k.type === 'd') {
+      setNsDialog({ profileId: k.profileId, caps, drop: { op: 'drop_database', name: k.catalog }, after: conn, inside: (x) => splitCatalog(x).catalog === k.catalog })
+    } else if (action === 'drop-database' && k.type === 's') {
+      setNsDialog({ profileId: k.profileId, caps, drop: { op: 'drop_database', name: k.schema }, after: conn, inside: (x) => x === k.schema })
+    } else if (action === 'drop-schema' && k.type === 's') {
+      const { catalog, schema } = splitCatalog(k.schema)
+      const after: NodeKey = catalog === undefined ? conn : { type: 'd', profileId: k.profileId, catalog }
+      setNsDialog({ profileId: k.profileId, catalog, caps, drop: { op: 'drop_schema', name: schema }, after, inside: (x) => x === k.schema })
+    }
+  }
+
   /** schema 节点：新建表、导入到新表、执行 SQL 文件，后面接分隔线。 */
   function schemaItems(k: NodeKey): NonNullable<MenuProps['items']> {
     if (k.type !== 's') return []
@@ -550,24 +657,13 @@ export default function ObjectTree() {
   }
 
   /** 对象节点的查看数据、设计表、导入导出、查看 DDL、生成 SQL，后面接分隔线；其他节点没有。 */
-  /** 这个模式列在"系统"分组下（看已加载的系统分组）。 */
-  function inSystemSchema(profileId: string, schema: string): boolean {
-    const key = encodeKey({ type: 's', profileId, schema })
-    return Object.entries(loaded).some(([x, l]) => {
-      const g = decodeKey(x)
-      return g.type === 'g' && g.profileId === profileId && l.items.some((i) => i.key === key)
-    })
-  }
-
   function objectItems(k: NodeKey): NonNullable<MenuProps['items']> {
     if (k.type !== 'o') return []
     const items: NonNullable<MenuProps['items']> = []
     const target = targetKind(k.kind)
     if (target) items.push({ key: 'view-data', label: t('tree.menu.viewData') })
-    // 系统模式下的表只看不改：不给设计、导入、删除
-    const writable = target === 'table' && !inSystemSchema(k.profileId, k.schema)
-    if (writable) items.push({ key: 'design', label: t('tree.menu.design') })
-    if (writable) items.push({ key: 'import', label: t('tree.menu.import') })
+    if (target === 'table') items.push({ key: 'design', label: t('tree.menu.design') })
+    if (target === 'table') items.push({ key: 'import', label: t('tree.menu.import') })
     if (target) items.push({ key: 'export-data', label: t('tree.menu.exportData') })
     if (ddlKind(k.kind, k.routineKind)) items.push({ key: 'ddl', label: t('tree.menu.viewDdl') })
     if (target) {
@@ -603,6 +699,11 @@ export default function ObjectTree() {
         insertSql(sql, k.profileId)
       } else if (key === 'view-data') openData(k)
       else if (key === 'privileges') useTabs.getState().openPrivileges(k.profileId, t('privilege.title'))
+      else if (key.startsWith('ns:')) openNamespace(k, key.slice(3))
+      else if (key === 'srv:new-user') setPrincipalDialog({ profileId: k.profileId, action: { kind: 'create-user' } })
+      else if (key === 'srv:new-role') setPrincipalDialog({ profileId: k.profileId, action: { kind: 'create-role' } })
+      else if (key === 'srv:open' && k.type === 'p') useTabs.getState().openPrivileges(k.profileId, t('privilege.title'), undefined, k.id)
+      else if (key === 'srv:drop' && k.type === 'p') setPrincipalDialog({ profileId: k.profileId, action: { kind: 'drop', principalId: k.id } })
       else if (key === 'who-can-access' && k.type === 'o') {
         useTabs.getState().openPrivileges(k.profileId, t('privilege.title'), { schema: k.schema, object: k.name })
       }
@@ -704,7 +805,11 @@ export default function ObjectTree() {
             }}
             onDoubleClick={(_, node) => {
               const key = String(node.key)
-              if (!key.includes('\u0002')) openData(decodeKey(key))
+              if (key.includes('\u0002')) return
+              const k = decodeKey(key)
+              // 双击用户、角色：打开账号权限并选中它
+              if (k.type === 'p') useTabs.getState().openPrivileges(k.profileId, t('privilege.title'), undefined, k.id)
+              else openData(k)
             }}
             onRightClick={({ node }) => {
               const key = String(node.key)
@@ -717,6 +822,41 @@ export default function ObjectTree() {
         <Suspense fallback={null}>
           <DdlDialog target={ddl} onClose={() => setDdl(null)} />
         </Suspense>
+      )}
+      {nsDialog && (
+        <NamespaceDialog
+          profileId={nsDialog.profileId}
+          catalog={nsDialog.catalog}
+          caps={nsDialog.caps}
+          create={nsDialog.create}
+          drop={nsDialog.drop}
+          onClose={() => setNsDialog(null)}
+          onDone={(change) => {
+            message.success(t(change.op.startsWith('drop') ? 'tree.ns.dropped' : 'tree.ns.created', { name: change.name }))
+            const inside = nsDialog.inside
+            if (inside) {
+              const tabs = useTabs.getState()
+              for (const x of tabsInSchemas(tabs.tabs, nsDialog.profileId, inside)) tabs.close(x.id)
+            }
+            void refresh(nsDialog.after)
+          }}
+        />
+      )}
+      {principalDialog && (
+        <PrincipalDialog
+          profileId={principalDialog.profileId}
+          action={principalDialog.action}
+          onClose={() => setPrincipalDialog(null)}
+          onDone={() => {
+            const profileId = principalDialog.profileId
+            void qc.invalidateQueries({ queryKey: ['privileges', profileId] })
+            // 只刷新已展开的用户、角色文件夹，保持展开状态
+            for (const folder of ['users', 'roles'] as const) {
+              const node: NodeKey = { type: 'f', profileId, folder }
+              if (loaded[encodeKey(node)]) void refresh(node)
+            }
+          }}
+        />
       )}
     </div>
   )

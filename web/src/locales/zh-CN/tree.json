@@ -64,7 +64,13 @@
     "newTable": "新建表",
     "exportDoc": "导出文档…",
     "migrate": "迁移到…",
-    "lint": "规范检查"
+    "lint": "规范检查",
+    "newDatabase": "新建数据库…",
+    "newSchema": "新建模式…",
+    "newSqlServerSchema": "新建架构…",
+    "dropDatabase": "删除数据库…",
+    "dropSchema": "删除模式…",
+    "dropSqlServerSchema": "删除架构…"
   },
   "duplicate": {
     "name": "{{name}} 副本",
@@ -113,5 +119,41 @@
     "lintLibrary": "规范库页面不对应树中的对象",
     "notFound": "树中没有找到 {{name}}",
     "modelNotOpen": "模型没有打开：{{path}}"
+  },
+  "server": {
+    "title": "服务器对象",
+    "users": "用户",
+    "roles": "角色",
+    "tablespaces": "表空间",
+    "newUser": "新建用户…",
+    "newRole": "新建角色…",
+    "openPrivileges": "查看权限",
+    "dropUser": "删除用户…",
+    "dropRole": "删除角色…"
+  },
+  "ns": {
+    "database": "数据库",
+    "schema": "模式",
+    "createTitle": "新建{{kind}}",
+    "dropTitle": "删除{{kind}}「{{name}}」",
+    "name": "名称",
+    "charset": "字符集",
+    "collation": "排序规则",
+    "collationDefault": "留空用字符集的默认排序规则",
+    "owner": "所有者",
+    "ownerOptional": "所有者（可选）",
+    "ownerDefault": "留空为当前连接的用户",
+    "next": "下一步",
+    "back": "上一步",
+    "cancel": "取消",
+    "execute": "执行",
+    "drop": "删除",
+    "willRun": "将在「{{name}}」上执行：",
+    "dropWarning": "里面的表、视图等对象和全部数据都会被删除，无法撤销。",
+    "notEmpty": "里面还有 {{n}} 张表，会一并删除。",
+    "notEmptySqlServer": "里面还有 {{n}} 张表：SQL Server 不能删除非空的架构，请先删除或移走其中的对象。",
+    "typeName": "这是生产环境，输入名称 {{name}} 确认：",
+    "created": "已新建 {{name}}",
+    "dropped": "已删除 {{name}}"
   }
 }

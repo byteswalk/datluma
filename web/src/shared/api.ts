@@ -428,6 +428,60 @@ export interface PrivCaps {
   global_grant: boolean
   database_grant: boolean
   schema_grant: boolean
+  /** 新建用户时能指定默认表空间并授予角色（Oracle、达梦）。 */
+  user_storage: boolean
+  /** 还能指定临时表空间和配额（Oracle）。 */
+  user_temp_quota: boolean
+}
+
+/** 新建用户时的表空间、配额和角色（`PrivCaps.user_storage` 为真时才能给）。 */
+export interface UserOptions {
+  default_tablespace?: string | null
+  temporary_tablespace?: string | null
+  unlimited_quota?: boolean
+  roles?: string[]
+}
+
+/** 对象树上新建、删除库或模式。 */
+export type NamespaceChange =
+  | { op: 'create_database'; name: string; charset?: string | null; collation?: string | null }
+  | { op: 'create_schema'; name: string; owner?: string | null }
+  | { op: 'drop_database'; name: string }
+  | { op: 'drop_schema'; name: string }
+
+/** 连接上能新建、删除什么。`schema` 在 SQL Server 上指库里的架构。 */
+export interface NamespaceCaps {
+  database: boolean
+  schema: boolean
+  charset: boolean
+  owner: boolean
+  owner_required: boolean
+}
+
+export interface NamespacePreview {
+  statements: string[]
+  profile_name: string
+  production: boolean
+  confirm_name: string | null
+  /** 删除时里面还有多少张表；读不到时为 null。 */
+  tables: number | null
+  confirm: string[]
+}
+
+/** 表空间。大小是字节，读不到时为 null；PG 只有已用大小。 */
+export interface Tablespace {
+  name: string
+  kind: string | null
+  total: number | null
+  used: number | null
+}
+
+/** 界面上可勾选的常用权限：对象（表、视图）、模式级、库级、全局。某级为空表示没有这一级。 */
+export interface PrivCatalog {
+  object: string[]
+  schema: string[]
+  database: string[]
+  global: string[]
 }
 
 export interface PrivilegeOverview {
@@ -435,6 +489,7 @@ export interface PrivilegeOverview {
   memberships: Membership[]
   public: string[]
   caps: PrivCaps
+  catalog: PrivCatalog
   coverage: Coverage
 }
 
@@ -447,7 +502,7 @@ export interface PrincipalRef {
 
 /** 修改账号和权限的操作。密码只随请求发送，不进前端的任何存储。 */
 export type PrivChange =
-  | { op: 'create_user'; name: string; host?: string; password: string }
+  | { op: 'create_user'; name: string; host?: string; password: string; options?: UserOptions }
   | { op: 'create_role'; name: string; level: Principal['level']; password?: string }
   | { op: 'drop'; principal: PrincipalRef; cascade?: boolean }
   | { op: 'set_password'; principal: PrincipalRef; password: string }
@@ -1515,10 +1570,20 @@ export function createApi(token: string, fetchFn: FetchFn = (i, o) => fetch(i, o
       request<Favorite>('PUT', `/favorites/${encodeURIComponent(id)}`, patch),
     deleteFavorite: (id: string) => request<null>('DELETE', `/favorites/${encodeURIComponent(id)}`),
     ops: (id: string) => request<OpsQuery[]>('GET', `${p(id)}/ops`),
+    namespaceCaps: (id: string) => request<NamespaceCaps>('GET', `${p(id)}/namespace/caps`),
+    namespacePreview: (id: string, change: NamespaceChange, catalog?: string) =>
+      request<NamespacePreview>('POST', `${p(id)}/namespace/preview`, { change, catalog }),
+    namespaceApply: (id: string, change: NamespaceChange, catalog?: string, confirm_name?: string) =>
+      request<null>('POST', `${p(id)}/namespace/apply`, { change, catalog, confirm_name }),
+    tablespaces: (id: string) => request<Tablespace[]>('GET', `${p(id)}/tablespaces`),
     privilegeOverview: (id: string, catalog?: string) =>
       request<PrivilegeOverview>('GET', `${p(id)}/privileges${q({ catalog })}`),
     privilegePreview: (id: string, change: PrivChange, catalog?: string) =>
       request<PrivPreview>('POST', `${p(id)}/privileges/preview`, { change, catalog }),
+    privilegePreviewBatch: (id: string, changes: PrivChange[], catalog?: string) =>
+      request<PrivPreview>('POST', `${p(id)}/privileges/preview_batch`, { changes, catalog }),
+    privilegeApplyBatch: (id: string, changes: PrivChange[], catalog?: string, confirm_name?: string) =>
+      request<PrivApplyResult>('POST', `${p(id)}/privileges/apply_batch`, { changes, catalog, confirm_name }),
     privilegeApply: (id: string, change: PrivChange, catalog?: string, confirm_name?: string) =>
       request<PrivApplyResult>('POST', `${p(id)}/privileges/apply`, { change, catalog, confirm_name }),
     principalPrivileges: (id: string, principal: string, catalog?: string) =>

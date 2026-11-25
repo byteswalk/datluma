@@ -321,7 +321,12 @@ async fn changes(env: &str, service: &Service, admin: &str, fx: &Fixture, driver
     apply(
         service,
         admin,
-        PrivChange::CreateUser { name: user.clone(), host: None, password: Secret::new(SENTINEL) },
+        PrivChange::CreateUser {
+            name: user.clone(),
+            host: None,
+            password: Secret::new(SENTINEL),
+            options: Default::default(),
+        },
     )
     .await;
     let level = if driver == DriverId::SqlServer { PrincipalLevel::Database } else { PrincipalLevel::Server };
@@ -633,6 +638,7 @@ async fn gbase_changes(service: &Service, admin: &str, owner: &str) {
         name: USER.into(),
         host: None,
         password: Secret::new("Dblens#Sentinel1"),
+        options: Default::default(),
     })
     .await;
     apply(PrivChange::CreateRole { name: ROLE.into(), level: PrincipalLevel::Database, password: None })
@@ -712,7 +718,13 @@ async fn gbase_changes(service: &Service, admin: &str, owner: &str) {
 
     // 操作系统用户：只授权，移除后 sysusers 没有记录
     let os = "dblens_priv_os";
-    apply(PrivChange::CreateUser { name: os.into(), host: None, password: Secret::new("") }).await;
+    apply(PrivChange::CreateUser {
+        name: os.into(),
+        host: None,
+        password: Secret::new(""),
+        options: Default::default(),
+    })
+    .await;
     let overview = service.privilege_overview(admin, None).await.unwrap();
     let found = overview.principals.iter().find(|p| p.id == os).expect("操作系统用户");
     assert_eq!(found.kind, PrincipalKind::User);

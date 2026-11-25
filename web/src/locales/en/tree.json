@@ -64,7 +64,13 @@
     "newTable": "New table",
     "exportDoc": "Export Document…",
     "migrate": "Migrate To…",
-    "lint": "Design lint"
+    "lint": "Design lint",
+    "newDatabase": "New Database…",
+    "newSchema": "New Schema…",
+    "newSqlServerSchema": "New Schema…",
+    "dropDatabase": "Drop Database…",
+    "dropSchema": "Drop Schema…",
+    "dropSqlServerSchema": "Drop Schema…"
   },
   "duplicate": {
     "name": "{{name}} copy",
@@ -113,5 +119,41 @@
     "lintLibrary": "The rule library page has no tree object",
     "notFound": "{{name}} was not found in the tree",
     "modelNotOpen": "Model is not open: {{path}}"
+  },
+  "server": {
+    "title": "Server Objects",
+    "users": "Users",
+    "roles": "Roles",
+    "tablespaces": "Tablespaces",
+    "newUser": "New User…",
+    "newRole": "New Role…",
+    "openPrivileges": "View Privileges",
+    "dropUser": "Drop User…",
+    "dropRole": "Drop Role…"
+  },
+  "ns": {
+    "database": "database",
+    "schema": "schema",
+    "createTitle": "New {{kind}}",
+    "dropTitle": "Drop {{kind}} \"{{name}}\"",
+    "name": "Name",
+    "charset": "Character set",
+    "collation": "Collation",
+    "collationDefault": "Leave empty for the character set default",
+    "owner": "Owner",
+    "ownerOptional": "Owner (optional)",
+    "ownerDefault": "Leave empty for the connected user",
+    "next": "Next",
+    "back": "Back",
+    "cancel": "Cancel",
+    "execute": "Execute",
+    "drop": "Drop",
+    "willRun": "Will run on \"{{name}}\":",
+    "dropWarning": "All tables, views and other objects inside, with their data, will be deleted. This cannot be undone.",
+    "notEmpty": "It still contains {{n}} tables, which will be dropped too.",
+    "notEmptySqlServer": "It still contains {{n}} tables: SQL Server cannot drop a non-empty schema; drop or move its objects first.",
+    "typeName": "This is a production connection. Type the name {{name}} to confirm:",
+    "created": "Created {{name}}",
+    "dropped": "Dropped {{name}}"
   }
 }

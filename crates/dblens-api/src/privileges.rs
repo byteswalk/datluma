@@ -57,6 +57,36 @@ pub async fn apply(
     Ok(Json(result))
 }
 
+#[derive(Deserialize)]
+pub struct BatchBody {
+    #[serde(default)]
+    catalog: Option<String>,
+    changes: Vec<PrivChange>,
+    #[serde(default)]
+    confirm_name: Option<String>,
+}
+
+/// 一组修改一起预览（权限矩阵、建用户时一并授予的角色和权限）。
+pub async fn preview_batch(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Json(b): Json<BatchBody>,
+) -> ApiResult<Json<PrivPreview>> {
+    Ok(Json(s.service.privilege_preview_batch(&id, b.catalog.as_deref(), &b.changes).await?))
+}
+
+pub async fn apply_batch(
+    State(s): State<AppState>,
+    Path(id): Path<String>,
+    Json(b): Json<BatchBody>,
+) -> ApiResult<Json<PrivApplyResult>> {
+    let result = s
+        .service
+        .privilege_apply_batch(&id, b.catalog.as_deref(), &b.changes, b.confirm_name.as_deref())
+        .await?;
+    Ok(Json(result))
+}
+
 pub async fn overview(
     State(s): State<AppState>,
     Path(id): Path<String>,

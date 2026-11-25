@@ -17,6 +17,7 @@ mod lint;
 mod metadata;
 mod migrate;
 mod model;
+mod namespace;
 mod objects;
 mod operator;
 #[cfg(test)]
@@ -69,6 +70,7 @@ pub use model::{
     ModelStore, ModelSummary, ModelTableView, ModelWrite, NewModel, Position, RECENT_MODELS_SETTING,
     ReverseRequest, SchemaRenames, SchemaTables, TableEntry,
 };
+pub use namespace::{NamespacePreview, NamespaceRequest, Tablespace};
 pub use objects::{DataOrder, GenerateKind, ObjectKind};
 pub use operator::Operator;
 pub use policy::{

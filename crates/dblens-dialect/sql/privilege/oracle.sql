@@ -59,7 +59,8 @@ SELECT p.grantee AS grantee, 'global' AS grant_scope, NULL AS db_name, NULL AS s
 FROM dba_sys_privs p
 WHERE p.grantee = {{ bind("name") }}
 UNION ALL
-SELECT p.grantee, 'object', NULL, p.owner, LOWER(p.type), p.table_name, NULL, p.privilege, 'grant', p.grantable, p.grantor
+-- dba_tab_privs.type 是 12c 才有的列；11g 上一律按表（视图、序列的授权写法相同）
+SELECT p.grantee, 'object', NULL, p.owner, {% if version >= 120100 %}LOWER(p.type){% else %}'table'{% endif %}, p.table_name, NULL, p.privilege, 'grant', p.grantable, p.grantor
 FROM dba_tab_privs p
 WHERE p.grantee = {{ bind("name") }}
 UNION ALL

@@ -21,7 +21,9 @@ use std::sync::OnceLock;
 use dblens_core::Result;
 use serde::{Deserialize, Serialize};
 
-pub use change::{PrincipalRef, PrivCaps, PrivChange, PrivStatement, Secret, is_admin_privilege};
+pub use change::{
+    PrincipalRef, PrivCaps, PrivCatalog, PrivChange, PrivStatement, Secret, UserOptions, is_admin_privilege,
+};
 pub use effective::{
     EffectiveContext, EffectivePrivilege, EffectiveState, ObjectAccess, PrivNote, Reach, effective,
     reachable, who_can_access,

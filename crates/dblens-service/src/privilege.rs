@@ -9,8 +9,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use dblens_core::{Error, Msg, Result, msg};
 use dblens_dialect::meta::{MetaArgs, MetaRows};
 use dblens_dialect::privilege::{
-    self, EffectiveContext, EffectivePrivilege, Membership, ObjectAccess, Principal, PrivCaps, PrivChange,
-    PrivSection, PrivStatement, PrivTier, PrivilegeGrant,
+    self, EffectiveContext, EffectivePrivilege, Membership, ObjectAccess, Principal, PrivCaps, PrivCatalog,
+    PrivChange, PrivSection, PrivStatement, PrivTier, PrivilegeGrant,
 };
 use dblens_dialect::{Dialect, Family};
 use serde::Serialize;
@@ -43,6 +43,8 @@ pub struct PrivilegeOverview {
     pub memberships: Vec<Membership>,
     pub public: Vec<String>,
     pub caps: PrivCaps,
+    /// 界面上可勾选的常用权限。
+    pub catalog: PrivCatalog,
     pub coverage: Coverage,
 }
 
@@ -207,6 +209,7 @@ impl Service {
         Ok(PrivilegeOverview {
             public: base.dialect.public_grantees().iter().map(|s| s.to_string()).collect(),
             caps: base.dialect.privilege_caps(),
+            catalog: base.dialect.privilege_catalog(),
             principals: base.principals,
             memberships: base.memberships,
             coverage: coverage(base.missing),
@@ -282,33 +285,50 @@ impl Service {
         catalog: Option<&str>,
         change: &PrivChange,
     ) -> Result<PrivPreview> {
+        self.privilege_preview_batch(profile_id, catalog, std::slice::from_ref(change)).await
+    }
+
+    /// 一组修改（权限矩阵里攒下的勾选、建用户时一并授予的角色和权限）一起预览：语句按顺序排在一起。
+    pub async fn privilege_preview_batch(
+        &self,
+        profile_id: &str,
+        catalog: Option<&str>,
+        changes: &[PrivChange],
+    ) -> Result<PrivPreview> {
+        if changes.is_empty() {
+            return Err(Error::invalid(msg!("privilege.change.empty")));
+        }
         let profile = self.scoped_profile(profile_id, catalog)?;
         let dialect = self.metadata.dialect(&profile).await?;
-        let statements = dialect.privilege_statements(change)?;
-        let masked: Vec<String> = statements.iter().map(|s| s.masked.clone()).collect();
-        let sqls: Vec<String> = masked.clone();
-        let (denied, confirm) = self.check_policy(&profile, dialect, Operation::Privilege, &sqls).await;
+        let mut masked = Vec::new();
+        for change in changes {
+            masked.extend(dialect.privilege_statements(change)?.into_iter().map(|s| s.masked));
+        }
+        let (denied, confirm) = self.check_policy(&profile, dialect, Operation::Privilege, &masked).await;
         if let Some(reason) = denied {
             return Err(Error::Denied { reason });
         }
         let production = profile.input.environment == Environment::Prod;
         let mut owned = Vec::new();
-        if let Some(p) = change.dropping() {
+        for p in changes.iter().filter_map(PrivChange::dropping) {
             let args = MetaArgs { name: Some(p.name.clone()), ..Default::default() };
             let mut ignored = Vec::new();
             // 只是提示：读不到不影响预览
             if let Ok(Some(rows)) =
                 self.privilege_rows(&profile, PrivSection::Owned, &args, &mut ignored).await
             {
-                owned = privilege::owned(&rows).unwrap_or_default();
+                owned.extend(privilege::owned(&rows).unwrap_or_default());
             }
         }
         Ok(PrivPreview {
             statements: masked,
             profile_name: profile.input.name.clone(),
             production,
-            confirm_name: change.high_risk_name().filter(|_| production).map(str::to_string),
-            own_account: change.subject().is_some_and(|s| s.eq_ignore_ascii_case(&profile.input.user)),
+            confirm_name: high_risk_name(changes).filter(|_| production).map(str::to_string),
+            own_account: changes
+                .iter()
+                .filter_map(PrivChange::subject)
+                .any(|s| s.eq_ignore_ascii_case(&profile.input.user)),
             owned,
             confirm,
         })
@@ -322,11 +342,29 @@ impl Service {
         change: &PrivChange,
         confirm_name: Option<&str>,
     ) -> Result<PrivApplyResult> {
+        self.privilege_apply_batch(profile_id, catalog, std::slice::from_ref(change), confirm_name).await
+    }
+
+    /// 一组修改按顺序执行：所有语句先过执行策略，再逐条执行，任何一条失败即停（前面成功的不回滚）。
+    pub async fn privilege_apply_batch(
+        &self,
+        profile_id: &str,
+        catalog: Option<&str>,
+        changes: &[PrivChange],
+        confirm_name: Option<&str>,
+    ) -> Result<PrivApplyResult> {
+        if changes.is_empty() {
+            return Err(Error::invalid(msg!("privilege.change.empty")));
+        }
         let profile = self.scoped_profile(profile_id, catalog)?;
         let dialect = self.metadata.dialect(&profile).await?;
-        let statements = dialect.privilege_statements(change)?;
+        let mut statements = Vec::new();
+        for change in changes {
+            let secret = change_password(change);
+            statements.extend(dialect.privilege_statements(change)?.into_iter().map(|s| (s, secret)));
+        }
         if profile.input.environment == Environment::Prod
-            && let Some(name) = change.high_risk_name()
+            && let Some(name) = high_risk_name(changes)
             && confirm_name != Some(name)
         {
             return Err(Error::invalid(msg!("privilege.change.confirm_name")));
@@ -334,7 +372,7 @@ impl Service {
         let ctx = ExecContext::new(&profile, dialect, Operation::Privilege);
         let policy = self.sessions.policy();
         let mut infos = Vec::with_capacity(statements.len());
-        for s in &statements {
+        for (s, _) in &statements {
             let (info, decision) = ask(&policy, &ctx, &s.masked).await;
             if let Some(e) = decision.into_error() {
                 return Err(e);
@@ -343,12 +381,11 @@ impl Service {
         }
         let password = self.password(&profile.id).await?;
         let (mut conn, _) = self.registry.connect(&profile, password).await?;
-        let secret = change_password(change);
         let mut result = PrivApplyResult { done: Vec::new(), failed: None, error: None };
-        for (statement, info) in statements.iter().zip(&infos) {
+        for ((statement, secret), info) in statements.iter().zip(&infos) {
             let (at, started) = (now_ms(), Instant::now());
             let outcome = exec(&mut conn, &statement.sql, &[]).await;
-            let error = outcome.as_ref().err().map(|e| scrub(&e.to_string(), statement, secret));
+            let error = outcome.as_ref().err().map(|e| scrub(&e.to_string(), statement, *secret));
             self.history.record(NewHistory {
                 at,
                 profile_id: profile.id.clone(),
@@ -376,6 +413,11 @@ impl Service {
         conn.close().await.ok();
         Ok(result)
     }
+}
+
+/// 一组修改里第一个需要在生产连接上输入名称确认的主体。
+fn high_risk_name(changes: &[PrivChange]) -> Option<&str> {
+    changes.iter().find_map(PrivChange::high_risk_name)
 }
 
 #[cfg(test)]
@@ -470,6 +512,20 @@ mod tests {
         assert!(s.privilege_apply(&id, None, &drop_user(), Some("x")).await.is_err());
         let r = s.privilege_apply(&id, None, &drop_user(), Some("u")).await.unwrap();
         assert_eq!(r.error, None);
+    }
+
+    #[tokio::test]
+    async fn a_batch_runs_in_order_and_asks_once_for_the_name() {
+        let (s, id, _log, store) = service(Environment::Prod);
+        let batch = [set_password(), drop_user()];
+        let preview = s.privilege_preview_batch(&id, None, &batch).await.unwrap();
+        assert_eq!(preview.statements.len(), 2);
+        assert_eq!(preview.confirm_name.as_deref(), Some("u"), "删除用户要输入名称");
+        assert!(s.privilege_apply_batch(&id, None, &batch, None).await.is_err());
+        let r = s.privilege_apply_batch(&id, None, &batch, Some("u")).await.unwrap();
+        assert_eq!((r.done.len(), r.error), (2, None));
+        assert_eq!(store.history(&HistoryQuery::default()).unwrap().len(), 2);
+        assert!(s.privilege_preview_batch(&id, None, &[]).await.is_err(), "空的一组不能执行");
     }
 
     #[tokio::test]

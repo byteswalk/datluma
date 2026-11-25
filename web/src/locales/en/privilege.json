@@ -14,7 +14,9 @@
   "tab": {
     "attrs": "Properties",
     "direct": "Direct grants",
-    "effective": "Effective privileges"
+    "effective": "Effective privileges",
+    "objects": "Object Privileges",
+    "scope": "Database & System"
   },
   "attr": {
     "name": "Name",
@@ -116,5 +118,61 @@
     "typeName": "This is a production connection. Type {{name}} to confirm",
     "done": "Executed:",
     "failed": "Failed: {{statement}}"
-  }
+  },
+  "storage": {
+    "defaultTablespace": "Default tablespace",
+    "tempTablespace": "Temporary tablespace",
+    "unlimitedQuota": "Unlimited quota on the default tablespace",
+    "roles": "Grant roles",
+    "dbDefault": "Database default",
+    "tablespacesFailed": "Could not read tablespaces (possibly no permission); leave empty to use the database default"
+  },
+  "status": {
+    "locked": "Locked",
+    "noLogin": "Cannot log in",
+    "canLogin": "Can log in",
+    "expires": "Expires {{at}}"
+  },
+  "matrix": {
+    "object": "Object",
+    "schema": "Choose a schema",
+    "search": "Search tables or views",
+    "onlyGranted": "Granted only",
+    "withGrant": "New grants are grantable",
+    "toggleColumn": "Toggle the whole column (listed rows)",
+    "all": "All",
+    "noObjects": "This schema has no tables or views",
+    "noMatch": "No matching objects",
+    "via": "Granted through {{path}}; cannot be removed here",
+    "viaAll": "Granted through ALL; revoke ALL to remove it"
+  },
+  "scopeTab": {
+    "global": "System privileges",
+    "database": "Database privileges ({{name}})",
+    "currentDb": "current database",
+    "schema": "Schema privileges",
+    "custom": "Other privilege, e.g. CREATE ANY TABLE",
+    "add": "Add",
+    "none": "This database has no database-level or system privileges"
+  },
+  "pending": {
+    "count": "{{n}} unsaved changes",
+    "undo": "Undo",
+    "apply": "Preview & Apply",
+    "discardTitle": "Discard unsaved changes?",
+    "discard": "{{n}} changes have not been applied and will be lost."
+  },
+  "batch": {
+    "title": "Apply {{n}} changes"
+  },
+  "newUser": {
+    "roles": "Roles",
+    "preset": "Common privileges",
+    "none": "None",
+    "read": "Read only",
+    "write": "Read & write",
+    "sql": "Will run:",
+    "fillFirst": "Fill in the name and password to see the statements"
+  },
+  "effectiveEmpty": "No privileges"
 }

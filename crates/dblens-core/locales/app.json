@@ -1632,6 +1632,34 @@
     "zh-CN": "生成 YAML 失败：%{error}",
     "en": "Failed to write YAML: %{error}"
   },
+  "namespace.bad_charset": {
+    "zh-CN": "字符集和排序规则只能包含字母、数字和下划线",
+    "en": "Character sets and collations may only contain letters, digits and underscores"
+  },
+  "namespace.confirm_name": {
+    "zh-CN": "生产连接上删除，请输入名称确认",
+    "en": "On a production connection, type the name to confirm the drop"
+  },
+  "namespace.name_required": {
+    "zh-CN": "请填写名称",
+    "en": "Enter a name"
+  },
+  "namespace.owner_required": {
+    "zh-CN": "请选择所有者",
+    "en": "Choose an owner"
+  },
+  "namespace.system": {
+    "zh-CN": "%{name} 是系统库或系统模式，不能删除",
+    "en": "%{name} is a system database or schema and cannot be dropped"
+  },
+  "namespace.tablespaces_failed": {
+    "zh-CN": "读不到表空间",
+    "en": "Could not read tablespaces"
+  },
+  "namespace.unsupported": {
+    "zh-CN": "这个数据库不支持这项操作",
+    "en": "This database does not support this operation"
+  },
   "native.dir_not_absolute": {
     "zh-CN": "%{lib}目录必须是绝对路径：%{dir}",
     "en": "The %{lib} directory must be an absolute path: %{dir}"
@@ -1771,6 +1799,10 @@
   "privilege.change.confirm_name": {
     "zh-CN": "生产连接上的这项操作要输入主体名确认",
     "en": "This operation on a production connection needs the principal name to confirm"
+  },
+  "privilege.change.empty": {
+    "zh-CN": "没有要执行的修改",
+    "en": "There are no changes to apply"
   },
   "privilege.change.name_required": {
     "zh-CN": "请填写名称",

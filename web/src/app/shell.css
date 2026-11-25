@@ -1519,3 +1519,115 @@ body {
 .ant-select-dropdown.env-filter-popup .ant-select-item-option-state {
   color: var(--text-2);
 }
+
+/* 一排操作按钮做成和 Segmented 一样的分段底：浅灰底块包住，按钮无边框，悬停时浮起成白块（账号权限的改密、授权、删除等） */
+.seg-actions {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.seg-actions .ant-btn {
+  border-radius: 4px;
+}
+.seg-actions .ant-btn:not(:disabled):hover {
+  background: var(--panel);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--text) 12%, transparent);
+}
+
+/* 用户与权限（第一期改版）：左侧分组列表、右侧头部、权限矩阵的格子、待提交栏 */
+.priv-group {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 12px 2px;
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+  cursor: pointer;
+  user-select: none;
+}
+.priv-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px 4px 20px;
+  cursor: pointer;
+}
+.priv-item.picked {
+  font-weight: 600;
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.priv-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.priv-head {
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid var(--border);
+}
+/* 页签内容占满剩余高度、在内部滚动，待提交栏固定在底部 */
+.priv-tabs {
+  min-height: 0;
+}
+.priv-tabs > .ant-tabs-body-holder,
+.priv-tabs > .ant-tabs-content-holder {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.priv-cell {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 28px;
+  padding: 1px 4px;
+  border-radius: 4px;
+}
+.priv-cell.priv-adding {
+  background: color-mix(in srgb, #3aa757 22%, transparent);
+}
+.priv-cell.priv-removing {
+  background: color-mix(in srgb, #d33b3b 20%, transparent);
+}
+.priv-via {
+  font-size: 11px;
+  color: var(--muted);
+}
+.priv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 2px 12px;
+}
+.priv-grid-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.priv-tag-adding {
+  border-style: dashed;
+  background: color-mix(in srgb, #3aa757 14%, transparent);
+}
+.priv-tag-removing {
+  text-decoration: line-through;
+  opacity: 0.6;
+}
+.priv-pending {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border);
+  background: var(--panel-2, var(--panel));
+}
+.sql-preview-box {
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--text) 3%, transparent);
+}

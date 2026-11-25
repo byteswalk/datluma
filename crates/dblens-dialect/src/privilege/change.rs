@@ -29,6 +29,19 @@ impl std::fmt::Debug for Secret {
     }
 }
 
+/// 新建用户时的存储设置和角色。都不填就是只建用户，和以前一样。
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct UserOptions {
+    pub default_tablespace: Option<String>,
+    /// 只有 Oracle 能按用户指定临时表空间。
+    pub temporary_tablespace: Option<String>,
+    /// 在默认表空间上不限配额（Oracle；没指定默认表空间时不生效）。
+    pub unlimited_quota: bool,
+    /// 建好后授予的角色。
+    pub roles: Vec<String>,
+}
+
 /// 界面选中的主体。
 #[derive(Debug, Clone, Deserialize)]
 pub struct PrincipalRef {
@@ -47,6 +60,9 @@ pub enum PrivChange {
         #[serde(default)]
         host: Option<String>,
         password: Secret,
+        /// 表空间、配额和一并授予的角色（Oracle、达梦，见 [`PrivCaps::user_storage`]）。
+        #[serde(default)]
+        options: UserOptions,
     },
     CreateRole {
         name: String,
@@ -145,6 +161,24 @@ pub struct PrivCaps {
     pub global_grant: bool,
     pub database_grant: bool,
     pub schema_grant: bool,
+    /// 新建用户时能指定默认表空间并授予角色（Oracle、达梦）。
+    pub user_storage: bool,
+    /// 还能指定临时表空间和配额（Oracle）。
+    pub user_temp_quota: bool,
+}
+
+/// 界面上可勾选的常用权限（权限矩阵的列、库与系统权限的选项）。清单外的权限仍可手工输入。
+/// 各级的取值都是能直接放进 GRANT 的写法；某一级为空表示这个库没有这一级的授权。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct PrivCatalog {
+    /// 表、视图上的权限。
+    pub object: Vec<&'static str>,
+    /// 模式级（MySQL 是库级 `db.*`）。
+    pub schema: Vec<&'static str>,
+    /// 库级（PG、SQL Server、GBase 8s）。
+    pub database: Vec<&'static str>,
+    /// 全局 / 系统权限（MySQL `*.*`、Oracle 和达梦的系统权限、SQL Server 的服务器权限）。
+    pub global: Vec<&'static str>,
 }
 
 /// 管理员角色或全局最高权限，生产连接上要输入主体名才能授予、回收。
@@ -183,6 +217,9 @@ impl PrivChange {
                 if is_admin_privilege(&role.name) =>
             {
                 Some(&member.name)
+            }
+            Self::CreateUser { name, options, .. } if options.roles.iter().any(|r| is_admin_privilege(r)) => {
+                Some(name)
             }
             _ => None,
         }
@@ -254,13 +291,118 @@ impl Dialect {
             global_grant: !matches!(family, Family::Postgres | Family::Informix),
             database_grant: matches!(family, Family::Postgres | Family::SqlServer | Family::Informix),
             schema_grant: matches!(family, Family::MySql | Family::Postgres | Family::SqlServer),
+            // OceanBase 的 Oracle 租户没有数据文件和配额，只建用户
+            user_storage: matches!(family, Family::Oracle | Family::Dameng)
+                && self.variant() != Variant::OceanBaseOracle,
+            user_temp_quota: family == Family::Oracle && self.variant() != Variant::OceanBaseOracle,
+        }
+    }
+
+    pub fn privilege_catalog(&self) -> PrivCatalog {
+        let caps = self.privilege_caps();
+        let (object, schema, database, global): (&[&str], &[&str], &[&str], &[&str]) = match self.family() {
+            Family::MySql => (
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "INDEX", "DROP", "REFERENCES", "TRIGGER"],
+                &[
+                    "SELECT",
+                    "INSERT",
+                    "UPDATE",
+                    "DELETE",
+                    "CREATE",
+                    "DROP",
+                    "ALTER",
+                    "INDEX",
+                    "CREATE VIEW",
+                    "SHOW VIEW",
+                    "EXECUTE",
+                ],
+                &[],
+                &[
+                    "SELECT",
+                    "INSERT",
+                    "UPDATE",
+                    "DELETE",
+                    "CREATE",
+                    "DROP",
+                    "PROCESS",
+                    "RELOAD",
+                    "SHOW DATABASES",
+                    "CREATE USER",
+                ],
+            ),
+            Family::Postgres => (
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE", "REFERENCES", "TRIGGER"],
+                &["USAGE", "CREATE"],
+                &["CONNECT", "CREATE", "TEMPORARY"],
+                &[],
+            ),
+            Family::Oracle => (
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "INDEX", "REFERENCES"],
+                &[],
+                &[],
+                &[
+                    "CREATE SESSION",
+                    "CREATE TABLE",
+                    "CREATE VIEW",
+                    "CREATE SEQUENCE",
+                    "CREATE PROCEDURE",
+                    "CREATE SYNONYM",
+                    "CREATE TRIGGER",
+                    "UNLIMITED TABLESPACE",
+                    "SELECT ANY TABLE",
+                ],
+            ),
+            Family::Dameng => (
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "INDEX", "REFERENCES"],
+                &[],
+                &[],
+                &[
+                    "CREATE TABLE",
+                    "CREATE VIEW",
+                    "CREATE SEQUENCE",
+                    "CREATE PROCEDURE",
+                    "CREATE SYNONYM",
+                    "CREATE TRIGGER",
+                    "CREATE SCHEMA",
+                    "SELECT ANY TABLE",
+                ],
+            ),
+            Family::SqlServer => (
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "REFERENCES", "CONTROL"],
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "EXECUTE", "ALTER"],
+                &["CREATE TABLE", "CREATE VIEW", "CREATE PROCEDURE", "CREATE FUNCTION", "BACKUP DATABASE"],
+                &["VIEW SERVER STATE", "VIEW ANY DATABASE", "CREATE ANY DATABASE", "ALTER ANY LOGIN"],
+            ),
+            Family::Informix => (
+                &["SELECT", "INSERT", "UPDATE", "DELETE", "ALTER", "INDEX", "REFERENCES"],
+                &[],
+                &["CONNECT", "RESOURCE", "DBA"],
+                &[],
+            ),
+            Family::Sqlite => (&[], &[], &[], &[]),
+        };
+        // 没有这一级授权的库不给选项
+        let keep = |on: bool, list: &[&'static str]| if on { list.to_vec() } else { Vec::new() };
+        PrivCatalog {
+            object: object.to_vec(),
+            schema: keep(caps.schema_grant, schema),
+            database: keep(caps.database_grant, database),
+            global: keep(caps.global_grant, global),
         }
     }
 
     pub fn privilege_statements(&self, change: &PrivChange) -> Result<Vec<PrivStatement>> {
         match change {
-            PrivChange::CreateUser { name, host, password } => {
-                self.create_user(required(name)?, host.as_deref(), password)
+            PrivChange::CreateUser { name, host, password, options } => {
+                let mut out = self.create_user(required(name)?, host.as_deref(), password, options)?;
+                for role in options.roles.iter().filter(|r| !r.trim().is_empty()) {
+                    out.push(PrivStatement::plain(format!(
+                        "GRANT {} TO {}",
+                        self.ident(role),
+                        self.ident(name)
+                    )));
+                }
+                Ok(out)
             }
             PrivChange::CreateRole { .. } | PrivChange::AddRole { .. } if !self.privilege_caps().roles => {
                 Err(unsupported())
@@ -351,7 +493,17 @@ impl Dialect {
         vec![PrivStatement::plain("DATABASE sysuser".to_string()), sql]
     }
 
-    fn create_user(&self, name: &str, host: Option<&str>, password: &Secret) -> Result<Vec<PrivStatement>> {
+    fn create_user(
+        &self,
+        name: &str,
+        host: Option<&str>,
+        password: &Secret,
+        options: &UserOptions,
+    ) -> Result<Vec<PrivStatement>> {
+        let caps = self.privilege_caps();
+        if *options != UserOptions::default() && !caps.user_storage {
+            return Err(unsupported());
+        }
         if self.family() == Family::Informix {
             let grant = format!("GRANT CONNECT TO {}", sql_string(Family::Informix, name));
             let mut out = vec![PrivStatement::plain(grant)];
@@ -384,7 +536,22 @@ impl Dialect {
             ],
             _ => {
                 let id = self.ident(name);
-                vec![PrivStatement::with_password(&format!("CREATE USER {id} IDENTIFIED BY \u{1}"), &lit)]
+                let mut tail = String::new();
+                let ts = options.default_tablespace.as_deref().filter(|t| !t.trim().is_empty());
+                if let Some(t) = ts {
+                    tail.push_str(&format!(" DEFAULT TABLESPACE {}", self.ident(t)));
+                }
+                if caps.user_temp_quota {
+                    if let Some(t) = options.temporary_tablespace.as_deref().filter(|t| !t.trim().is_empty())
+                    {
+                        tail.push_str(&format!(" TEMPORARY TABLESPACE {}", self.ident(t)));
+                    }
+                    if let (true, Some(t)) = (options.unlimited_quota, ts) {
+                        tail.push_str(&format!(" QUOTA UNLIMITED ON {}", self.ident(t)));
+                    }
+                }
+                let template = format!("CREATE USER {id} IDENTIFIED BY \u{1}{tail}");
+                vec![PrivStatement::with_password(&template, &lit)]
             }
         })
     }
@@ -682,7 +849,12 @@ mod tests {
     }
 
     fn create(name: &str) -> PrivChange {
-        PrivChange::CreateUser { name: name.into(), host: None, password: Secret::new("pa'ss") }
+        PrivChange::CreateUser {
+            name: name.into(),
+            host: None,
+            password: Secret::new("pa'ss"),
+            options: UserOptions::default(),
+        }
     }
 
     #[test]
@@ -695,6 +867,47 @@ mod tests {
             masked(Variant::SqlServer, &create("u")),
             ["CREATE LOGIN [u] WITH PASSWORD = ***", "CREATE USER [u] FOR LOGIN [u]"]
         );
+    }
+
+    #[test]
+    fn create_user_with_storage_and_roles() {
+        let options = UserOptions {
+            default_tablespace: Some("USERS".into()),
+            temporary_tablespace: Some("TEMP".into()),
+            unlimited_quota: true,
+            roles: vec!["CONNECT".into(), "RESOURCE".into()],
+        };
+        let with = |options: UserOptions| PrivChange::CreateUser {
+            name: "APP".into(),
+            host: None,
+            password: Secret::new("pa'ss"),
+            options,
+        };
+        let change = with(options.clone());
+        assert_eq!(
+            masked(Variant::Oracle, &change),
+            [
+                "CREATE USER APP IDENTIFIED BY *** DEFAULT TABLESPACE USERS TEMPORARY TABLESPACE TEMP QUOTA UNLIMITED ON USERS",
+                "GRANT \"CONNECT\" TO APP",
+                "GRANT \"RESOURCE\" TO APP",
+            ]
+        );
+        // 达梦没有按用户的临时表空间和配额
+        assert_eq!(
+            masked(Variant::Dameng, &change),
+            [
+                "CREATE USER APP IDENTIFIED BY *** DEFAULT TABLESPACE USERS",
+                "GRANT \"CONNECT\" TO APP",
+                "GRANT \"RESOURCE\" TO APP"
+            ]
+        );
+        // 其他库不能带这些设置
+        assert!(Dialect::new(Variant::MySql).privilege_statements(&change).is_err());
+        assert!(Dialect::new(Variant::OceanBaseOracle).privilege_statements(&change).is_err());
+        // 建用户时一并给 DBA：生产连接上要输入用户名
+        let dba = with(UserOptions { roles: vec!["DBA".into()], ..options });
+        assert_eq!(dba.high_risk_name(), Some("APP"));
+        assert_eq!(change.high_risk_name(), None);
     }
 
     #[test]
@@ -714,9 +927,19 @@ mod tests {
         assert!(sql(Variant::MySql).ends_with("'pa''ss'"));
         assert!(sql(Variant::SqlServer).ends_with("N'pa''ss'"));
         assert!(sql(Variant::Oracle).ends_with("\"pa'ss\""));
-        let quote = PrivChange::CreateUser { name: "U".into(), host: None, password: Secret::new("a\"b") };
+        let quote = PrivChange::CreateUser {
+            name: "U".into(),
+            host: None,
+            password: Secret::new("a\"b"),
+            options: UserOptions::default(),
+        };
         assert!(Dialect::new(Variant::Oracle).privilege_statements(&quote).is_err());
-        let empty = PrivChange::CreateUser { name: "U".into(), host: None, password: Secret::new("") };
+        let empty = PrivChange::CreateUser {
+            name: "U".into(),
+            host: None,
+            password: Secret::new(""),
+            options: UserOptions::default(),
+        };
         assert!(Dialect::new(Variant::MySql).privilege_statements(&empty).is_err());
     }
 
@@ -811,7 +1034,12 @@ mod tests {
     #[test]
     fn gbase_accounts() {
         let v = Variant::Gbase8s;
-        let os = PrivChange::CreateUser { name: "u".into(), host: None, password: Secret::new("") };
+        let os = PrivChange::CreateUser {
+            name: "u".into(),
+            host: None,
+            password: Secret::new(""),
+            options: UserOptions::default(),
+        };
         assert_eq!(masked(v, &os), ["GRANT CONNECT TO 'u'"]);
         assert_eq!(
             masked(v, &create("u")),

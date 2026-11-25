@@ -52,7 +52,13 @@ export function categoriesFor(driver: DriverId): Category[] {
  * - `k` 分类：k、profileId、schema、kind
  * - `o` 对象：o、profileId、schema、kind、name，程序另有 routineKind（包和包体同名，靠它区分）
  * - `l` 列：l、profileId、schema、table、column
+ * - `v` 服务器对象分组：v、profileId
+ * - `f` 服务器对象下的文件夹：f、profileId、folder（users / roles / tablespaces）
+ * - `p` 用户或角色：p、profileId、kind、id（Principal.id），显示名另存在节点上
+ * - `t` 表空间：t、profileId、name
  */
+export type ServerFolder = 'users' | 'roles' | 'tablespaces'
+
 export type NodeKey =
   | { type: 'c'; profileId: string }
   | { type: 'd'; profileId: string; catalog: string }
@@ -68,6 +74,10 @@ export type NodeKey =
       routineKind?: RoutineInfo['kind']
     }
   | { type: 'l'; profileId: string; schema: string; table: string; column: string }
+  | { type: 'v'; profileId: string }
+  | { type: 'f'; profileId: string; folder: ServerFolder }
+  | { type: 'p'; profileId: string; kind: 'user' | 'role'; id: string }
+  | { type: 't'; profileId: string; name: string }
 
 const SEP = '\u0001'
 
@@ -87,6 +97,14 @@ export function encodeKey(k: NodeKey): string {
       return [k.type, k.profileId, k.schema, k.kind, k.name, ...(k.routineKind ? [k.routineKind] : [])].join(SEP)
     case 'l':
       return [k.type, k.profileId, k.schema, k.table, k.column].join(SEP)
+    case 'v':
+      return [k.type, k.profileId].join(SEP)
+    case 'f':
+      return [k.type, k.profileId, k.folder].join(SEP)
+    case 'p':
+      return [k.type, k.profileId, k.kind, k.id].join(SEP)
+    case 't':
+      return [k.type, k.profileId, k.name].join(SEP)
   }
 }
 
@@ -109,6 +127,14 @@ export function decodeKey(s: string): NodeKey {
         : { type, profileId, schema: a, kind: b as CategoryKind, name: c }
     case 'l':
       return { type, profileId, schema: a, table: b, column: c }
+    case 'v':
+      return { type, profileId }
+    case 'f':
+      return { type, profileId, folder: a as ServerFolder }
+    case 'p':
+      return { type, profileId, kind: a as 'user' | 'role', id: b }
+    case 't':
+      return { type, profileId, name: a }
     default:
       throw new Error(t('tree.error.badKey', { key: s }))
   }
@@ -159,6 +185,8 @@ export function qualifiedName(k: NodeKey): string {
       return schemaLabel(k.schema)
     case 'd':
       return k.catalog
+    case 't':
+      return k.name
     default:
       return ''
   }
@@ -186,6 +214,14 @@ export function isWithin(child: NodeKey, parent: NodeKey): boolean {
     case 'o':
       return child.type === 'l' && child.schema === parent.schema && child.table === parent.name
     case 'l':
+    case 'p':
+    case 't':
       return false
+    case 'v':
+      return child.type === 'f' || child.type === 'p' || child.type === 't'
+    case 'f':
+      return parent.folder === 'tablespaces'
+        ? child.type === 't'
+        : child.type === 'p' && child.kind === (parent.folder === 'users' ? 'user' : 'role')
   }
 }

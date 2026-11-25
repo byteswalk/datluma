@@ -1,12 +1,13 @@
 // 账号与权限的修改（M9 设计文档第 9 节）：表单收集内容，统一进预览对话框，确认后执行。
 // 密码只放在组件状态里：不进 tabs、localStorage 和草稿，对话框关闭就没了。
 
-import { Alert, Button, Checkbox, Input, Modal, Select, Space } from 'antd'
+import { Alert, Button, Checkbox, Input, Modal, Select, Space, Spin } from 'antd'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
-import type { GrantScope, Principal, PrivApplyResult, PrivCaps, PrivChange, PrivPreview } from '../../shared/api'
+import { useQuery } from '@tanstack/react-query'
+import type { GrantScope, Principal, PrivApplyResult, PrivCaps, PrivChange, PrivPreview, Tablespace, UserOptions } from '../../shared/api'
 import { principalRef, randomPassword, withCascade } from './logic'
 
 const SQL_STYLE = { whiteSpace: 'pre-wrap', margin: '0 0 8px', fontFamily: 'var(--mono)' } as const
@@ -71,6 +72,7 @@ export function ChangeDialog({ profileId, catalog, change, cascadable, onClose, 
       ]}
     >
       {error && <Alert type="error" showIcon message={error} style={{ marginBottom: 8 }} />}
+      {!preview && !error && !finished && <Spin style={{ display: 'block', margin: '24px auto' }} />}
       {preview && !finished && (
         <>
           <div className="muted" style={{ marginBottom: 4 }}>{t('privilege.change.connection', { name: preview.profile_name })}</div>
@@ -105,7 +107,7 @@ export function ChangeDialog({ profileId, catalog, change, cascadable, onClose, 
   )
 }
 
-function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export function PasswordField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const { t } = useTranslation()
   const [shown, setShown] = useState(false)
   return (
@@ -127,7 +129,7 @@ function PasswordField({ value, onChange }: { value: string; onChange: (v: strin
   )
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ marginBottom: 10 }}>
       <div style={{ marginBottom: 4 }}>{label}</div>
@@ -151,9 +153,70 @@ function FormDialog({ title, disabled, onCancel, onNext, children }: {
   )
 }
 
-export function CreateDialog({ role, caps, onCancel, onNext }: {
+/** Oracle、达梦新建用户时默认选上的表空间和角色（库里有才选）。 */
+export function storageDefaults(caps: PrivCaps, tablespaces: Tablespace[], roles: string[]): UserOptions {
+  const has = (n: string) => tablespaces.some((x) => x.name === n)
+  const oracle = caps.user_temp_quota
+  const wanted = oracle ? ['CONNECT', 'RESOURCE'] : ['RESOURCE']
+  return {
+    default_tablespace: oracle ? (has('USERS') ? 'USERS' : null) : has('MAIN') ? 'MAIN' : null,
+    temporary_tablespace: oracle && has('TEMP') ? 'TEMP' : null,
+    unlimited_quota: oracle,
+    roles: wanted.filter((r) => roles.includes(r)),
+  }
+}
+
+/** Oracle、达梦新建用户时的表空间、配额和角色。 */
+export function StorageFields({ profileId, caps, roles, value, onChange, showRoles = true }: {
+  profileId: string
+  caps: PrivCaps
+  roles: string[]
+  value: UserOptions | null
+  onChange: (v: UserOptions) => void
+  /** 新建用户对话框另有角色选择时不在这里显示。 */
+  showRoles?: boolean
+}) {
+  const api = useApi()
+  const { t } = useTranslation()
+  const { data: tablespaces, error } = useQuery({ queryKey: ['tablespaces', profileId], queryFn: () => api.tablespaces(profileId) })
+  useEffect(() => {
+    if (tablespaces && value === null) onChange(storageDefaults(caps, tablespaces, roles))
+  }, [tablespaces]) // eslint-disable-line react-hooks/exhaustive-deps
+  const v = value ?? {}
+  const of = (temp: boolean) =>
+    (tablespaces ?? [])
+      .filter((x) => (temp ? x.kind === 'TEMPORARY' : x.kind !== 'TEMPORARY' && x.kind !== 'UNDO'))
+      .map((x) => ({ value: x.name, label: x.name }))
+  return (
+    <>
+      {error && <div className="muted" style={{ marginBottom: 8 }}>{t('privilege.storage.tablespacesFailed')}</div>}
+      <Field label={t('privilege.storage.defaultTablespace')}>
+        <Select allowClear showSearch value={v.default_tablespace ?? undefined} placeholder={t('privilege.storage.dbDefault')} options={of(false)} onChange={(x) => onChange({ ...v, default_tablespace: x ?? null })} style={{ width: '100%' }} />
+      </Field>
+      {caps.user_temp_quota && (
+        <>
+          <Field label={t('privilege.storage.tempTablespace')}>
+            <Select allowClear showSearch value={v.temporary_tablespace ?? undefined} placeholder={t('privilege.storage.dbDefault')} options={of(true)} onChange={(x) => onChange({ ...v, temporary_tablespace: x ?? null })} style={{ width: '100%' }} />
+          </Field>
+          <Checkbox checked={!!v.unlimited_quota} disabled={!v.default_tablespace} onChange={(e) => onChange({ ...v, unlimited_quota: e.target.checked })} style={{ marginBottom: 10 }}>
+            {t('privilege.storage.unlimitedQuota')}
+          </Checkbox>
+        </>
+      )}
+      {showRoles && <Field label={t('privilege.storage.roles')}>
+        <Select mode="multiple" allowClear value={v.roles ?? []} options={roles.map((r) => ({ value: r, label: r }))} onChange={(x) => onChange({ ...v, roles: x })} style={{ width: '100%' }} />
+      </Field>}
+    </>
+  )
+}
+
+export function CreateDialog({ role, caps, profileId, roles = [], onCancel, onNext }: {
   role: boolean
   caps: PrivCaps
+  /** 连接配置 id：Oracle、达梦新建用户时读表空间用。 */
+  profileId?: string
+  /** 库里已有的角色名：Oracle、达梦新建用户时可一并授予。 */
+  roles?: string[]
   onCancel: () => void
   onNext: (c: PrivChange) => void
 }) {
@@ -161,18 +224,21 @@ export function CreateDialog({ role, caps, onCancel, onNext }: {
   const [name, setName] = useState('')
   const [host, setHost] = useState('%')
   const [password, setPassword] = useState('')
+  const [options, setOptions] = useState<UserOptions | null>(null)
+  const storage = !role && caps.user_storage && profileId !== undefined
   const needsPassword = !caps.os_accounts && (!role || caps.role_password)
   const showPassword = needsPassword || (caps.os_accounts && !role)
   const next = () =>
     onNext(role
       ? { op: 'create_role', name, level: 'database', password: caps.role_password ? password : undefined }
-      : { op: 'create_user', name, host: caps.host ? host : undefined, password })
+      : { op: 'create_user', name, host: caps.host ? host : undefined, password, ...(storage && options ? { options } : {}) })
   return (
     <FormDialog title={t(role ? 'privilege.action.newRole' : 'privilege.action.newUser')} disabled={!name.trim() || (needsPassword && !password)} onCancel={onCancel} onNext={next}>
       <Field label={t('privilege.attr.name')}><Input autoFocus value={name} onChange={(e) => setName(e.target.value)} autoComplete="off" /></Field>
       {caps.host && !role && <Field label={t('privilege.attr.host')}><Input value={host} onChange={(e) => setHost(e.target.value)} /></Field>}
       {showPassword && <Field label={t('privilege.action.password')}><PasswordField value={password} onChange={setPassword} /></Field>}
       {caps.os_accounts && !role && <div className="muted">{t('privilege.action.osAccountHint')}</div>}
+      {storage && <StorageFields profileId={profileId} caps={caps} roles={roles} value={options} onChange={setOptions} />}
     </FormDialog>
   )
 }

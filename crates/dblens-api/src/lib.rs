@@ -12,6 +12,7 @@ mod lang;
 mod lint;
 mod migrations;
 mod models;
+mod namespace;
 mod privileges;
 mod routes;
 mod tasks;
@@ -102,11 +103,17 @@ pub fn api_routes() -> Router<AppState> {
         .route("/profiles/{id}/schemas/{schema}/relations", get(routes::relations))
         .route("/profiles/{id}/schemas/{schema}/data-sql", post(routes::data_sql))
         .route("/profiles/{id}/ops", get(exports::ops))
+        .route("/profiles/{id}/namespace/caps", get(namespace::caps))
+        .route("/profiles/{id}/namespace/preview", post(namespace::preview))
+        .route("/profiles/{id}/namespace/apply", post(namespace::apply))
+        .route("/profiles/{id}/tablespaces", get(namespace::tablespaces))
         .route("/profiles/{id}/privileges", get(privileges::overview))
         .route("/profiles/{id}/privileges/principal", get(privileges::principal))
         .route("/profiles/{id}/privileges/object", get(privileges::object))
         .route("/profiles/{id}/privileges/preview", post(privileges::preview))
         .route("/profiles/{id}/privileges/apply", post(privileges::apply))
+        .route("/profiles/{id}/privileges/preview_batch", post(privileges::preview_batch))
+        .route("/profiles/{id}/privileges/apply_batch", post(privileges::apply_batch))
         .route("/profiles/{id}/changes/preview", post(routes::preview_changes))
         .route("/profiles/{id}/design/caps", get(design::caps))
         .route("/profiles/{id}/design/table", get(design::table))

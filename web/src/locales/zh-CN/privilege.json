@@ -14,7 +14,9 @@
   "tab": {
     "attrs": "属性",
     "direct": "直接授权",
-    "effective": "实际权限"
+    "effective": "实际权限",
+    "objects": "对象权限",
+    "scope": "库与系统权限"
   },
   "attr": {
     "name": "名称",
@@ -116,5 +118,61 @@
     "typeName": "这是生产连接，输入 {{name}} 确认",
     "done": "已执行：",
     "failed": "执行失败：{{statement}}"
-  }
+  },
+  "storage": {
+    "defaultTablespace": "默认表空间",
+    "tempTablespace": "临时表空间",
+    "unlimitedQuota": "在默认表空间上不限配额",
+    "roles": "授予角色",
+    "dbDefault": "用数据库的默认值",
+    "tablespacesFailed": "读不到表空间（可能没有查看权限），可留空用数据库的默认值"
+  },
+  "status": {
+    "locked": "已锁定",
+    "noLogin": "不可登录",
+    "canLogin": "可登录",
+    "expires": "过期时间 {{at}}"
+  },
+  "matrix": {
+    "object": "对象",
+    "schema": "选择模式",
+    "search": "搜索表或视图",
+    "onlyGranted": "只看已授权",
+    "withGrant": "新授予的可转授",
+    "toggleColumn": "点击切换整列（当前列表里的）",
+    "all": "全部",
+    "noObjects": "这个模式里没有表或视图",
+    "noMatch": "没有符合条件的对象",
+    "via": "通过 {{path}} 获得，这里不能去掉",
+    "viaAll": "已通过 ALL 授予，回收要回收 ALL"
+  },
+  "scopeTab": {
+    "global": "系统权限",
+    "database": "库级权限（{{name}}）",
+    "currentDb": "当前库",
+    "schema": "模式级权限",
+    "custom": "其他权限，例如 CREATE ANY TABLE",
+    "add": "添加",
+    "none": "这个数据库没有库级或系统级的授权"
+  },
+  "pending": {
+    "count": "{{n}} 项改动未提交",
+    "undo": "撤销",
+    "apply": "预览并应用",
+    "discardTitle": "放弃未提交的改动？",
+    "discard": "还有 {{n}} 项改动没有提交，切换后会丢掉。"
+  },
+  "batch": {
+    "title": "应用 {{n}} 项改动"
+  },
+  "newUser": {
+    "roles": "所属角色",
+    "preset": "常用权限",
+    "none": "不授予",
+    "read": "只读",
+    "write": "读写",
+    "sql": "将执行：",
+    "fillFirst": "填好名称和密码后显示要执行的语句"
+  },
+  "effectiveEmpty": "没有任何权限"
 }
