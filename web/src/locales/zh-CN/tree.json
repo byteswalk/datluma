@@ -70,7 +70,8 @@
     "newSqlServerSchema": "新建架构…",
     "dropDatabase": "删除数据库…",
     "dropSchema": "删除模式…",
-    "dropSqlServerSchema": "删除架构…"
+    "dropSqlServerSchema": "删除架构…",
+    "grantTo": "授权给…"
   },
   "duplicate": {
     "name": "{{name}} 副本",

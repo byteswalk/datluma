@@ -129,6 +129,27 @@ export function toggleRole(pending: Pending, member: PrincipalRef, role: Princip
   return next
 }
 
+export function memberKey(member: string): string {
+  return `member${member}`
+}
+
+/** 角色的"成员"页：把某个用户或角色加进这个角色，或移出。和 toggleRole 方向相反（这里 role 是当前选中的角色）。 */
+export function toggleMember(pending: Pending, role: PrincipalRef, member: Principal, isMember: boolean): Pending {
+  const next = new Map(pending)
+  const key = memberKey(member.id)
+  if (next.has(key)) next.delete(key)
+  else {
+    const ref: PrincipalRef = { name: member.name, host: member.host, kind: member.kind, level: member.level }
+    next.set(key, isMember ? { op: 'remove_role', member: ref, role } : { op: 'add_role', member: ref, role })
+  }
+  return next
+}
+
+/** 对象反查矩阵里的格子键：同一个对象上每个主体各一行，键里带上主体。 */
+export function principalCellKey(principal: string, privilege: string): string {
+  return `${principal}${privilege.trim().toUpperCase()}`
+}
+
 /** 回收先于授予：同一批里先去掉再加上，避免有的库报"已存在"之类的冲突。 */
 export function orderedChanges(pending: Pending): PrivChange[] {
   const rank = (c: PrivChange) => (c.op === 'revoke' || c.op === 'remove_role' ? 0 : 1)

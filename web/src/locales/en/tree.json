@@ -70,7 +70,8 @@
     "newSqlServerSchema": "New Schema…",
     "dropDatabase": "Drop Database…",
     "dropSchema": "Drop Schema…",
-    "dropSqlServerSchema": "Drop Schema…"
+    "dropSqlServerSchema": "Drop Schema…",
+    "grantTo": "Grant To…"
   },
   "duplicate": {
     "name": "{{name}} copy",

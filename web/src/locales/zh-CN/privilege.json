@@ -16,7 +16,8 @@
     "direct": "直接授权",
     "effective": "实际权限",
     "objects": "对象权限",
-    "scope": "库与系统权限"
+    "scope": "库与系统权限",
+    "members": "成员（{{n}}）"
   },
   "attr": {
     "name": "名称",
@@ -27,7 +28,8 @@
     "locked": "已锁定",
     "expires": "过期时间",
     "roles": "所属角色",
-    "builtin": "内置"
+    "builtin": "内置",
+    "defaultRole": "默认角色"
   },
   "yes": "是",
   "no": "否",
@@ -77,9 +79,10 @@
   "computed": "按字典计算的结果，不代表实际执行一定成功。",
   "partial": "读取范围不完整：{{detail}}",
   "object": {
-    "title": "谁能访问 {{target}}",
+    "title": "对象授权：{{target}}",
     "back": "返回列表",
-    "none": "没有读到访问者"
+    "none": "没有读到访问者",
+    "addPrincipal": "添加用户或角色"
   },
   "error": "读取失败：{{detail}}",
   "defaultRole": "默认",
@@ -174,5 +177,10 @@
     "sql": "将执行：",
     "fillFirst": "填好名称和密码后显示要执行的语句"
   },
-  "effectiveEmpty": "没有任何权限"
+  "effectiveEmpty": "没有任何权限",
+  "members": {
+    "add": "添加成员",
+    "none": "这个角色还没有成员",
+    "admin": "可管理该角色"
+  }
 }

@@ -1631,3 +1631,17 @@ body {
   border-radius: 6px;
   background: color-mix(in srgb, var(--text) 3%, transparent);
 }
+.priv-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+}
+.priv-member-adding {
+  background: color-mix(in srgb, #3aa757 12%, transparent);
+}
+.priv-member-removing .priv-item-name {
+  text-decoration: line-through;
+  opacity: 0.6;
+}

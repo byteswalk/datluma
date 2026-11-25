@@ -5,24 +5,25 @@
 // - 勾选、加减角色都先攒成待提交的改动，底部一次预览、执行（BatchDialog）；改密、锁定、删除仍是单项确认（ChangeDialog）。
 // 对象反查（从对象树"谁能访问"进来）时右侧列出访问者。
 
-import { Alert, App, Button, Checkbox, Dropdown, Empty, Input, Select, Spin, Table, Tabs, Tag, Tooltip } from 'antd'
+import { Alert, App, Button, Checkbox, Descriptions, Dropdown, Empty, Input, Select, Spin, Table, Tabs, Tag, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { IconArrowLeft, IconClockX, IconLock, IconPlus, IconRefresh, IconUserOff } from '@tabler/icons-react'
+import { IconClockX, IconLock, IconPlus, IconRefresh, IconUserOff } from '@tabler/icons-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { useApi } from '../../app/context'
-import { schemaLabel, splitCatalog } from '../../shared/api'
+import { splitCatalog } from '../../shared/api'
 import type { Coverage, EffectivePrivilege, Membership, Principal, PrivCaps, PrivCatalog, PrivChange, PrivNote } from '../../shared/api'
 import { type QueryTab, useTabs } from '../editor/tabs'
 import { BatchDialog } from './BatchDialog'
 import NewUserDialog from './NewUserDialog'
+import ObjectAccessMatrix from './ObjectAccess'
 import ObjectMatrix from './ObjectMatrix'
 import { ChangeDialog, CreateDialog, PasswordDialog } from './PrivilegeDialogs'
 import ScopePrivileges from './ScopePrivileges'
-import { groupAccess, hasCredentials, pathLabel, principalRef, targetLabel } from './logic'
-import { type Pending, directIndex, inheritedIndex, orderedChanges, roleKey, toggleRole } from './matrix'
+import { hasCredentials, pathLabel, principalRef, targetLabel } from './logic'
+import { type Pending, directIndex, inheritedIndex, memberKey, orderedChanges, roleKey, toggleMember, toggleRole } from './matrix'
 
 type FormKind = 'new_user' | 'new_role' | 'password'
 
@@ -68,6 +69,64 @@ function humanValue(v: string, yes: string, no: string): string {
   return v
 }
 
+/** 角色的成员：谁在这个角色里。移出、加入都先攒成待提交的改动。 */
+function RoleMembers({ role, members, principals, pending, onPending, write }: {
+  role: Principal
+  members: Membership[]
+  principals: Principal[]
+  pending: Pending
+  onPending: (p: Pending) => void
+  write: boolean
+}) {
+  const { t } = useTranslation()
+  const ref = principalRef(role)
+  const of = (id: string) => principals.find((p) => p.id === id)
+  const adding = principals.filter((p) => pending.get(memberKey(p.id))?.op === 'add_role')
+  const candidates = principals.filter(
+    (p) => p.id !== role.id && p.level === role.level && !members.some((m) => m.member === p.id) && !pending.has(memberKey(p.id)),
+  )
+  const row = (p: Principal | undefined, id: string, state: 'member' | 'removing' | 'adding', extra?: React.ReactNode) => (
+    <div key={id} className={`priv-member priv-member-${state}`}>
+      <span className="priv-item-name">
+        {state === 'adding' && '+ '}
+        {p?.name ?? id}
+        {p?.host && <span className="muted">@{p.host}</span>}
+        <span className="muted" style={{ marginLeft: 6 }}>{p ? t(`privilege.kindName.${p.kind}`) : ''}</span>
+        {extra}
+      </span>
+      {write && p && (
+        <a onClick={() => onPending(toggleMember(pending, ref, p, state !== 'adding'))}>
+          {state === 'member' ? t('privilege.action.removeRole') : t('privilege.pending.undo')}
+        </a>
+      )}
+    </div>
+  )
+  return (
+    <div style={{ paddingTop: 4, maxWidth: 560 }}>
+      {write && candidates.length > 0 && (
+        <Select
+          size="small"
+          showSearch
+          value={null}
+          placeholder={t('privilege.members.add')}
+          style={{ width: 220, marginBottom: 8 }}
+          optionFilterProp="label"
+          options={candidates.map((p) => ({ value: p.id, label: p.host ? `${p.name}@${p.host}` : p.name }))}
+          onChange={(id: string) => {
+            const p = of(id)
+            if (p) onPending(toggleMember(pending, ref, p, false))
+          }}
+        />
+      )}
+      {!members.length && !adding.length && <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('privilege.members.none')} />}
+      {members.map((m) =>
+        row(of(m.member), m.member, pending.has(memberKey(m.member)) ? 'removing' : 'member', m.admin_option ? <span className="muted"> · {t('privilege.members.admin')}</span> : null),
+      )}
+      {adding.map((p) => row(p, p.id, 'adding'))}
+    </div>
+  )
+}
+
 function PrincipalDetail({ tab, catalog, database, principal, principals, memberships, caps, privCatalog, pending, onPending, onForm, onChange }: {
   tab: QueryTab
   catalog: string | undefined
@@ -95,6 +154,7 @@ function PrincipalDetail({ tab, catalog, database, principal, principals, member
   const pathOf = (via: string[]) => pathLabel(via, principals)
   const nameOf = (id: string) => principals.find((p) => p.id === id)?.name ?? id
   const memberOf = memberships.filter((m) => m.member === principal.id)
+  const members = memberships.filter((m) => m.role === principal.id)
   const write = caps.write
   const yesNo = (v: boolean | null) => (v === null ? t('privilege.unknown') : v ? t('privilege.yes') : t('privilege.no'))
 
@@ -251,69 +311,54 @@ function PrincipalDetail({ tab, catalog, database, principal, principals, member
               </>
             ),
           },
+          ...(principal.kind === 'role'
+            ? [
+                {
+                  key: 'members',
+                  label: t('privilege.tab.members', { n: members.length }),
+                  children: (
+                    <RoleMembers
+                      role={principal}
+                      members={members}
+                      principals={principals}
+                      pending={pending}
+                      onPending={onPending}
+                      write={write}
+                    />
+                  ),
+                },
+              ]
+            : []),
           {
             key: 'attrs',
             label: t('privilege.tab.attrs'),
             children: (
-              <table className="kv">
-                <tbody>
-                  {rows.map(([k, v]) => (
-                    <tr key={k}><td className="muted" style={{ paddingRight: 24 }}>{k}</td><td>{v}</td></tr>
-                  ))}
-                  {caps.os_accounts && memberOf.map((m) => (
-                    <tr key={m.role}>
-                      <td className="muted" style={{ paddingRight: 24 }}>{nameOf(m.role)}</td>
-                      <td><a onClick={() => setDefault(m)}>{t(m.default_role ? 'privilege.action.clearDefault' : 'privilege.action.setDefault')}</a></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <>
+                <Descriptions size="small" bordered column={{ xs: 1, md: 2 }} items={rows.map(([k, v]) => ({ key: k, label: k, children: v }))} />
+                {caps.os_accounts && memberOf.length > 0 && (
+                  <Descriptions
+                    size="small"
+                    bordered
+                    column={1}
+                    style={{ marginTop: 12 }}
+                    title={t('privilege.attr.defaultRole')}
+                    items={memberOf.map((m) => ({
+                      key: m.role,
+                      label: nameOf(m.role),
+                      children: (
+                        <span>
+                          {m.default_role ? t('privilege.defaultRole') : '—'}{' '}
+                          {write && <a onClick={() => setDefault(m)}>{t(m.default_role ? 'privilege.action.clearDefault' : 'privilege.action.setDefault')}</a>}
+                        </span>
+                      ),
+                    }))}
+                  />
+                )}
+              </>
             ),
           },
         ]}
       />
-    </div>
-  )
-}
-
-function ObjectAccessPanel({ tab, principals, onPick }: { tab: QueryTab; principals: Principal[]; onPick: (id: string) => void }) {
-  const api = useApi()
-  const { t } = useTranslation()
-  const focus = tab.privileges!.focus!
-  const { catalog, schema } = splitCatalog(focus.schema)
-  const { data, error, isLoading } = useQuery({
-    queryKey: ['privileges', tab.profileId, catalog, 'object', focus.schema, focus.object],
-    queryFn: () => api.objectAccess(tab.profileId, schema, focus.object, catalog),
-  })
-  const groups = useMemo(() => groupAccess(data?.access ?? []), [data])
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, flex: 1 }}>
-      <div className="row" style={{ padding: '6px 12px', gap: 8 }}>
-        <Button size="small" type="text" icon={<IconArrowLeft size={14} />} onClick={() => useTabs.getState().setPrivilegesFocus(tab.id, undefined)}>
-          {t('privilege.object.back')}
-        </Button>
-        <strong>{t('privilege.object.title', { target: `${schemaLabel(focus.schema)}.${focus.object}` })}</strong>
-      </div>
-      <CoverageNote coverage={data?.coverage} />
-      <div className="muted" style={{ padding: '4px 12px' }}>{t('privilege.computed')}</div>
-      {error && <div className="err" style={{ padding: 12 }}>{t('privilege.error', { detail: (error as Error).message })}</div>}
-      <div style={{ flex: 1, overflow: 'auto', padding: '0 12px' }}>
-        {isLoading ? <Spin style={{ margin: 48 }} /> : !groups.length ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('privilege.object.none')} />
-        ) : (
-          groups.map((g) => (
-            <div key={g.principal} style={{ marginBottom: 12 }}>
-              <a onClick={() => onPick(g.principal)}>{principals.find((p) => p.id === g.principal)?.name ?? g.principal}</a>
-              {g.items.map((a, i) => (
-                <div key={i} className="muted" style={{ paddingLeft: 12 }}>
-                  {a.privilege.grant.privilege} · {t(`privilege.state.${a.privilege.state}`)} · {pathLabel(a.privilege.via, principals)}
-                  <Notes notes={a.privilege.notes} />
-                </div>
-              ))}
-            </div>
-          ))
-        )}
-      </div>
     </div>
   )
 }
@@ -449,8 +494,10 @@ export default function PrivilegesView({ tab }: { tab: QueryTab }) {
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <CoverageNote coverage={data?.coverage} />
         {error && <div className="err" style={{ padding: 12 }}>{t('privilege.error', { detail: (error as Error).message })}</div>}
-        {focus ? (
-          <ObjectAccessPanel tab={tab} principals={principals} onPick={pick} />
+        {focus && data ? (
+          <ObjectAccessMatrix tab={tab} principals={principals} caps={data.caps} privCatalog={data.catalog} coverage={data.coverage} onPick={pick} />
+        ) : focus ? (
+          <Spin style={{ margin: 48 }} />
         ) : current && data ? (
           <PrincipalDetail
             key={current.id}
@@ -470,7 +517,7 @@ export default function PrivilegesView({ tab }: { tab: QueryTab }) {
         ) : (
           <Empty style={{ marginTop: 64 }} image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('privilege.empty')} />
         )}
-        {pending.size > 0 && (
+        {!focus && pending.size > 0 && (
           <div className="priv-pending">
             <span>{t('privilege.pending.count', { n: pending.size })}</span>
             <span className="grow" />

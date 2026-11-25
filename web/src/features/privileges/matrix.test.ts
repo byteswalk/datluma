@@ -11,6 +11,7 @@ import {
   orderedChanges,
   toggleCell,
   toggleMany,
+  toggleMember,
   toggleRole,
   type Pending,
 } from './matrix'
@@ -70,5 +71,16 @@ describe('权限矩阵', () => {
     p = toggleCell(p, k('ORDERS', 'SELECT'), me, 'object', objectTarget('APP', 'ORDERS'), 'SELECT', direct, false)
     expect(orderedChanges(p).map((c) => c.op)).toEqual(['revoke', 'add_role'])
     expect(toggleRole(p, me, role, false).size).toBe(1)
+  })
+})
+
+describe('角色成员', () => {
+  it('加成员、移出成员都是以当前角色为 role 的改动，再点一次撤销', () => {
+    const role: PrincipalRef = { name: 'R', host: null, kind: 'role', level: 'server' }
+    const user: Principal = { id: 'u2', name: 'U2', host: null, kind: 'user', level: 'server', can_login: true, locked: false, expires_at: null, builtin: false, attrs: [] }
+    const add = toggleMember(new Map(), role, user, false)
+    expect([...add.values()][0]).toMatchObject({ op: 'add_role', member: { name: 'U2' }, role: { name: 'R' } })
+    expect(toggleMember(add, role, user, false).size).toBe(0)
+    expect([...toggleMember(new Map(), role, user, true).values()][0]).toMatchObject({ op: 'remove_role' })
   })
 })

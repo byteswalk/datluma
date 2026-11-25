@@ -104,6 +104,19 @@ struct Pool {
     idle: Mutex<Vec<(Box<dyn Connection>, Dialect)>>,
 }
 
+/// 在元数据连接上执行一条查询，取回全部行。
+async fn query(
+    conn: &mut dyn Connection,
+    q: &MetaQuery,
+    dialect: &Dialect,
+    key: MetaKey,
+    args: &MetaArgs,
+) -> Result<MetaRows> {
+    let mut stream = conn.execute(&q.sql, &q.params).await?;
+    let events = collect_all(stream.as_mut(), 1000).await?;
+    MetaRows::from_events(events).map(|r| dialect.adapt_rows(key, args, r))
+}
+
 pub struct MetadataService {
     registry: Arc<DriverRegistry>,
     credentials: Arc<dyn CredentialSource>,
@@ -197,7 +210,8 @@ impl MetadataService {
             .lock()
             .map_err(|_| Error::internal(msg!("internal.lock_poisoned", lock = "pool")))?
             .pop();
-        let (mut conn, dialect) = match idle {
+        let reused = idle.is_some();
+        let (mut conn, mut dialect) = match idle {
             Some(c) => c,
             None => {
                 let password = self.credentials.password(&profile.id).await?.unwrap_or_default();
@@ -211,13 +225,23 @@ impl MetadataService {
                 .push((conn, dialect));
             return Ok(None);
         };
-        let result = match conn.execute(&q.sql, &q.params).await {
-            Ok(mut stream) => match collect_all(stream.as_mut(), 1000).await {
-                Ok(events) => MetaRows::from_events(events).map(|r| dialect.adapt_rows(key, args, r)),
-                Err(e) => Err(e),
-            },
-            Err(e) => Err(e),
-        };
+        let mut result = query(conn.as_mut(), &q, &dialect, key, args).await;
+        // 数据库重启过：池里留着的连接都已断开。丢掉它们，新建一个连接再试一次，用户不用手动刷新
+        if reused && matches!(result, Err(Error::Connect { .. })) {
+            let _ = conn.close().await;
+            let stale: Vec<_> = pool
+                .idle
+                .lock()
+                .map_err(|_| Error::internal(msg!("internal.lock_poisoned", lock = "pool")))?
+                .drain(..)
+                .collect();
+            for (c, _) in stale {
+                let _ = c.close().await;
+            }
+            let password = self.credentials.password(&profile.id).await?.unwrap_or_default();
+            (conn, dialect) = self.registry.connect(profile, password).await?;
+            result = query(conn.as_mut(), &q, &dialect, key, args).await;
+        }
         match result {
             Ok(rows) => {
                 pool.idle
@@ -415,6 +439,32 @@ mod tests {
         c.put(("p".into(), MetaKey::Tables, args("SALES")), rows.clone());
         c.put(("q".into(), MetaKey::Tables, args("HR")), rows);
         c
+    }
+
+    #[tokio::test]
+    async fn a_dropped_pooled_connection_is_replaced_without_an_error() {
+        let (service, id, log, _dir) = crate::compare::tests::service();
+        let profile = service.profile(&id).unwrap();
+        let args = MetaArgs::default();
+        // 假驱动认得的查询，返回一个结果集
+        let query = |_: &Dialect| {
+            Ok(Some(MetaQuery {
+                key: MetaKey::Schemas,
+                sql: "SELECT current_schema()".into(),
+                params: vec![],
+            }))
+        };
+        service.metadata.run(&profile, MetaKey::Schemas, &args, query).await.unwrap();
+        // 数据库重启：池里的连接断开，缓存也清掉，下一次查询要走连接
+        log.lock().unwrap().push("restart".into());
+        service.metadata.cache().invalidate(&id, None);
+        service
+            .metadata
+            .run(&profile, MetaKey::Schemas, &args, query)
+            .await
+            .expect("应自动重连，不报连接断开");
+        let connects = log.lock().unwrap().iter().filter(|l| *l == "connect").count();
+        assert_eq!(connects, 2, "断开后只新建一个连接");
     }
 
     #[test]

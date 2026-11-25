@@ -16,7 +16,8 @@
     "direct": "Direct grants",
     "effective": "Effective privileges",
     "objects": "Object Privileges",
-    "scope": "Database & System"
+    "scope": "Database & System",
+    "members": "Members ({{n}})"
   },
   "attr": {
     "name": "Name",
@@ -27,7 +28,8 @@
     "locked": "Locked",
     "expires": "Expires",
     "roles": "Member of",
-    "builtin": "Built-in"
+    "builtin": "Built-in",
+    "defaultRole": "Default roles"
   },
   "yes": "Yes",
   "no": "No",
@@ -77,9 +79,10 @@
   "computed": "Computed from the data dictionary; execution may still differ.",
   "partial": "Incomplete results: {{detail}}",
   "object": {
-    "title": "Who can access {{target}}",
+    "title": "Privileges on {{target}}",
     "back": "Back to list",
-    "none": "No one found"
+    "none": "No one found",
+    "addPrincipal": "Add user or role"
   },
   "error": "Failed to read: {{detail}}",
   "defaultRole": "default",
@@ -174,5 +177,10 @@
     "sql": "Will run:",
     "fillFirst": "Fill in the name and password to see the statements"
   },
-  "effectiveEmpty": "No privileges"
+  "effectiveEmpty": "No privileges",
+  "members": {
+    "add": "Add member",
+    "none": "This role has no members",
+    "admin": "can administer the role"
+  }
 }

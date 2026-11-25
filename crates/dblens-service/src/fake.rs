@@ -78,15 +78,24 @@ impl Driver for FakeDriver {
 
 pub struct FakeConn {
     log: Log,
+    /// 建立时日志里已有几条 `restart`：之后再多出来，说明"服务器重启过"，这个连接已断开。
+    born: usize,
     schema: String,
     cancelled: Arc<AtomicBool>,
     wake: Arc<Notify>,
 }
 
+/// 日志里的 `restart` 条数：测试往日志里加一条就相当于数据库重启，之前建立的连接都会断开。
+fn restarts(log: &Log) -> usize {
+    log.lock().unwrap().iter().filter(|l| *l == "restart").count()
+}
+
 impl FakeConn {
     pub fn new(log: Log) -> Self {
+        let born = restarts(&log);
         Self {
             log,
+            born,
             schema: "public".into(),
             cancelled: Arc::new(AtomicBool::new(false)),
             wake: Arc::new(Notify::new()),
@@ -140,6 +149,9 @@ impl Connection for FakeConn {
         params: &'a [Value],
     ) -> Result<Box<dyn ExecStream + 'a>> {
         let sql = sql.trim();
+        if restarts(&self.log) > self.born {
+            return Err(Error::connect("连接已断开"));
+        }
         self.log.lock().unwrap().push(format!("execute {sql}"));
         // 导出只接受查询语句：`SELECT ROWS n`、`SELECT SLEEP`、`SELECT FAIL` 与去掉 SELECT 的语句相同
         let sql = sql

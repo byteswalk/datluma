@@ -672,7 +672,9 @@ export default function ObjectTree() {
       items.push({ key: 'gen-menu', label: t('tree.menu.generate'), children })
     }
     // SQLite 没有权限
-    if (target && driverOf(k.profileId) !== 'sqlite') items.push({ key: 'who-can-access', label: t('tree.menu.whoCanAccess') })
+    if (target && driverOf(k.profileId) !== 'sqlite') {
+      items.push({ key: 'grant-to', label: t('tree.menu.grantTo') }, { key: 'who-can-access', label: t('tree.menu.whoCanAccess') })
+    }
     return items.length ? [...items, { type: 'divider' }] : []
   }
 
@@ -704,7 +706,7 @@ export default function ObjectTree() {
       else if (key === 'srv:new-role') setPrincipalDialog({ profileId: k.profileId, action: { kind: 'create-role' } })
       else if (key === 'srv:open' && k.type === 'p') useTabs.getState().openPrivileges(k.profileId, t('privilege.title'), undefined, k.id)
       else if (key === 'srv:drop' && k.type === 'p') setPrincipalDialog({ profileId: k.profileId, action: { kind: 'drop', principalId: k.id } })
-      else if (key === 'who-can-access' && k.type === 'o') {
+      else if ((key === 'who-can-access' || key === 'grant-to') && k.type === 'o') {
         useTabs.getState().openPrivileges(k.profileId, t('privilege.title'), { schema: k.schema, object: k.name })
       }
       else if (key === 'design' && k.type === 'o') useTabs.getState().openDesign(k.profileId, { schema: k.schema, table: k.name })
