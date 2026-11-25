@@ -5,21 +5,21 @@
 **Goal:** 实现达梦（DM8，经 DPI）和 Oracle（经 `oracle` crate / ODPI-C）两个驱动。两者在运行时加载用户本机的客户端库，并通过与 MySQL/PG 相同的 9 项一致性测试。
 
 **Architecture:**
-- 两个底层客户端库都是同步阻塞接口。在 `dblens-driver` 中新增"阻塞适配器"：每个连接一个专用线程加命令通道，对外仍是异步的 `Connection`，结果集的状态全部保存在工作线程的栈上。
+- 两个底层客户端库都是同步阻塞接口。在 `datluma-driver` 中新增"阻塞适配器"：每个连接一个专用线程加命令通道，对外仍是异步的 `Connection`，结果集的状态全部保存在工作线程的栈上。
 - 新增"原生库查找"：按"设置中的目录 → 环境变量 → 常见安装位置"的顺序找到客户端库。找不到时返回 `DriverUnavailable`，并附上安装提示。
 - 达梦的 FFI 绑定用 bindgen 从官方头文件生成一次，然后提交到仓库；生成的代码通过 `libloading` 在运行时加载 `dmdpi`。
 - 达梦部分以一个**技术验证任务**开头，它是是否改走 ODBC 的决策点。
 
 **Tech Stack:** Rust 1.99、tokio、libloading 0.9、bindgen-cli 0.73（只在生成绑定时用）、oracle 0.6.3（chrono 特性）、chrono。
 
-**Spec:** `docs/superpowers/specs/2026-10-22-dblens-design.md`（第 5.1–5.3、8、9、12 节）。总览：`docs/superpowers/plans/2026-10-22-m0-overview.md`。
+**Spec:** `docs/superpowers/specs/2026-10-22-datluma-design.md`（第 5.1–5.3、8、9、12 节）。总览：`docs/superpowers/plans/2026-10-22-m0-overview.md`。
 
 ## Global Constraints
 
-- 沿用 M0-1 的全部约束：仓库根目录 `E:\VibeCoding\16数据库管理工具\dblens\`、Rust 1.99.0、edition 2024、依赖版本统一在工作区声明、错误一律转换为 `dblens_core::Error`、中文注释和文案、提交时附加 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`。
+- 沿用 M0-1 的全部约束：仓库根目录 `E:\VibeCoding\16数据库管理工具\datluma\`、Rust 1.99.0、edition 2024、依赖版本统一在工作区声明、错误一律转换为 `datluma_core::Error`、中文注释和文案、提交时附加 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`。
 - **客户端库一律在运行时加载，不在编译期链接**：没装达梦或 Oracle 客户端的机器也必须能编译、能启动；该驱动报 `DriverUnavailable` 即可。
 - **客户端库不随仓库分发**：仓库中不得提交任何 `dmdpi`、`oci` 等二进制文件。达梦头文件也不提交，只提交由它生成的 `ffi.rs`。
-- **集成测试使用的环境变量**：`DBLENS_TEST_DM_URL`（如 `dm://SYSDBA:密码@主机:5236`）、`DBLENS_TEST_ORACLE_URL`（如 `oracle://用户:密码@主机:1521/FREEPDB1`）。客户端库目录通过 URL 查询参数指定：达梦用 `dpi_lib_dir`，Oracle 用 `oracle_client_lib_dir`；没有指定时按查找顺序自动寻找。
+- **集成测试使用的环境变量**：`DATLUMA_TEST_DM_URL`（如 `dm://SYSDBA:密码@主机:5236`）、`DATLUMA_TEST_ORACLE_URL`（如 `oracle://用户:密码@主机:1521/FREEPDB1`）。客户端库目录通过 URL 查询参数指定：达梦用 `dpi_lib_dir`，Oracle 用 `oracle_client_lib_dir`；没有指定时按查找顺序自动寻找。
 - **完成标准**：Task 5（Oracle）和 Task 4（达梦）必须在真实数据库上跑通一致性测试，并且没有"跳过"；单元测试不能代替。
 - **前置条件**（执行到对应任务前由用户准备）：
   - Task 3：本机安装达梦客户端（提供 `DM_HOME/include/DPI.h`、`DPIext.h`、`DPItypes.h` 和 `DM_HOME/bin/dmdpi.dll`）；安装 LLVM，供 bindgen 使用（`winget install LLVM.LLVM`）；准备一个可连接的 DM8 测试库。
@@ -47,13 +47,13 @@
 
 ```
 Cargo.toml                                    增加 libloading、oracle 依赖
-crates/dblens-driver/
+crates/datluma-driver/
 ├── Cargo.toml                                tokio 改为常规依赖（sync 特性）
 ├── src/lib.rs                                导出 blocking、native 模块
 ├── src/blocking.rs                           阻塞适配器：BlockingConnection/BlockingExec → 异步 Connection
 ├── src/native.rs                             原生库查找：NativeLib、locate、locate_with
 └── tests/blocking.rs                         适配器测试（内存假驱动）
-crates/dblens-driver-dameng/
+crates/datluma-driver-dameng/
 ├── Cargo.toml
 ├── dpi/wrapper.h                             bindgen 输入（只 include 三个官方头文件）
 ├── dpi/README.md                             重新生成 ffi.rs 的命令
@@ -65,7 +65,7 @@ crates/dblens-driver-dameng/
 ├── src/conn.rs                               DmConnection（BlockingConnection）、DmExec（BlockingExec）
 ├── src/spike.rs                              技术验证测试（#[ignore]，手动运行）
 └── tests/conformance.rs
-crates/dblens-driver-oracle/
+crates/datluma-driver-oracle/
 ├── Cargo.toml
 ├── src/lib.rs                                OracleDriver、客户端初始化、连接串
 ├── src/conn.rs                               OracleConnection（BlockingConnection）、OraExec、DBMS_OUTPUT
@@ -78,12 +78,12 @@ docs/notes/dameng-dpi-spike.md                技术验证结论
 
 ---
 
-### Task 1: 阻塞适配器（`dblens-driver::blocking`）
+### Task 1: 阻塞适配器（`datluma-driver::blocking`）
 
 **Files:**
-- Modify: `Cargo.toml`（工作区依赖）、`crates/dblens-driver/Cargo.toml`、`crates/dblens-driver/src/lib.rs`
-- Create: `crates/dblens-driver/src/blocking.rs`
-- Test: `crates/dblens-driver/tests/blocking.rs`
+- Modify: `Cargo.toml`（工作区依赖）、`crates/datluma-driver/Cargo.toml`、`crates/datluma-driver/src/lib.rs`
+- Create: `crates/datluma-driver/src/blocking.rs`
+- Test: `crates/datluma-driver/tests/blocking.rs`
 
 **Interfaces:**
 - Consumes: M0-1 的 `Connection`、`ExecStream`、`ExecEvent`、`CancelHandle`、`ServerInfo`
@@ -100,14 +100,14 @@ libloading = "0.9.0"
 oracle = { version = "0.6.3", features = ["chrono"] }
 ```
 
-把 `crates/dblens-driver/Cargo.toml` 的 `[features]` 和 tokio 依赖改为：
+把 `crates/datluma-driver/Cargo.toml` 的 `[features]` 和 tokio 依赖改为：
 ```toml
 [features]
 conformance = []
 
 [dependencies]
 async-trait.workspace = true
-dblens-core.workspace = true
+datluma-core.workspace = true
 futures.workspace = true
 percent-encoding.workspace = true
 serde.workspace = true
@@ -118,7 +118,7 @@ url.workspace = true
 
 - [ ] **Step 2: 写失败的测试**
 
-`crates/dblens-driver/tests/blocking.rs`：
+`crates/datluma-driver/tests/blocking.rs`：
 ```rust
 //! 用内存假驱动验证阻塞适配器：专用线程、分批取数、错误传递、取消、提前丢弃执行流、事务命令转发。
 
@@ -126,9 +126,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use dblens_core::{Error, Result, Value};
-use dblens_driver::blocking::{BlockingConnection, BlockingExec, into_async};
-use dblens_driver::{CancelHandle, ColumnMeta, ExecEvent, ServerInfo, collect_all};
+use datluma_core::{Error, Result, Value};
+use datluma_driver::blocking::{BlockingConnection, BlockingExec, into_async};
+use datluma_driver::{CancelHandle, ColumnMeta, ExecEvent, ServerInfo, collect_all};
 
 struct Fake {
     log: Arc<Mutex<Vec<String>>>,
@@ -201,7 +201,7 @@ impl BlockingConnection for Fake {
     }
 }
 
-fn setup() -> (Box<dyn dblens_driver::Connection>, Arc<Mutex<Vec<String>>>) {
+fn setup() -> (Box<dyn datluma_driver::Connection>, Arc<Mutex<Vec<String>>>) {
     let log = Arc::new(Mutex::new(Vec::new()));
     let flag = Arc::new(AtomicBool::new(false));
     let cancel = {
@@ -214,7 +214,7 @@ fn setup() -> (Box<dyn dblens_driver::Connection>, Arc<Mutex<Vec<String>>>) {
             }
         })
     };
-    let conn = into_async(Fake { log: log.clone(), cancel_flag: flag }, cancel, "dblens-test-worker").unwrap();
+    let conn = into_async(Fake { log: log.clone(), cancel_flag: flag }, cancel, "datluma-test-worker").unwrap();
     (conn, log)
 }
 
@@ -227,7 +227,7 @@ async fn streams_rows_in_batches_on_worker_thread() {
         events.iter().filter_map(|e| if let ExecEvent::Rows(r) = e { Some(r.len()) } else { None }).collect();
     assert_eq!(sizes, vec![2, 2, 1]);
     assert_eq!(events.last(), Some(&ExecEvent::ResultEnd));
-    assert_eq!(log.lock().unwrap()[0], "dblens-test-worker:rows:5");
+    assert_eq!(log.lock().unwrap()[0], "datluma-test-worker:rows:5");
 }
 
 #[tokio::test]
@@ -285,7 +285,7 @@ async fn transaction_calls_are_forwarded() {
 }
 ```
 
-把 `crates/dblens-driver/src/lib.rs` 改为：
+把 `crates/datluma-driver/src/lib.rs` 改为：
 ```rust
 //! 驱动接口：所有数据库驱动都实现这里的 `Driver` / `Connection` / `ExecStream`。
 
@@ -304,16 +304,16 @@ pub use exec::{ColumnMeta, ExecEvent, ExecStream, collect_all};
 pub use params::{Capabilities, ConnectParams, DriverId, ServerInfo};
 pub use traits::{Connection, Driver};
 ```
-同时创建空文件 `crates/dblens-driver/src/native.rs`，内容只有一行 `//! 原生客户端库查找（Task 2 实现）。`，以便本任务能编译。
+同时创建空文件 `crates/datluma-driver/src/native.rs`，内容只有一行 `//! 原生客户端库查找（Task 2 实现）。`，以便本任务能编译。
 
 - [ ] **Step 3: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver --test blocking`
+Run: `cargo test -p datluma-driver --test blocking`
 Expected: 编译失败，提示 `blocking` 模块不存在（或找不到 `into_async`）。
 
 - [ ] **Step 4: 实现 `blocking.rs`**
 
-`crates/dblens-driver/src/blocking.rs`：
+`crates/datluma-driver/src/blocking.rs`：
 ```rust
 //! 把同步（阻塞）驱动包装成异步 `Connection`：每个连接一个专用线程，通过命令通道交互。
 //! 达梦（DPI）、Oracle（ODPI-C）以及以后的 JDBC 桥都用这个适配器。
@@ -323,7 +323,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use async_trait::async_trait;
-use dblens_core::{Error, Result, Value};
+use datluma_core::{Error, Result, Value};
 use tokio::sync::oneshot;
 
 use crate::{CancelHandle, Connection, ExecEvent, ExecStream, ServerInfo};
@@ -538,28 +538,28 @@ impl Drop for AsyncExec<'_> {
 
 - [ ] **Step 5: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-driver --all-features`
+Run: `cargo test -p datluma-driver --all-features`
 Expected: 新增的 5 个 blocking 测试 PASS；M0-1 原有测试仍然 PASS。
 
-Run: `cargo clippy -p dblens-driver --all-features --all-targets -- -D warnings`
+Run: `cargo clippy -p datluma-driver --all-features --all-targets -- -D warnings`
 Expected: 没有警告。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add Cargo.toml Cargo.lock crates/dblens-driver
+git add Cargo.toml Cargo.lock crates/datluma-driver
 git commit -m "feat(driver): 阻塞驱动适配器（专用线程 + 命令通道）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 2: 原生库查找（`dblens-driver::native`）
+### Task 2: 原生库查找（`datluma-driver::native`）
 
 **Files:**
-- Modify: `crates/dblens-driver/src/native.rs`
+- Modify: `crates/datluma-driver/src/native.rs`
 
 **Interfaces:**
-- Consumes: `dblens_core::Error`
+- Consumes: `datluma_core::Error`
 - Produces:
   - `pub enum NativeLib { OracleClient, DamengDpi }`，带 `pub fn file_name(self) -> &'static str`
   - `pub fn locate(lib: NativeLib, configured: Option<&Path>) -> Result<PathBuf>`（返回库**所在目录**）
@@ -568,7 +568,7 @@ git commit -m "feat(driver): 阻塞驱动适配器（专用线程 + 命令通道
 
 - [ ] **Step 1: 写失败的测试**
 
-把 `crates/dblens-driver/src/native.rs` 的内容替换为下面的测试模块（实现放在 Step 3 中，写在测试模块之前）：
+把 `crates/datluma-driver/src/native.rs` 的内容替换为下面的测试模块（实现放在 Step 3 中，写在测试模块之前）：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -576,7 +576,7 @@ mod tests {
     use std::fs;
 
     fn temp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("dblens-native-{}-{name}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("datluma-native-{}-{name}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         dir
@@ -657,7 +657,7 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver --lib native`
+Run: `cargo test -p datluma-driver --lib native`
 Expected: 编译失败，提示找不到 `NativeLib`、`locate_with` 等。
 
 - [ ] **Step 3: 实现**
@@ -670,7 +670,7 @@ Expected: 编译失败，提示找不到 `NativeLib`、`locate_with` 等。
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
-use dblens_core::{Error, Result};
+use datluma_core::{Error, Result};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NativeLib {
@@ -839,13 +839,13 @@ pub fn expand_common(patterns: &[&str]) -> Vec<PathBuf> {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-driver --lib native && cargo clippy -p dblens-driver --all-features --all-targets -- -D warnings`
+Run: `cargo test -p datluma-driver --lib native && cargo clippy -p datluma-driver --all-features --all-targets -- -D warnings`
 Expected: 5 个 native 测试 PASS，没有警告。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-driver
+git add crates/datluma-driver
 git commit -m "feat(driver): 原生客户端库查找（设置目录、环境变量、常见安装位置）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -854,8 +854,8 @@ git commit -m "feat(driver): 原生客户端库查找（设置目录、环境变
 ### Task 3: 达梦 DPI 绑定与技术验证（决策点）
 
 **Files:**
-- Create: `crates/dblens-driver-dameng/Cargo.toml`、`dpi/wrapper.h`、`dpi/README.md`
-- Create: `crates/dblens-driver-dameng/src/{lib.rs,ffi.rs,load.rs,handles.rs,spike.rs}`
+- Create: `crates/datluma-driver-dameng/Cargo.toml`、`dpi/wrapper.h`、`dpi/README.md`
+- Create: `crates/datluma-driver-dameng/src/{lib.rs,ffi.rs,load.rs,handles.rs,spike.rs}`
 - Create: `docs/notes/dameng-dpi-spike.md`
 
 **Interfaces:**
@@ -884,10 +884,10 @@ cargo install bindgen-cli --version 0.73.2 --locked
 
 - [ ] **Step 2: 创建 crate 骨架和 bindgen 输入**
 
-`crates/dblens-driver-dameng/Cargo.toml`：
+`crates/datluma-driver-dameng/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-driver-dameng"
+name = "datluma-driver-dameng"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -896,17 +896,17 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 chrono.workspace = true
-dblens-core.workspace = true
-dblens-driver.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
 libloading.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-dblens-driver = { workspace = true, features = ["conformance"] }
+datluma-driver = { workspace = true, features = ["conformance"] }
 tokio.workspace = true
 ```
 
-`crates/dblens-driver-dameng/dpi/wrapper.h`：
+`crates/datluma-driver-dameng/dpi/wrapper.h`：
 ```c
 /* bindgen 输入：只包含达梦官方 DPI 头文件。头文件本身不提交，来自 DM_HOME/include。 */
 #include "DPI.h"
@@ -914,7 +914,7 @@ tokio.workspace = true
 #include "DPItypes.h"
 ```
 
-`crates/dblens-driver-dameng/dpi/README.md`：
+`crates/datluma-driver-dameng/dpi/README.md`：
 ````markdown
 # 达梦 DPI 绑定
 
@@ -922,13 +922,13 @@ tokio.workspace = true
 达梦客户端升级、需要新的 DPI 函数时，按下面的命令重新生成（需要 LLVM 和 `cargo install bindgen-cli --version 0.73.2`）：
 
 ```bash
-bindgen crates/dblens-driver-dameng/dpi/wrapper.h \
+bindgen crates/datluma-driver-dameng/dpi/wrapper.h \
   --dynamic-loading DmDpi \
   --allowlist-function "dpi_.*" \
   --allowlist-var "DSQL_.*|PG_.*" \
   --no-layout-tests \
   --raw-line "#![allow(non_upper_case_globals, non_camel_case_types, non_snake_case, dead_code, clippy::all)]" \
-  -o crates/dblens-driver-dameng/src/ffi.rs \
+  -o crates/datluma-driver-dameng/src/ffi.rs \
   -- -I "$DM_HOME/include"
 ```
 
@@ -941,9 +941,9 @@ bindgen crates/dblens-driver-dameng/dpi/wrapper.h \
 
 检查生成结果：
 ```bash
-grep -c "pub unsafe fn dpi_" crates/dblens-driver-dameng/src/ffi.rs
-grep -E "pub struct DmDpi|pub unsafe fn (dpi_alloc_env|dpi_login|dpi_exec_direct|dpi_cancel|dpi_get_data|dpi_desc_column|dpi_get_diag_rec)\b" crates/dblens-driver-dameng/src/ffi.rs
-grep -E "pub const (DSQL_SUCCESS|DSQL_SUCCESS_WITH_INFO|DSQL_NO_DATA|DSQL_NULL_DATA|DSQL_HANDLE_DBC|DSQL_HANDLE_STMT|DSQL_ATTR_LOCAL_CODE|DSQL_ATTR_LOGIN_PORT|DSQL_ATTR_LOGIN_TIMEOUT|DSQL_ATTR_AUTOCOMMIT|PG_UTF8|DSQL_C_NCHAR|DSQL_C_BINARY|DSQL_PARAM_INPUT|DSQL_VARCHAR|DSQL_VARBINARY)\b" crates/dblens-driver-dameng/src/ffi.rs
+grep -c "pub unsafe fn dpi_" crates/datluma-driver-dameng/src/ffi.rs
+grep -E "pub struct DmDpi|pub unsafe fn (dpi_alloc_env|dpi_login|dpi_exec_direct|dpi_cancel|dpi_get_data|dpi_desc_column|dpi_get_diag_rec)\b" crates/datluma-driver-dameng/src/ffi.rs
+grep -E "pub const (DSQL_SUCCESS|DSQL_SUCCESS_WITH_INFO|DSQL_NO_DATA|DSQL_NULL_DATA|DSQL_HANDLE_DBC|DSQL_HANDLE_STMT|DSQL_ATTR_LOCAL_CODE|DSQL_ATTR_LOGIN_PORT|DSQL_ATTR_LOGIN_TIMEOUT|DSQL_ATTR_AUTOCOMMIT|PG_UTF8|DSQL_C_NCHAR|DSQL_C_BINARY|DSQL_PARAM_INPUT|DSQL_VARCHAR|DSQL_VARBINARY)\b" crates/datluma-driver-dameng/src/ffi.rs
 ```
 Expected: 函数数量 ≥ 100；`DmDpi` 结构体和列出的 7 个函数都存在；列出的 16 个常量都存在。
 
@@ -951,7 +951,7 @@ Expected: 函数数量 ≥ 100；`DmDpi` 结构体和列出的 7 个函数都存
 
 - [ ] **Step 4: 实现加载与句柄封装**
 
-`crates/dblens-driver-dameng/src/lib.rs`（本任务的临时版本，Task 4 再补充驱动本体）：
+`crates/datluma-driver-dameng/src/lib.rs`（本任务的临时版本，Task 4 再补充驱动本体）：
 ```rust
 //! 达梦驱动：通过 DPI（运行时加载 dmdpi）访问 DM8。
 
@@ -964,16 +964,16 @@ mod load;
 mod spike;
 ```
 
-`crates/dblens-driver-dameng/src/load.rs`：
+`crates/datluma-driver-dameng/src/load.rs`：
 ```rust
 //! 查找并加载 dmdpi。同一目录只加载一次，进程内共享。
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use dblens_core::{Error, Result};
-use dblens_driver::ConnectParams;
-use dblens_driver::native::{self, NativeLib};
+use datluma_core::{Error, Result};
+use datluma_driver::ConnectParams;
+use datluma_driver::native::{self, NativeLib};
 
 use crate::ffi::DmDpi;
 
@@ -1015,7 +1015,7 @@ fn open_library(path: &Path) -> Result<libloading::Library> {
 }
 ```
 
-`crates/dblens-driver-dameng/src/handles.rs`：
+`crates/datluma-driver-dameng/src/handles.rs`：
 ```rust
 //! DPI 句柄的 RAII 封装。头文件中的整数类型在不同版本间可能有差异，
 //! 因此传参一律用 `as _` 转换；输出参数的局部变量类型若与 ffi.rs 不一致，以 ffi.rs 为准调整。
@@ -1023,7 +1023,7 @@ fn open_library(path: &Path) -> Result<libloading::Library> {
 use std::ffi::CString;
 use std::sync::Arc;
 
-use dblens_core::{Error, Result};
+use datluma_core::{Error, Result};
 
 use crate::ffi::*;
 
@@ -1334,23 +1334,23 @@ impl Drop for Stmt<'_> {
 
 - [ ] **Step 5: 编写技术验证测试**
 
-`crates/dblens-driver-dameng/src/spike.rs`：
+`crates/datluma-driver-dameng/src/spike.rs`：
 ```rust
 //! 达梦 DPI 技术验证。手动运行：
-//! `cargo test -p dblens-driver-dameng spike -- --ignored --nocapture --test-threads=1`
-//! 需要环境变量 DBLENS_TEST_DM_URL。结论写入 docs/notes/dameng-dpi-spike.md。
+//! `cargo test -p datluma-driver-dameng spike -- --ignored --nocapture --test-threads=1`
+//! 需要环境变量 DATLUMA_TEST_DM_URL。结论写入 docs/notes/dameng-dpi-spike.md。
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use dblens_driver::ConnectParams;
+use datluma_driver::ConnectParams;
 
 use crate::ffi::*;
 use crate::handles::{Con, Env, Stmt, succeeded};
 use crate::load;
 
 fn connect() -> Con {
-    let url = std::env::var("DBLENS_TEST_DM_URL").expect("请设置 DBLENS_TEST_DM_URL");
+    let url = std::env::var("DATLUMA_TEST_DM_URL").expect("请设置 DATLUMA_TEST_DM_URL");
     let (_, p): (_, ConnectParams) = ConnectParams::from_url(&url).unwrap();
     let dpi = load::load(&p).expect("加载 dmdpi 失败");
     let env = Arc::new(Env::new(dpi).unwrap());
@@ -1372,12 +1372,12 @@ fn first_text(stmt: &Stmt<'_>) -> String {
 fn spike_1_connect_and_unicode() {
     let con = connect();
     let stmt = Stmt::new(&con).unwrap();
-    stmt.exec_direct("SELECT '数洞', 1, SYSDATE FROM DUAL").unwrap();
+    stmt.exec_direct("SELECT '数览', 1, SYSDATE FROM DUAL").unwrap();
     let n = stmt.num_columns().unwrap();
     for i in 1..=n {
         println!("列 {i}：{:?}", stmt.describe(i).unwrap());
     }
-    assert_eq!(first_text(&stmt), "数洞");
+    assert_eq!(first_text(&stmt), "数览");
     let v = Stmt::new(&con).unwrap();
     v.exec_direct("SELECT TOP 1 BANNER FROM V$VERSION").unwrap();
     println!("服务器版本：{}", first_text(&v));
@@ -1425,7 +1425,7 @@ fn spike_3_large_clob_preview() {
 fn spike_4_error_code_format() {
     let con = connect();
     let stmt = Stmt::new(&con).unwrap();
-    let err = stmt.exec_direct("SELECT * FROM dblens_no_such_table").unwrap_err();
+    let err = stmt.exec_direct("SELECT * FROM datluma_no_such_table").unwrap_err();
     println!("不存在的表：{err:?}");
     let bad = Stmt::new(&con).unwrap();
     println!("语法错误：{:?}", bad.exec_direct("SELEC 1").unwrap_err());
@@ -1435,8 +1435,8 @@ fn spike_4_error_code_format() {
 - [ ] **Step 6: 运行技术验证**
 
 ```powershell
-$env:DBLENS_TEST_DM_URL = "dm://用户:密码@主机:5236"
-cargo test -p dblens-driver-dameng spike -- --ignored --nocapture --test-threads=1
+$env:DATLUMA_TEST_DM_URL = "dm://用户:密码@主机:5236"
+cargo test -p datluma-driver-dameng spike -- --ignored --nocapture --test-threads=1
 ```
 Expected：
 - `spike_1`：能连接，中文能正确往返，打印出各列描述和服务器版本；
@@ -1475,7 +1475,7 @@ Expected：
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-driver-dameng docs/notes/dameng-dpi-spike.md
+git add crates/datluma-driver-dameng docs/notes/dameng-dpi-spike.md
 git commit -m "feat(dameng): DPI 绑定、句柄封装与技术验证" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1486,16 +1486,16 @@ git commit -m "feat(dameng): DPI 绑定、句柄封装与技术验证" -m "Co-Au
 ### Task 4: 达梦驱动
 
 **Files:**
-- Create: `crates/dblens-driver-dameng/src/types.rs`、`src/conn.rs`、`tests/conformance.rs`
-- Modify: `crates/dblens-driver-dameng/src/lib.rs`
+- Create: `crates/datluma-driver-dameng/src/types.rs`、`src/conn.rs`、`tests/conformance.rs`
+- Modify: `crates/datluma-driver-dameng/src/lib.rs`
 
 **Interfaces:**
 - Consumes: Task 1 的 `blocking::{BlockingConnection, BlockingExec, into_async}`；Task 3 的 `load`、`handles`、`ffi`
-- Produces: `dblens_driver_dameng::DmDriver`（实现 `Driver`，`id()` 为 `DriverId::Dameng`）
+- Produces: `datluma_driver_dameng::DmDriver`（实现 `Driver`，`id()` 为 `DriverId::Dameng`）
 
 - [ ] **Step 1: 写失败的单元测试（类型转换，不需要数据库）**
 
-`crates/dblens-driver-dameng/src/types.rs` 末尾：
+`crates/datluma-driver-dameng/src/types.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -1516,7 +1516,7 @@ mod tests {
             text_value(DmType::Timestamp, "2024-02-29 13:45:30.123456".into()),
             Value::DateTime(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap().and_hms_micro_opt(13, 45, 30, 123456).unwrap())
         );
-        assert_eq!(text_value(DmType::Char, "数洞".into()), Value::String("数洞".into()));
+        assert_eq!(text_value(DmType::Char, "数览".into()), Value::String("数览".into()));
         assert_eq!(text_value(DmType::Interval, "INTERVAL '1' DAY".into()), Value::Interval("INTERVAL '1' DAY".into()));
         // 解析失败时保留原文
         assert_eq!(text_value(DmType::Int, "abc".into()), Value::Other { type_name: "INT".into(), text: "abc".into() });
@@ -1553,7 +1553,7 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver-dameng --lib types`
+Run: `cargo test -p datluma-driver-dameng --lib types`
 Expected: 编译失败，提示找不到 `text_value`、`DmType`。
 
 - [ ] **Step 3: 实现 `types.rs`**
@@ -1564,7 +1564,7 @@ Expected: 编译失败，提示找不到 `text_value`、`DmType`。
 //! DPI 的 SQL 类型常量来自 ffi.rs，类型宽度不确定，统一按 i64 比较。
 
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
-use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value};
+use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value};
 
 use crate::ffi::*;
 
@@ -1764,18 +1764,18 @@ mod spike;
 
 - [ ] **Step 4: 运行单元测试，确认通过**
 
-Run: `cargo test -p dblens-driver-dameng --lib types`
+Run: `cargo test -p datluma-driver-dameng --lib types`
 Expected: 3 个测试 PASS。
 
 - [ ] **Step 5: 写失败的一致性测试**
 
-`crates/dblens-driver-dameng/tests/conformance.rs`：
+`crates/datluma-driver-dameng/tests/conformance.rs`：
 ```rust
 use chrono::{NaiveDate, NaiveTime};
-use dblens_core::Value;
-use dblens_driver::ConnectParams;
-use dblens_driver::conformance::Fixture;
-use dblens_driver_dameng::DmDriver;
+use datluma_core::Value;
+use datluma_driver::ConnectParams;
+use datluma_driver::conformance::Fixture;
+use datluma_driver_dameng::DmDriver;
 
 fn fixture(params: ConnectParams) -> Fixture {
     Fixture {
@@ -1791,14 +1791,14 @@ fn fixture(params: ConnectParams) -> Fixture {
         insert_with_params: |t| format!("INSERT INTO {t} (id, name) VALUES (?, ?)"),
         select_name_by_id: |t| format!("SELECT name FROM {t} WHERE id = ?"),
         count_rows: |t| format!("SELECT COUNT(*) FROM {t}"),
-        missing_table_query: "SELECT * FROM dblens_no_such_table",
+        missing_table_query: "SELECT * FROM datluma_no_such_table",
         type_cases: vec![
             ("SELECT NULL", Value::Null),
             ("SELECT CAST(42 AS INT)", Value::Int(42)),
             ("SELECT CAST(42 AS BIGINT)", Value::Int(42)),
             ("SELECT CAST(1.5 AS DOUBLE)", Value::Float(1.5)),
             ("SELECT CAST(123.45 AS DEC(10,4))", Value::Decimal("123.4500".into())),
-            ("SELECT '数洞'", Value::String("数洞".into())),
+            ("SELECT '数览'", Value::String("数览".into())),
             ("SELECT DATE '2024-02-29'", Value::Date(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap())),
             (
                 "SELECT TIMESTAMP '2024-02-29 13:45:30.123456'",
@@ -1812,15 +1812,15 @@ fn fixture(params: ConnectParams) -> Fixture {
     }
 }
 
-dblens_driver::conformance_tests!("DBLENS_TEST_DM_URL", fixture);
+datluma_driver::conformance_tests!("DATLUMA_TEST_DM_URL", fixture);
 ```
 
-Run: `cargo test -p dblens-driver-dameng --test conformance`
+Run: `cargo test -p datluma-driver-dameng --test conformance`
 Expected: 编译失败，提示找不到 `DmDriver`。
 
 - [ ] **Step 6: 实现 `conn.rs` 和驱动入口**
 
-`crates/dblens-driver-dameng/src/conn.rs`：
+`crates/datluma-driver-dameng/src/conn.rs`：
 ```rust
 //! 达梦连接（在专用线程上运行的同步实现）与执行流。
 
@@ -1828,9 +1828,9 @@ use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
-use dblens_core::{Error, Result, Row, Value};
-use dblens_driver::blocking::{BlockingConnection, BlockingExec};
-use dblens_driver::{CancelHandle, ColumnMeta, ExecEvent, ServerInfo};
+use datluma_core::{Error, Result, Row, Value};
+use datluma_driver::blocking::{BlockingConnection, BlockingExec};
+use datluma_driver::{CancelHandle, ColumnMeta, ExecEvent, ServerInfo};
 
 use crate::ffi::*;
 use crate::handles::{ColDesc, Con, Stmt, diag, succeeded};
@@ -2083,7 +2083,7 @@ impl BlockingConnection for DmConnection {
 }
 ```
 
-把 `crates/dblens-driver-dameng/src/lib.rs` 改为：
+把 `crates/datluma-driver-dameng/src/lib.rs` 改为：
 ```rust
 //! 达梦驱动：通过 DPI（运行时加载 dmdpi）访问 DM8。
 
@@ -2100,9 +2100,9 @@ mod spike;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dblens_core::{Error, Result};
-use dblens_driver::blocking::into_async;
-use dblens_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId};
+use datluma_core::{Error, Result};
+use datluma_driver::blocking::into_async;
+use datluma_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId};
 
 use crate::conn::DmConnection;
 use crate::ffi::*;
@@ -2149,7 +2149,7 @@ impl Driver for DmDriver {
             .await
             .map_err(|e| Error::internal(format!("连接任务异常退出：{e}")))??;
         let cancel = conn.cancel_handle();
-        into_async(conn, cancel, "dblens-dameng")
+        into_async(conn, cancel, "datluma-dameng")
     }
 }
 ```
@@ -2157,8 +2157,8 @@ impl Driver for DmDriver {
 - [ ] **Step 7: 运行一致性测试**
 
 ```powershell
-$env:DBLENS_TEST_DM_URL = "dm://用户:密码@主机:5236"
-cargo test -p dblens-driver-dameng --test conformance -- --nocapture --test-threads=1
+$env:DATLUMA_TEST_DM_URL = "dm://用户:密码@主机:5236"
+cargo test -p datluma-driver-dameng --test conformance -- --nocapture --test-threads=1
 ```
 Expected: 9 个测试全部 PASS，输出中没有"跳过"。
 
@@ -2169,16 +2169,16 @@ Expected: 9 个测试全部 PASS，输出中没有"跳过"。
 
 然后按并行方式连跑 3 次，确认稳定：
 ```powershell
-1..3 | ForEach-Object { cargo test -q -p dblens-driver-dameng --test conformance -- --nocapture 2>&1 | Select-String "test result|跳过|FAILED" }
+1..3 | ForEach-Object { cargo test -q -p datluma-driver-dameng --test conformance -- --nocapture 2>&1 | Select-String "test result|跳过|FAILED" }
 ```
 
 - [ ] **Step 8: clippy 与提交**
 
-Run: `cargo clippy -p dblens-driver-dameng --all-targets -- -D warnings`
+Run: `cargo clippy -p datluma-driver-dameng --all-targets -- -D warnings`
 Expected: 没有警告（`ffi.rs` 已整体放行 clippy）。
 
 ```bash
-git add crates/dblens-driver-dameng
+git add crates/datluma-driver-dameng
 git commit -m "feat(dameng): 达梦驱动（DPI、流式取数、取消、事务、LOB 预览）" -m "一致性测试 9 项已在真实 DM8 上通过。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2187,20 +2187,20 @@ git commit -m "feat(dameng): 达梦驱动（DPI、流式取数、取消、事务
 ### Task 5: Oracle 驱动
 
 **Files:**
-- Create: `crates/dblens-driver-oracle/Cargo.toml`
-- Create: `crates/dblens-driver-oracle/src/{lib.rs,conn.rs,value.rs,error.rs}`
-- Test: `crates/dblens-driver-oracle/tests/conformance.rs`
+- Create: `crates/datluma-driver-oracle/Cargo.toml`
+- Create: `crates/datluma-driver-oracle/src/{lib.rs,conn.rs,value.rs,error.rs}`
+- Test: `crates/datluma-driver-oracle/tests/conformance.rs`
 
 **Interfaces:**
 - Consumes: Task 1 的 `blocking`；Task 2 的 `native::locate`、`NativeLib::OracleClient`
-- Produces: `dblens_driver_oracle::OracleDriver`（实现 `Driver`，`id()` 为 `DriverId::Oracle`）
+- Produces: `datluma_driver_oracle::OracleDriver`（实现 `Driver`，`id()` 为 `DriverId::Oracle`）
 
 - [ ] **Step 1: 创建 crate 并写失败的单元测试**
 
-`crates/dblens-driver-oracle/Cargo.toml`：
+`crates/datluma-driver-oracle/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-driver-oracle"
+name = "datluma-driver-oracle"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -2209,17 +2209,17 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 chrono.workspace = true
-dblens-core.workspace = true
-dblens-driver.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
 oracle.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-dblens-driver = { workspace = true, features = ["conformance"] }
+datluma-driver = { workspace = true, features = ["conformance"] }
 tokio.workspace = true
 ```
 
-`crates/dblens-driver-oracle/src/lib.rs`（本步骤的临时版本）：
+`crates/datluma-driver-oracle/src/lib.rs`（本步骤的临时版本）：
 ```rust
 //! Oracle 驱动：基于 `oracle` crate（ODPI-C），运行时加载 Oracle Instant Client。
 
@@ -2227,7 +2227,7 @@ mod error;
 mod value;
 ```
 
-`crates/dblens-driver-oracle/src/value.rs` 末尾：
+`crates/datluma-driver-oracle/src/value.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -2251,14 +2251,14 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver-oracle --lib`
+Run: `cargo test -p datluma-driver-oracle --lib`
 Expected: 编译失败，提示找不到 `normalize_number`、`to_binds`。注意：首次编译 `oracle` crate 会用 MSVC 编译 ODPI-C 的 C 源码，耗时较长，这是正常的。
 
 - [ ] **Step 3: 实现 `error.rs` 和 `value.rs`**
 
-`crates/dblens-driver-oracle/src/error.rs`：
+`crates/datluma-driver-oracle/src/error.rs`：
 ```rust
-use dblens_core::Error;
+use datluma_core::Error;
 use oracle::ErrorKind;
 
 pub(crate) fn map_err(e: oracle::Error) -> Error {
@@ -2287,15 +2287,15 @@ pub(crate) fn map_err(e: oracle::Error) -> Error {
 }
 ```
 
-`crates/dblens-driver-oracle/src/value.rs`（测试模块之前）：
+`crates/datluma-driver-oracle/src/value.rs`（测试模块之前）：
 ```rust
 //! Oracle 列信息、值映射与参数绑定。
 
 use std::io::Read;
 
 use chrono::{DateTime, FixedOffset, NaiveDateTime};
-use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value};
-use dblens_driver::ColumnMeta;
+use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value};
+use datluma_driver::ColumnMeta;
 use oracle::sql_type::{Blob, Clob, Lob, OracleType, ToSql};
 use oracle::{ColumnInfo, SqlValue};
 
@@ -2417,18 +2417,18 @@ pub(crate) fn to_binds(params: &[Value]) -> Result<Vec<Box<dyn ToSql>>> {
 
 - [ ] **Step 4: 运行单元测试，确认通过**
 
-Run: `cargo test -p dblens-driver-oracle --lib`
+Run: `cargo test -p datluma-driver-oracle --lib`
 Expected: 2 个测试 PASS。
 
 - [ ] **Step 5: 写失败的一致性测试**
 
-`crates/dblens-driver-oracle/tests/conformance.rs`：
+`crates/datluma-driver-oracle/tests/conformance.rs`：
 ```rust
 use chrono::{FixedOffset, NaiveDate, TimeZone};
-use dblens_core::Value;
-use dblens_driver::conformance::Fixture;
-use dblens_driver::{ConnectParams, Driver, ExecEvent, collect_all};
-use dblens_driver_oracle::OracleDriver;
+use datluma_core::Value;
+use datluma_driver::conformance::Fixture;
+use datluma_driver::{ConnectParams, Driver, ExecEvent, collect_all};
+use datluma_driver_oracle::OracleDriver;
 
 fn fixture(params: ConnectParams) -> Fixture {
     Fixture {
@@ -2448,14 +2448,14 @@ fn fixture(params: ConnectParams) -> Fixture {
         insert_with_params: |t| format!("INSERT INTO {t} (id, name) VALUES (:1, :2)"),
         select_name_by_id: |t| format!("SELECT name FROM {t} WHERE id = :1"),
         count_rows: |t| format!("SELECT COUNT(*) FROM {t}"),
-        missing_table_query: "SELECT * FROM dblens_no_such_table",
+        missing_table_query: "SELECT * FROM datluma_no_such_table",
         type_cases: vec![
             ("SELECT NULL FROM DUAL", Value::Null),
             ("SELECT 42 FROM DUAL", Value::Decimal("42".into())),
             ("SELECT 123.45 FROM DUAL", Value::Decimal("123.45".into())),
             ("SELECT 0.5 FROM DUAL", Value::Decimal("0.5".into())),
             ("SELECT CAST(1.5 AS BINARY_DOUBLE) FROM DUAL", Value::Float(1.5)),
-            ("SELECT '数洞' FROM DUAL", Value::String("数洞".into())),
+            ("SELECT '数览' FROM DUAL", Value::String("数览".into())),
             (
                 "SELECT DATE '2024-02-29' FROM DUAL",
                 Value::DateTime(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap().and_hms_opt(0, 0, 0).unwrap()),
@@ -2476,46 +2476,46 @@ fn fixture(params: ConnectParams) -> Fixture {
     }
 }
 
-dblens_driver::conformance_tests!("DBLENS_TEST_ORACLE_URL", fixture);
+datluma_driver::conformance_tests!("DATLUMA_TEST_ORACLE_URL", fixture);
 
 /// PL/SQL 中 DBMS_OUTPUT 的输出应作为 Message 事件返回。
 #[tokio::test]
 async fn dbms_output_becomes_message() {
-    let Ok(url) = std::env::var("DBLENS_TEST_ORACLE_URL") else {
-        eprintln!("跳过：未设置环境变量 DBLENS_TEST_ORACLE_URL");
+    let Ok(url) = std::env::var("DATLUMA_TEST_ORACLE_URL") else {
+        eprintln!("跳过：未设置环境变量 DATLUMA_TEST_ORACLE_URL");
         return;
     };
     let (_, params) = ConnectParams::from_url(&url).unwrap();
     let mut conn = OracleDriver.connect(&params).await.unwrap();
     let mut stream = conn
-        .execute("BEGIN DBMS_OUTPUT.PUT_LINE('你好'); DBMS_OUTPUT.PUT_LINE('数洞'); END;", &[])
+        .execute("BEGIN DBMS_OUTPUT.PUT_LINE('你好'); DBMS_OUTPUT.PUT_LINE('数览'); END;", &[])
         .await
         .unwrap();
     let events = collect_all(stream.as_mut(), 100).await.unwrap();
     assert_eq!(
         events,
-        vec![ExecEvent::Message("你好".into()), ExecEvent::Message("数洞".into()), ExecEvent::Affected(1)]
+        vec![ExecEvent::Message("你好".into()), ExecEvent::Message("数览".into()), ExecEvent::Affected(1)]
     );
 }
 ```
 
 > 说明：PL/SQL 块执行后 `row_count()` 返回 1，这是 ODPI-C 的约定。如果实测为 0，把期望中的 `Affected(1)` 改为实测值，并在旁边写注释说明。
 
-Run: `cargo test -p dblens-driver-oracle --test conformance`
+Run: `cargo test -p datluma-driver-oracle --test conformance`
 Expected: 编译失败，提示找不到 `OracleDriver`。
 
 - [ ] **Step 6: 实现 `conn.rs` 和驱动入口**
 
-`crates/dblens-driver-oracle/src/conn.rs`：
+`crates/datluma-driver-oracle/src/conn.rs`：
 ```rust
 //! Oracle 连接（在专用线程上运行的同步实现）与执行流。
 
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use dblens_core::{Result, Row, Value};
-use dblens_driver::blocking::{BlockingConnection, BlockingExec};
-use dblens_driver::{ColumnMeta, ExecEvent, ServerInfo};
+use datluma_core::{Result, Row, Value};
+use datluma_driver::blocking::{BlockingConnection, BlockingExec};
+use datluma_driver::{ColumnMeta, ExecEvent, ServerInfo};
 use oracle::sql_type::{OracleType, ToSql};
 use oracle::{ResultSet, Row as OraRow};
 
@@ -2654,7 +2654,7 @@ impl BlockingConnection for OracleConnection {
 }
 ```
 
-把 `crates/dblens-driver-oracle/src/lib.rs` 改为：
+把 `crates/datluma-driver-oracle/src/lib.rs` 改为：
 ```rust
 //! Oracle 驱动：基于 `oracle` crate（ODPI-C），运行时加载 Oracle Instant Client。
 
@@ -2666,10 +2666,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use async_trait::async_trait;
-use dblens_core::{Error, Result};
-use dblens_driver::blocking::into_async;
-use dblens_driver::native::{self, NativeLib};
-use dblens_driver::{CancelHandle, Capabilities, ConnectParams, Connection, Driver, DriverId};
+use datluma_core::{Error, Result};
+use datluma_driver::blocking::into_async;
+use datluma_driver::native::{self, NativeLib};
+use datluma_driver::{CancelHandle, Capabilities, ConnectParams, Connection, Driver, DriverId};
 
 use crate::conn::OracleConnection;
 use crate::error::map_err;
@@ -2746,7 +2746,7 @@ impl Driver for OracleDriver {
                 }
             })
         };
-        into_async(OracleConnection::new(conn), cancel, "dblens-oracle")
+        into_async(OracleConnection::new(conn), cancel, "datluma-oracle")
     }
 }
 
@@ -2769,8 +2769,8 @@ mod tests {
 - [ ] **Step 7: 运行一致性测试**
 
 ```powershell
-$env:DBLENS_TEST_ORACLE_URL = "oracle://用户:密码@主机:1521/FREEPDB1?oracle_client_lib_dir=C:\oracle\instantclient_23_x"
-cargo test -p dblens-driver-oracle -- --nocapture --test-threads=1
+$env:DATLUMA_TEST_ORACLE_URL = "oracle://用户:密码@主机:1521/FREEPDB1?oracle_client_lib_dir=C:\oracle\instantclient_23_x"
+cargo test -p datluma-driver-oracle -- --nocapture --test-threads=1
 ```
 （如果 Instant Client 放在 `C:\oracle\instantclient_*` 这类常见位置，可以不写 `oracle_client_lib_dir`。）
 
@@ -2778,16 +2778,16 @@ Expected: 单元测试 3 个，一致性测试 9 个，`dbms_output_becomes_mess
 
 再按并行方式连跑 3 次，确认稳定：
 ```powershell
-1..3 | ForEach-Object { cargo test -q -p dblens-driver-oracle --test conformance -- --nocapture 2>&1 | Select-String "test result|跳过|FAILED" }
+1..3 | ForEach-Object { cargo test -q -p datluma-driver-oracle --test conformance -- --nocapture 2>&1 | Select-String "test result|跳过|FAILED" }
 ```
 
 - [ ] **Step 8: clippy 与提交**
 
-Run: `cargo clippy -p dblens-driver-oracle --all-targets -- -D warnings`
+Run: `cargo clippy -p datluma-driver-oracle --all-targets -- -D warnings`
 Expected: 没有警告。
 
 ```bash
-git add Cargo.lock crates/dblens-driver-oracle
+git add Cargo.lock crates/datluma-driver-oracle
 git commit -m "feat(oracle): Oracle 驱动（Instant Client 运行时加载、流式取数、取消、DBMS_OUTPUT、LOB 预览）" -m "一致性测试 9 项与 DBMS_OUTPUT 测试已在真实 Oracle 上通过。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2813,15 +2813,15 @@ git commit -m "feat(oracle): Oracle 驱动（Instant Client 运行时加载、�
       oracle:
         image: gvenzl/oracle-free:23-slim
         env:
-          ORACLE_PASSWORD: dblens
-          APP_USER: dblens
-          APP_USER_PASSWORD: dblens
+          ORACLE_PASSWORD: datluma
+          APP_USER: datluma
+          APP_USER_PASSWORD: datluma
         ports: ["1521:1521"]
         options: >-
           --health-cmd healthcheck.sh
           --health-interval 10s --health-timeout 5s --health-retries 30
     env:
-      DBLENS_TEST_ORACLE_URL: oracle://dblens:dblens@127.0.0.1:1521/FREEPDB1?oracle_client_lib_dir=/opt/oracle/instantclient
+      DATLUMA_TEST_ORACLE_URL: oracle://datluma:datluma@127.0.0.1:1521/FREEPDB1?oracle_client_lib_dir=/opt/oracle/instantclient
     steps:
       - uses: actions/checkout@v4
       - name: 安装 Oracle Instant Client
@@ -2835,7 +2835,7 @@ git commit -m "feat(oracle): Oracle 驱动（Instant Client 运行时加载、�
       - uses: Swatinem/rust-cache@v2
       - name: 运行 Oracle 一致性测试（不允许跳过）
         run: |
-          cargo test -p dblens-driver-oracle -- --nocapture 2>&1 | tee test.log
+          cargo test -p datluma-driver-oracle -- --nocapture 2>&1 | tee test.log
           if grep -q "跳过" test.log; then echo "有测试被跳过，环境变量未生效"; exit 1; fi
 ```
 
@@ -2845,11 +2845,11 @@ git commit -m "feat(oracle): Oracle 驱动（Instant Client 运行时加载、�
 
 在 README "集成测试数据库"一节的表格末尾追加两行，并在表格下方追加说明：
 ```markdown
-| `DBLENS_TEST_DM_URL` | `dm://SYSDBA:密码@127.0.0.1:5236` |
-| `DBLENS_TEST_ORACLE_URL` | `oracle://dblens:dblens@127.0.0.1:1521/FREEPDB1` |
+| `DATLUMA_TEST_DM_URL` | `dm://SYSDBA:密码@127.0.0.1:5236` |
+| `DATLUMA_TEST_ORACLE_URL` | `oracle://datluma:datluma@127.0.0.1:1521/FREEPDB1` |
 
 - 达梦和 Oracle 驱动在运行时加载本机的客户端库：达梦需要安装达梦客户端（dmdpi），Oracle 需要 Instant Client。库所在目录可以用 URL 参数 `dpi_lib_dir` / `oracle_client_lib_dir` 指定，不指定时会按 `DM_HOME` / `ORACLE_HOME`、PATH 和常见安装位置自动查找。
-- 达梦集成测试只能在本地运行（CI 中没有达梦镜像）；达梦 DPI 技术验证：`cargo test -p dblens-driver-dameng spike -- --ignored --nocapture --test-threads=1`。
+- 达梦集成测试只能在本地运行（CI 中没有达梦镜像）；达梦 DPI 技术验证：`cargo test -p datluma-driver-dameng spike -- --ignored --nocapture --test-threads=1`。
 ```
 
 - [ ] **Step 3: 更新总览**

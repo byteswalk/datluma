@@ -8,7 +8,7 @@ import { TOKEN_IN_HASH, bootstrapToken } from './shared/token'
 
 const token = bootstrapToken(window as unknown as Parameters<typeof bootstrapToken>[0])
 
-// 页面已打开时再打开新的链接（如 dblens-server 重启后的新令牌），只有 # 后面变了，浏览器不会重新加载页面
+// 页面已打开时再打开新的链接（如 datluma-server 重启后的新令牌），只有 # 后面变了，浏览器不会重新加载页面
 window.addEventListener('hashchange', () => {
   if (TOKEN_IN_HASH.test(window.location.hash)) window.location.reload()
 })

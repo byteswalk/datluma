@@ -1,6 +1,6 @@
-# DBLens 审计版（授权审批服务端）
+# DATLUMA 审计版（授权审批服务端）
 
-日期：2026-10-31，2026-11-01 改架构（控制面改用 Spring Boot）。状态：待用户审阅。上级设计：总设计 `2026-10-22-dblens-design.md`（7.7 节执行策略）；相关：M7 规范检查、M9 账号权限；调研：`docs/research/reports/数据库工具竞品与差异化.md`。里程碑编号 G0–G5 暂定。
+日期：2026-10-31，2026-11-01 改架构（控制面改用 Spring Boot）。状态：待用户审阅。上级设计：总设计 `2026-10-22-datluma-design.md`（7.7 节执行策略）；相关：M7 规范检查、M9 账号权限；调研：`docs/research/reports/数据库工具竞品与差异化.md`。里程碑编号 G0–G5 暂定。
 
 **2026-11-02 更新。** 用户体验后调整了定位、角色和审批规则，下面这些以新决定为准，正文保留原始设计：
 
@@ -14,9 +14,9 @@
 
 ## 1. 目标与范围
 
-把 DBLens 分成两版：
+把 DATLUMA 分成两版：
 
-- **单机版**：现有产品，桌面和本机浏览器，继续在公开仓库 `byteswalk/dblens`。
+- **单机版**：现有产品，桌面和本机浏览器，继续在公开仓库 `byteswalk/datluma`。
 - **审计版**：面向政企的服务端，所有受控数据库操作经它执行。关键指令分级，按可配置的多级审批放行，全过程留痕并防篡改，提供统计分析，可对接客户单点登录，也有内置的用户和权限能力。
 
 本设计取代总设计和 M9 第 11 节所说的“团队版”。M9 把团队版的前提写成“付费意愿假设得到验证”，2026-10-31 用户决定直接开始设计。
@@ -78,7 +78,7 @@ Spring Boot 控制面（私有仓库，可多实例，对外唯一入口）
 Rust 执行引擎（每个控制面实例一个，子进程）
  ├ 内部接口：工作台代理入口、语句分析、工单执行
  ├ 回调实现：Policy、CredentialSource、ProfileSource
- └ 复用：dblens-service / -api / -dialect / -driver / -driver-* / -lint
+ └ 复用：datluma-service / -api / -dialect / -driver / -driver-* / -lint
    │
 目标数据库（凭据只在内存中短暂存在）
 ```
@@ -115,7 +115,7 @@ Rust 执行引擎（每个控制面实例一个，子进程）
 - `ProfileSource`：连接配置的来源。
 - 执行收口：全部路径走同一入口，增加架构测试（如禁止入口外直接调用 `registry.connect` 后执行）。
 - 所有者：会话、任务、导出、上传记录归属，取用时校验。
-- `dblens-api` 路由可组合，鉴权中间件可替换。
+- `datluma-api` 路由可组合，鉴权中间件可替换。
 - `web/` 作为包可引用，导出入口和能力开关。
 
 这些扩展点由私有仓库的 `engine/` 使用。
@@ -150,9 +150,9 @@ Rust 执行引擎（每个控制面实例一个，子进程）
 ### 3.5 仓库结构
 
 ```
-dblens-gate/
+datluma-gate/
  ├ control/    Spring Boot 控制面
- ├ engine/     Rust 引擎，path 依赖 ../dblens 的 crate
+ ├ engine/     Rust 引擎，path 依赖 ../datluma 的 crate
  ├ web-gate/   管理台前端，构建后打进 jar
  └ docs/
 ```

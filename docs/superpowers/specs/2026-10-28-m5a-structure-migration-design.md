@@ -1,6 +1,6 @@
 # M5a 结构迁移 设计
 
-日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-dblens-design.md` 第 11 节（M5 迁移："选择源和目标 → 按逻辑类型映射结构，生成目标 DDL，可人工调整 → 分批迁移数据（断点续传、进度、行数校验） → 最后建索引和约束"）；
+日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-datluma-design.md` 第 11 节（M5 迁移："选择源和目标 → 按逻辑类型映射结构，生成目标 DDL，可人工调整 → 分批迁移数据（断点续传、进度、行数校验） → 最后建索引和约束"）；
 M3 设计 `docs/superpowers/specs/2026-10-27-m3-table-designer-design.md`（按方言生成 DDL）；M4a 设计 `docs/superpowers/specs/2026-10-27-m4a-model-compare-design.md`（比对、同步脚本的执行，跨家族留给 M5）。
 
 ## 1. 目标与范围
@@ -36,11 +36,11 @@ M5a 做：
 
 ## 3. 结构
 
-### 3.1 方言层 `dblens-dialect::migrate`（纯逻辑，不做 IO）
+### 3.1 方言层 `datluma-dialect::migrate`（纯逻辑，不做 IO）
 
 输入：源方言、目标方言（含变体、兼容模式、版本）、源 schema 的表和序列、映射设置（`MigrationPlan` 中的选项、类型规则、覆盖）。
 输出 `MigrationDraft`：
-- 目标表和序列（`dblens_core::schema` 的结构，类型为目标原生类型）；
+- 目标表和序列（`datluma_core::schema` 的结构，类型为目标原生类型）；
 - 逐项提示 `MigrationNote { object, column?, level, message }`，`level` 为 等价 `Info` / 有损 `Lossy` / 不支持 `Unsupported`；
 - 两步的 DDL：第一步建序列、建表（列、主键、注释）；第二步建索引、唯一约束、检查约束、外键（外键最后）。每条语句带所属对象，便于报告和出错时跳过。
 

@@ -4,7 +4,7 @@
 
 ## 测试库
 
-VM .106 上每个版本一个容器，都有 PG 兼容库 `dblens_test`、A 兼容库 `dblens_test_a`，以及只存 SHA256 密码的账号 `admin_sha` 和它的库 `dblens_test_sha`。远程认证都是 sha256。
+VM .106 上每个版本一个容器，都有 PG 兼容库 `datluma_test`、A 兼容库 `datluma_test_a`，以及只存 SHA256 密码的账号 `admin_sha` 和它的库 `datluma_test_sha`。远程认证都是 sha256。
 
 | 版本 | 容器 | 端口 | 安装方式 |
 |---|---|---|---|
@@ -15,8 +15,8 @@ VM .106 上每个版本一个容器，都有 PG 兼容库 `dblens_test`、A 兼�
 - 轻量版安装包来自 `opengauss.obs.cn-south-1.myhuaweicloud.com/<版本>/openEuler20.03/x86/`，已核对 sha256。
 - 轻量版依赖 `libatomic`、`openblas`，RC1 镜像里没有，要先在容器里 `dnf install`。
 - 5.0 的轻量包命名不同，没找到，所以用镜像；Docker Hub 和 daocloud 镜像站都拉不到 6.0、7.0 的镜像。
-- 本机连接串是 `DBLENS_TEST_OG{7,6,5}_URL`、`_A_URL`、`_SHA_URL`。跑测试时赋给 `DBLENS_TEST_OPENGAUSS_URL`、`_A_URL`、`_SHA_URL`。
-- 2026-11-04 验证完后为腾磁盘删了 `og5`、`og6` 和旧的 7.0.0-RC1 容器（`opengauss`，端口 5433），只留 `og7`。默认的 `DBLENS_TEST_OPENGAUSS_URL` 等改指 og7（5434）。要重测 5.0、6.0 时按上表重装：6.0.6 的安装包还在 VM 的 `/var/tmp/og-pkg`。
+- 本机连接串是 `DATLUMA_TEST_OG{7,6,5}_URL`、`_A_URL`、`_SHA_URL`。跑测试时赋给 `DATLUMA_TEST_OPENGAUSS_URL`、`_A_URL`、`_SHA_URL`。
+- 2026-11-04 验证完后为腾磁盘删了 `og5`、`og6` 和旧的 7.0.0-RC1 容器（`opengauss`，端口 5433），只留 `og7`。默认的 `DATLUMA_TEST_OPENGAUSS_URL` 等改指 og7（5434）。要重测 5.0、6.0 时按上表重装：6.0.6 的安装包还在 VM 的 `/var/tmp/og-pkg`。
 
 ## 改了什么
 

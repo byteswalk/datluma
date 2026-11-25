@@ -5,10 +5,10 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/privilege/change.rs   按方言生成语句；PrivStatement 的 sql 只用于执行，masked 用于显示和落盘
-crates/dblens-dialect/src/privilege/redact.rs   历史的尽力脱敏，不依赖 SQL 解析器
-crates/dblens-service/src/privilege.rs          privilege_preview、privilege_apply：逐条执行，失败即停
-crates/dblens-api/src/privileges.rs             POST /profiles/{id}/privileges/preview、/apply
+crates/datluma-dialect/src/privilege/change.rs   按方言生成语句；PrivStatement 的 sql 只用于执行，masked 用于显示和落盘
+crates/datluma-dialect/src/privilege/redact.rs   历史的尽力脱敏，不依赖 SQL 解析器
+crates/datluma-service/src/privilege.rs          privilege_preview、privilege_apply：逐条执行，失败即停
+crates/datluma-api/src/privileges.rs             POST /profiles/{id}/privileges/preview、/apply
 web/src/features/privileges/PrivilegeDialogs.tsx  表单和统一的确认对话框
 ```
 

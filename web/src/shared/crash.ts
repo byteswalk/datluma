@@ -1,5 +1,5 @@
 // 前端错误写进后端日志：界面崩溃、未捕获的异常和 Promise 拒绝。
-// 日志文件在数据目录的 logs 下（浏览器模式打印到 dblens-server 的控制台）。
+// 日志文件在数据目录的 logs 下（浏览器模式打印到 datluma-server 的控制台）。
 
 export interface ClientError {
   kind: 'render' | 'error' | 'rejection'

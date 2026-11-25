@@ -14,7 +14,7 @@ import { contextOf, pathOf } from './provider'
 import { sqlClient } from './service'
 import { NO_SYNTAX, SYNTAX_KEY, type SyntaxState, syntaxEnabled, useSyntax } from './syntax'
 
-const OWNER = 'dblens-syntax'
+const OWNER = 'datluma-syntax'
 export const DEBOUNCE_MS = 400
 export const MAX_CHARS = 1_000_000
 const MAX_TIMEOUTS = 3

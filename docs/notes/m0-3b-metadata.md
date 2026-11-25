@@ -1,6 +1,6 @@
 # 元数据查询：各家族的实现要点
 
-M0-3b 的元数据查询模板在 `crates/dblens-dialect/sql/` 下，每个家族一个文件，兼容库可以另有覆盖文件（目前只有 `mariadb.sql`）。每个查询都返回同一套规范化的列，由 `meta::assemble` 统一组装成结构模型。
+M0-3b 的元数据查询模板在 `crates/datluma-dialect/sql/` 下，每个家族一个文件，兼容库可以另有覆盖文件（目前只有 `mariadb.sql`）。每个查询都返回同一套规范化的列，由 `meta::assemble` 统一组装成结构模型。
 
 本文记录写模板时在真实数据库上确认的事实和取舍。实测版本：MySQL 9.7.4、MariaDB 12.3.3、PostgreSQL 18.6、Oracle 23ai Free（23.26.3）、DM8（V8，DB Version 0x7000d）。
 
@@ -111,4 +111,4 @@ M0-3b 的元数据查询模板在 `crates/dblens-dialect/sql/` 下，每个家�
   - dmdpi 的 DLL 初始化例程在持有加载器锁的情况下调用 `getaddrinfo`，等待 Winsock 的目录锁；
   - 另一个线程正在第一次创建 socket，持有 Winsock 的目录锁，等待加载器锁以加载协议提供程序 DLL。
 - **修复：** 加载 dmdpi 之前，先在本线程初始化 Winsock，见 `load.rs` 的 `warm_up_winsock`。
-- **回归测试：** `crates/dblens-driver-dameng/tests/concurrent_load.rs`。
+- **回归测试：** `crates/datluma-driver-dameng/tests/concurrent_load.rs`。

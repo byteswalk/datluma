@@ -218,7 +218,7 @@ where
     /// acknowledging DONE token (with the `DONE_ATTN` status bit set) is
     /// received, per MS-TDS section 2.2.1.6. Returns that DONE token so the
     /// connection is left clean and ready for reuse.
-    // DBLens 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
+    // DATLUMA 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
     #[allow(dead_code)]
     pub(crate) async fn flush_done_attention(self) -> crate::Result<TokenDone> {
         let mut stream = self.try_unfold();

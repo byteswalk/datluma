@@ -2,7 +2,7 @@
 
 覆盖计划（`docs/superpowers/specs/2026-11-02-db-coverage-plan.md`）的第五项。华为云下载页现在只提供混合云开发者版（集中式），用户确认后按它适配。分布式版和 DWS 没有免费安装包，不做。
 
-测试库：VM .106 的容器 `gaussdb-dev`（Ubuntu 22.04，内核 507.0.T1），端口 8000，用户 `admin`。库 `dblens_test` 是 A 模式，`dblens_test_pg` 是 PG 模式。连接串 `DBLENS_TEST_GAUSSDB_URL`、`DBLENS_TEST_GAUSSDB_PG_URL` 在本机 `~/.dblens-test`。跑测试时把 A 模式的赋给 `DBLENS_TEST_OPENGAUSS_A_URL`，PG 模式的赋给 `DBLENS_TEST_OPENGAUSS_URL`：GaussDB 和 openGauss 用同一份查询，测试也共用。
+测试库：VM .106 的容器 `gaussdb-dev`（Ubuntu 22.04，内核 507.0.T1），端口 8000，用户 `admin`。库 `datluma_test` 是 A 模式，`datluma_test_pg` 是 PG 模式。连接串 `DATLUMA_TEST_GAUSSDB_URL`、`DATLUMA_TEST_GAUSSDB_PG_URL` 在本机 `~/.datluma-test`。跑测试时把 A 模式的赋给 `DATLUMA_TEST_OPENGAUSS_A_URL`，PG 模式的赋给 `DATLUMA_TEST_OPENGAUSS_URL`：GaussDB 和 openGauss 用同一份查询，测试也共用。
 
 容器起来后要手动启动数据库：用户 `omm`，`gs_ctl start -D /opt/gs/data`（`GAUSSHOME=/opt/gs/app`，`LD_LIBRARY_PATH` 指向它的 `lib`）。
 

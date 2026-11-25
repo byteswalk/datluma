@@ -4,7 +4,7 @@
 
 **Goal:** 在数据标签中编辑表的数据（改单元格、新增、复制、删除行、从 Excel 粘贴），改动暂存，预览后在一个事务里提交，能发现并发修改。
 
-**Architecture:** 前端把暂存的改动转成改动集交给后端；`dblens-dialect` 按方言生成带占位符的 DML（同时给出字面量形式的预览）；会话在空闲时开事务逐条执行，检查影响行数，失败整体回滚并返回失败的改动序号。前端用 Glide Data Grid 的编辑和粘贴事件，编辑状态是纯函数，单独测试。
+**Architecture:** 前端把暂存的改动转成改动集交给后端；`datluma-dialect` 按方言生成带占位符的 DML（同时给出字面量形式的预览）；会话在空闲时开事务逐条执行，检查影响行数，失败整体回滚并返回失败的改动序号。前端用 Glide Data Grid 的编辑和粘贴事件，编辑状态是纯函数，单独测试。
 
 **Tech Stack:** Rust（axum、tokio）；React 19 + TypeScript、antd 6、Glide Data Grid、zustand、@tanstack/react-query 5、Vitest。
 
@@ -18,7 +18,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级；本里程碑不引入新依赖。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -35,10 +35,10 @@
 ## 文件结构
 
 ```text
-crates/dblens-dialect/src/changes.rs; src/lib.rs              改动集与 DML 生成（新增）
-crates/dblens-core/locales/app.json                          后端词条
-crates/dblens-service/src/{session.rs, changes.rs, fake.rs, lib.rs}; tests/live.rs   事务执行、Service 入口、实库测试
-crates/dblens-api/src/{routes.rs, lib.rs}; tests/api.rs       接口
+crates/datluma-dialect/src/changes.rs; src/lib.rs              改动集与 DML 生成（新增）
+crates/datluma-core/locales/app.json                          后端词条
+crates/datluma-service/src/{session.rs, changes.rs, fake.rs, lib.rs}; tests/live.rs   事务执行、Service 入口、实库测试
+crates/datluma-api/src/{routes.rs, lib.rs}; tests/api.rs       接口
 docs/notes/m0-4b-api.md                                       接口说明
 web/src/shared/api.ts                                         接口客户端与类型
 web/src/features/data/{parse.ts, edit.ts, editable.ts, editStore.ts}   纯逻辑与编辑状态（新增）
@@ -74,7 +74,7 @@ Expected：输出中没有"查询失败"。2026-10-26 写计划时：共 77 个�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -96,7 +96,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 ### Task 2: 方言：改动集与 DML 生成
 
-`dblens-dialect/src/changes.rs`：
+`datluma-dialect/src/changes.rs`：
 - `RowChange`（`update` / `insert` / `delete`，值为 `Value`，按列名）；
 - `row_key(table)`：主键，没有时取第一个所有列都 NOT NULL 的唯一键；
 - `Dialect::change_statements(schema, table, changes)`：每个改动一条语句，同时给出带占位符的 SQL 和参数（执行用）与值写成字面量的 SQL（预览用）。
@@ -110,26 +110,26 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 后端词条加 `changes.no_key`、`changes.bad_key`、`changes.unknown_column`、`changes.generated_column`、`changes.empty_update`。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-dialect/src/changes.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-dialect/src/changes.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
 
 **Interfaces:**
-- Produces（`dblens_dialect`）：
+- Produces（`datluma_dialect`）：
   - `RowChange::{Update { key, original, values }, Insert { values }, Delete { key }}`，字段为 `BTreeMap<String, Value>`，serde 按 `kind`（snake_case）区分；
   - `ChangeStatement { index: usize, sql: String, params: Vec<Value>（不序列化）, preview: String }`；
   - `row_key(&Table) -> Option<Vec<&Column>>`；
   - `Dialect::change_statements(&self, schema: &str, table: &Table, changes: &[RowChange]) -> Result<Vec<ChangeStatement>>`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -8,6 +8,11 @@
    "api.setting_too_large": {"zh-CN": "设置项 %{key} 的值超过 64 KiB", "en": "The value of setting %{key} exceeds 64 KiB"},
    "api.still_running": {"zh-CN": "上一段 SQL 还没有执行完", "en": "The previous SQL has not finished yet"},
-   "app.name": {"zh-CN": "DBLens 数洞", "en": "DBLens"},
+   "app.name": {"zh-CN": "DATLUMA 数览", "en": "DATLUMA"},
 +  "changes.bad_key": {"zh-CN": "改动的行标识与表 %{table} 的主键（或唯一键）不一致", "en": "The row identity of a change does not match the primary (or unique) key of table %{table}"},
 +  "changes.empty_update": {"zh-CN": "修改中没有改动的列", "en": "An update has no changed columns"},
 +  "changes.generated_column": {"zh-CN": "列 %{column} 是生成列，不能写入", "en": "Column %{column} is generated and cannot be written"},
@@ -140,7 +140,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
    "desktop.bind_failed": {"zh-CN": "无法监听本机端口：%{error}", "en": "Cannot listen on a local port: %{error}"},
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-dialect/src/changes.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-dialect/src/changes.rs`**
 
 ```rust
 //! 表数据编辑的改动集（M2a 设计文档第 3、4 节）：由前端暂存的修改、新增、删除生成 DML。
@@ -148,8 +148,8 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 use std::collections::BTreeMap;
 
-use dblens_core::schema::{Column, Table};
-use dblens_core::{Error, LogicalType, Result, Value, msg};
+use datluma_core::schema::{Column, Table};
+use datluma_core::{Error, LogicalType, Result, Value, msg};
 use serde::{Deserialize, Serialize};
 
 use crate::{Dialect, Family};
@@ -389,8 +389,8 @@ impl Dialect {
 
 #[cfg(test)]
 mod tests {
-    use dblens_core::ColumnType;
-    use dblens_core::schema::{PrimaryKey, UniqueConstraint};
+    use datluma_core::ColumnType;
+    use datluma_core::schema::{PrimaryKey, UniqueConstraint};
 
     use super::*;
     use crate::Variant;
@@ -546,11 +546,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -1,6 +1,7 @@
  //! 方言层：不做任何 IO，只负责各数据库的语法差异——标识符与字面量、语句拆分、类型映射、SQL 生成。
  
@@ -559,8 +559,8 @@ mod tests {
  mod ddl;
  mod dml;
  pub mod ident;
-@@ -17,6 +18,7 @@ use dblens_core::{LogicalType, Result, Value};
- use dblens_driver::{DriverId, ServerInfo};
+@@ -17,6 +18,7 @@ use datluma_core::{LogicalType, Result, Value};
+ use datluma_driver::{DriverId, ServerInfo};
  
  pub use browse::{Direction, Relation, relations};
 +pub use changes::{ChangeStatement, RowChange, row_key};
@@ -575,7 +575,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 5 个：WHERE 的构成、语句顺序和各方言占位符、非法改动、唯一键回退、只用默认值的新增）。
@@ -583,7 +583,7 @@ Expected: 全部测试通过（dialect 新增 5 个：WHERE 的构成、语句�
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/src/changes.rs crates/dblens-dialect/src/lib.rs
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/src/changes.rs crates/datluma-dialect/src/lib.rs
 git commit -m "feat(dialect): 表数据编辑的改动集：行标识、按改动生成 DML（执行用占位符、预览用字面量）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -601,16 +601,16 @@ git commit -m "feat(dialect): 表数据编辑的改动集：行标识、按改�
 - 实库测试 `*_editing`：一次提交新增、修改、删除；另一个会话先改同一字段后冲突回滚；没有主键的表被拒绝。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-service/src/changes.rs`
-- Modify: `crates/dblens-service/src/fake.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/session.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-service/src/changes.rs`
+- Modify: `crates/datluma-service/src/fake.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/session.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `ChangeStatement`、`RowChange`、`Dialect::change_statements`。
-- Produces（`dblens_service`）：
+- Produces（`datluma_service`）：
   - `SessionManager::apply(&self, id, statements: Vec<ChangeStatement>) -> Result<ApplyOutcome>`；
   - `ApplyOutcome { applied: usize, failed: Option<ApplyFailure> }`、`ApplyFailure { index: usize, error: Error }`（Serialize）；
   - `ChangeSet { schema, table, changes: Vec<RowChange> }`（Deserialize）；
@@ -618,19 +618,19 @@ git commit -m "feat(dialect): 表数据编辑的改动集：行标识、按改�
   - `Service::apply_changes(&self, session: SessionId, set: &ChangeSet) -> Result<ApplyOutcome>`；
   - 后端词条 `changes.in_transaction`、`changes.conflict`、`changes.not_unique`、`changes.rolled_back`。
 
-- [ ] **Step 1: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -10,12 +10,12 @@ use std::time::Duration;
  
- use dblens_core::{Error, Value};
- use dblens_dialect::meta::MetaKey;
--use dblens_dialect::{DdlKind, Direction};
-+use dblens_dialect::{DdlKind, Direction, RowChange};
- use dblens_driver::{ConnectParams, DriverId};
- use dblens_service::{
+ use datluma_core::{Error, Value};
+ use datluma_dialect::meta::MetaKey;
+-use datluma_dialect::{DdlKind, Direction};
++use datluma_dialect::{DdlKind, Direction, RowChange};
+ use datluma_driver::{ConnectParams, DriverId};
+ use datluma_service::{
 -    DataOrder, DefaultPolicy, DriverRegistry, Environment, ExecRequest, ExportFormat, ExportOptions,
 -    ExportRequest, ExportSource, ExportState, ExportStatus, GenerateKind, ObjectKind, ProfileInput,
 -    SecretBackend, Secrets, Service, SessionEvent, SessionId, Store,
@@ -642,7 +642,7 @@ git commit -m "feat(dialect): 表数据编辑的改动集：行标识、按改�
  struct Live {
 @@ -613,3 +613,181 @@ async fn oracle_export() {
  async fn dameng_export() {
-     export_flow("DBLENS_TEST_DM_URL").await;
+     export_flow("DATLUMA_TEST_DM_URL").await;
  }
 +
 +/// 单元格的文本，比较用（各库返回的类型不同：Oracle 的整数是 Decimal）。
@@ -800,38 +800,38 @@ git commit -m "feat(dialect): 表数据编辑的改动集：行标识、按改�
 +
 +#[tokio::test]
 +async fn mysql_editing() {
-+    editing_flow("DBLENS_TEST_MYSQL_URL").await;
++    editing_flow("DATLUMA_TEST_MYSQL_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn mariadb_editing() {
-+    editing_flow("DBLENS_TEST_MARIADB_URL").await;
++    editing_flow("DATLUMA_TEST_MARIADB_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn postgres_editing() {
-+    editing_flow("DBLENS_TEST_PG_URL").await;
++    editing_flow("DATLUMA_TEST_PG_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn oracle_editing() {
-+    editing_flow("DBLENS_TEST_ORACLE_URL").await;
++    editing_flow("DATLUMA_TEST_ORACLE_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn dameng_editing() {
-+    editing_flow("DBLENS_TEST_DM_URL").await;
++    editing_flow("DATLUMA_TEST_DM_URL").await;
 +}
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 2: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -9,9 +9,13 @@
    "api.still_running": {"zh-CN": "上一段 SQL 还没有执行完", "en": "The previous SQL has not finished yet"},
-   "app.name": {"zh-CN": "DBLens 数洞", "en": "DBLens"},
+   "app.name": {"zh-CN": "DATLUMA 数览", "en": "DATLUMA"},
    "changes.bad_key": {"zh-CN": "改动的行标识与表 %{table} 的主键（或唯一键）不一致", "en": "The row identity of a change does not match the primary (or unique) key of table %{table}"},
 +  "changes.conflict": {"zh-CN": "第 %{n} 个改动没有影响任何行：这一行已被修改或删除，请刷新后再改", "en": "Change %{n} affected no rows: the row has been modified or deleted; refresh and try again"},
    "changes.empty_update": {"zh-CN": "修改中没有改动的列", "en": "An update has no changed columns"},
@@ -845,13 +845,13 @@ git commit -m "feat(dialect): 表数据编辑的改动集：行标识、按改�
    "ddl.unsupported": {"zh-CN": "该数据库不支持查看 %{kind} 的 DDL", "en": "This database does not support viewing the DDL of %{kind}"},
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-service/src/changes.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-service/src/changes.rs`**
 
 ```rust
 //! 表数据编辑（M2a 设计文档第 5 节）：由改动集生成语句，预览或在会话中执行。
 
-use dblens_core::{Error, Result, msg};
-use dblens_dialect::{ChangeStatement, RowChange};
+use datluma_core::{Error, Result, msg};
+use datluma_dialect::{ChangeStatement, RowChange};
 use serde::Deserialize;
 
 use crate::profile::Profile;
@@ -901,11 +901,11 @@ impl Service {
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/fake.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/fake.rs`**
 
 ```diff
---- a/crates/dblens-service/src/fake.rs
-+++ b/crates/dblens-service/src/fake.rs
+--- a/crates/datluma-service/src/fake.rs
++++ b/crates/datluma-service/src/fake.rs
 @@ -143,6 +143,8 @@ impl Connection for FakeConn {
                  stream.events.push_back(ExecEvent::Affected(0));
              }
@@ -917,17 +917,17 @@ impl Service {
                      stream
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -1,5 +1,6 @@
- //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `dblens-api` 使用，自身不处理 HTTP。
+ //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `datluma-api` 使用，自身不处理 HTTP。
  
 +mod changes;
  mod export;
- /// 测试用的假驱动，供本 crate 和 `dblens-api` 的测试使用（feature `testing`）。
+ /// 测试用的假驱动，供本 crate 和 `datluma-api` 的测试使用（feature `testing`）。
  #[cfg(any(test, feature = "testing"))]
 @@ -16,6 +17,7 @@ mod service;
  mod session;
@@ -949,18 +949,18 @@ impl Service {
  pub use store::{Store, default_data_dir};
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/session.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/session.rs`**
 
 ```diff
---- a/crates/dblens-service/src/session.rs
-+++ b/crates/dblens-service/src/session.rs
+--- a/crates/datluma-service/src/session.rs
++++ b/crates/datluma-service/src/session.rs
 @@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
  use std::time::{Instant, SystemTime, UNIX_EPOCH};
  
- use dblens_core::{Error, Msg, Result, Row, Value, msg};
--use dblens_dialect::{Dialect, SqlStatement, Variant, may_change_schema};
-+use dblens_dialect::{ChangeStatement, Dialect, SqlStatement, Variant, may_change_schema};
- use dblens_driver::{CancelHandle, ColumnMeta, Connection, ExecEvent};
+ use datluma_core::{Error, Msg, Result, Row, Value, msg};
+-use datluma_dialect::{Dialect, SqlStatement, Variant, may_change_schema};
++use datluma_dialect::{ChangeStatement, Dialect, SqlStatement, Variant, may_change_schema};
+ use datluma_driver::{CancelHandle, ColumnMeta, Connection, ExecEvent};
  use serde::{Deserialize, Serialize};
  use tokio::sync::{mpsc, oneshot};
 @@ -175,11 +175,31 @@ async fn run_quiet(conn: &mut Box<dyn Connection>, sql: &str) -> Result<()> {
@@ -1197,17 +1197,17 @@ impl Service {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`（密码不写进任何文件）。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`（密码不写进任何文件）。
 
 Expected: 全部测试通过（会话新增 `apply_commits_or_rolls_back_as_a_whole`）；`*_editing` 在 5 个实库上通过。
 
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/changes.rs crates/dblens-service/src/fake.rs crates/dblens-service/src/lib.rs crates/dblens-service/src/session.rs crates/dblens-service/tests/live.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/changes.rs crates/datluma-service/src/fake.rs crates/datluma-service/src/lib.rs crates/datluma-service/src/session.rs crates/datluma-service/tests/live.rs
 git commit -m "feat(service): 表数据编辑：在会话中按事务执行改动集，检查影响行数，冲突时整体回滚" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1220,20 +1220,20 @@ git commit -m "feat(service): 表数据编辑：在会话中按事务执行改�
 - 接口说明补充"表数据编辑"一节。
 
 **Files:**
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/src/routes.rs`
-- Modify: `crates/dblens-api/tests/api.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/src/routes.rs`
+- Modify: `crates/datluma-api/tests/api.rs`
 - Modify: `docs/notes/m0-4b-api.md`
 
 **Interfaces:**
 - Consumes：任务 3 的 `Service::preview_changes`、`Service::apply_changes`。
 - Produces（HTTP）：见上。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/api.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/api.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/api.rs
-+++ b/crates/dblens-api/tests/api.rs
+--- a/crates/datluma-api/tests/api.rs
++++ b/crates/datluma-api/tests/api.rs
 @@ -519,3 +519,24 @@ async fn ops_follow_language() {
      assert!(zh[0]["sql"].as_str().unwrap().contains("pg_stat_activity"), "没连接过时按驱动选 PG 的模板");
      assert_eq!(get("en").await[0]["name"], "Sessions");
@@ -1261,11 +1261,11 @@ git commit -m "feat(service): 表数据编辑：在会话中按事务执行改�
 +}
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -81,6 +81,8 @@ pub fn router(service: Arc<Service>, config: ApiConfig) -> Router {
          .route("/profiles/{id}/schemas/{schema}/relations", get(routes::relations))
          .route("/profiles/{id}/schemas/{schema}/data-sql", post(routes::data_sql))
@@ -1277,15 +1277,15 @@ git commit -m "feat(service): 表数据编辑：在会话中按事务执行改�
          .route("/exports/{id}/file", get(exports::file))
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-api/src/routes.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-api/src/routes.rs`**
 
 ```diff
---- a/crates/dblens-api/src/routes.rs
-+++ b/crates/dblens-api/src/routes.rs
-@@ -12,8 +12,9 @@ use dblens_dialect::meta::{MetaKey, ObjectInfo, SchemaInfo};
- use dblens_dialect::{DdlKind, Relation};
- use dblens_driver::DriverId;
- use dblens_service::{
+--- a/crates/datluma-api/src/routes.rs
++++ b/crates/datluma-api/src/routes.rs
+@@ -12,8 +12,9 @@ use datluma_dialect::meta::{MetaKey, ObjectInfo, SchemaInfo};
+ use datluma_dialect::{DdlKind, Relation};
+ use datluma_driver::DriverId;
+ use datluma_service::{
 -    DataOrder, DriverStatus, Favorite, FavoritePatch, GenerateKind, HistoryItem, HistoryQuery, NewFavorite,
 -    ObjectKind, Profile, ProfileInput, SecretStatus, ServerSummary, SessionId, SessionInfo,
 +    ApplyOutcome, ChangeSet, DataOrder, DriverStatus, Favorite, FavoritePatch, GenerateKind, HistoryItem,
@@ -1360,7 +1360,7 @@ git commit -m "feat(service): 表数据编辑：在会话中按事务执行改�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（接口新增 `changes_routes_report_errors`）。
@@ -1368,7 +1368,7 @@ Expected: 全部测试通过（接口新增 `changes_routes_report_errors`）。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-api/src/lib.rs crates/dblens-api/src/routes.rs crates/dblens-api/tests/api.rs docs/notes/m0-4b-api.md
+git add crates/datluma-api/src/lib.rs crates/datluma-api/src/routes.rs crates/datluma-api/tests/api.rs docs/notes/m0-4b-api.md
 git commit -m "feat(api): 表数据编辑接口：预览改动集、在会话中执行" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1756,7 +1756,7 @@ export function buildChanges(
 import type { CellValue } from '../../shared/exec'
 import { t } from '../../shared/i18n'
 
-/** 列的逻辑类型（dblens_core::LogicalType 的 JSON，按 kind 区分）。 */
+/** 列的逻辑类型（datluma_core::LogicalType 的 JSON，按 kind 区分）。 */
 export interface Logical {
   kind: string
   bits?: number
@@ -3046,7 +3046,7 @@ git commit -m "feat(web): 数据标签编辑：可编辑表格（改单元格、
 
 **Files:**
 - Create: `docs/notes/m2a-data-editing.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 新建 `docs/notes/m2a-data-editing.md`**
 
@@ -3058,11 +3058,11 @@ git commit -m "feat(web): 数据标签编辑：可编辑表格（改单元格、
 ## 结构
 
 ```text
-crates/dblens-dialect/src/changes.rs   改动集（RowChange）、行标识（row_key）、按改动生成语句（执行用占位符、预览用字面量）
-crates/dblens-service/src/
+crates/datluma-dialect/src/changes.rs   改动集（RowChange）、行标识（row_key）、按改动生成语句（执行用占位符、预览用字面量）
+crates/datluma-service/src/
   session.rs     Command::Apply：在会话中按事务执行，检查影响行数，失败整体回滚；ApplyOutcome / ApplyFailure
   changes.rs     ChangeSet；Service::preview_changes / apply_changes（取表的结构模型、生成语句）
-crates/dblens-api/src/routes.rs        /profiles/{id}/changes/preview、/sessions/{id}/changes
+crates/datluma-api/src/routes.rs        /profiles/{id}/changes/preview、/sessions/{id}/changes
 web/src/features/data/
   parse.ts       按逻辑类型解析文本；解析制表符分隔的文本
   edit.ts        编辑状态（修改、新增、删除）、粘贴区域、生成改动集
@@ -3100,7 +3100,7 @@ web/src/features/editor/{runner.ts, actions.tsx}   Runner.stop；关闭有未提
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过（420 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过（420 个）。
   - 实库测试（5 个库）：建带主键、唯一键、自增列、默认值的表，含中文和 NULL。一次提交新增、修改、删除，核对结果（新增行取到默认值）。另一个会话先改同一字段，再按旧值提交，整体回滚，表中数据不变，会话恢复自动提交。没有主键的表被拒绝。
   - 有一次全量运行中，达梦的导出实库测试失败一次，单独重跑和再跑全量都通过。与 M1c1、M1c3 记录的情况相同：多个测试同时连达梦时偶发失败。
 - 前端：tsc、Vitest、打包通过。
@@ -3112,11 +3112,11 @@ web/src/features/editor/{runner.ts, actions.tsx}   Runner.stop；关闭有未提
 - 实测中没有覆盖（内置浏览器在窗口最小化时停止绘制，表格的画布不能交互）：粘贴、右键菜单、删除行、冲突时标红、放弃确认。冲突回滚由实库测试覆盖，粘贴区域和编辑状态有单元测试。这几项在执行计划时人工确认。
 ````
 
-- [ ] **Step 2: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 2: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -323,6 +323,10 @@ trait Policy: Send + Sync {
  | M5 迁移 | 选择源和目标 → 按逻辑类型映射结构，生成目标 DDL，可人工调整 → 分批迁移数据（断点续传、进度、行数校验） → 最后建索引和约束 | M2 的批量读写、M3 的 DDL 生成、类型映射 |
  | 后续 | 团队管控（多用户、RBAC、SQL 审核、审计、执行前备份）、JDBC 桥、SQLite、SQL Server 等 | 浏览器模式、Policy、Driver 接口 |
@@ -3138,10 +3138,10 @@ web/src/features/editor/{runner.ts, actions.tsx}   Runner.stop；关闭有未提
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`（密码不写进任何文件）。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`（密码不写进任何文件）。
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
 
@@ -3149,7 +3149,7 @@ DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rspro
 $env:PATH = "D:\Environments\nvm4w\nodejs;$env:PATH"; Set-Location web; pnpm typecheck; pnpm test; pnpm build
 ```
 
-浏览器实测（用新的数据目录启动 `dblens-server --web-dir web/dist`；窗口要保持显示，表格是画布，窗口最小化时不能交互）：
+浏览器实测（用新的数据目录启动 `datluma-server --web-dir web/dist`；窗口要保持显示，表格是画布，窗口最小化时不能交互）：
 1. 经接口建 5 个测试连接（密码只经环境变量传给建连接的脚本），经 WebSocket 建测试数据（父子表，主键为 id）。
 2. 打开 PG 的 `c2_parent` 数据标签：出现编辑工具栏；打开视图的数据标签：显示"视图只读"。
 3. 双击（或选中后回车）把一行的 `code` 改掉：单元格变色，"提交（1）"。
@@ -3166,6 +3166,6 @@ Expected: 全部通过。
 - [ ] **Step 4: 提交**
 
 ```bash
-git add docs/notes/m2a-data-editing.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m2a-data-editing.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M2a 说明文档；总设计文档记录 M2 的拆分与进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

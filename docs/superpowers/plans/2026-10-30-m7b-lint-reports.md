@@ -6,11 +6,11 @@
 
 ## 任务
 
-1. **引擎**（`dblens-lint`）：`Ruleset.exceptions`、`ClauseResult.waived`/`clear`、`waive`/`unwaive`、`Summary.waived`；检查时应用例外；内置差异带上例外；校验例外。
-2. **服务**（`dblens-service/src/lint`）：`waive_lint_issue`、`unwaive_lint_issue`。
+1. **引擎**（`datluma-lint`）：`Ruleset.exceptions`、`ClauseResult.waived`/`clear`、`waive`/`unwaive`、`Summary.waived`；检查时应用例外；内置差异带上例外；校验例外。
+2. **服务**（`datluma-service/src/lint`）：`waive_lint_issue`、`unwaive_lint_issue`。
 3. **报告数据**：`report.rs` 抽出报告数据，HTML 补人工确认清单和豁免清单。
 4. **Office 报告**：`document/docx.rs` 抽出 `assemble`，`document/xlsx.rs` 开放 `Sheet`；新增 `lint/report_office.rs` 写 Word、Excel、自查表。
-5. **接口**（`dblens-api`）：`waivers` 两个路由；报告按格式给 Content-Type。
+5. **接口**（`datluma-api`）：`waivers` 两个路由；报告按格式给 Content-Type。
 6. **界面**（`web/src/features/lint`）：问题右键豁免、已豁免清单和撤销、报告格式菜单、规范库的例外列表。报告改用下载而非 `window.open`。
 7. **验证与文档**：全量测试、clippy、i18n、前端构建；真实鼠标走查；`docs/notes/m7b-lint-reports.md`，总设计进度。
 

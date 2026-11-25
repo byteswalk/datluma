@@ -32,6 +32,13 @@ import StatusBar from './StatusBar'
 import TitleBar from './TitleBar'
 import NoticeHost from './NoticeHost'
 import { type SideKey, useUi } from './ui'
+import auditDark from './brand/logo-audit-dark.svg'
+import auditLight from './brand/logo-audit.svg'
+import sloth from './brand/sloth-flat.webp'
+import standaloneDark from './brand/logo-standalone-dark.svg'
+import standaloneLight from './brand/logo-standalone.svg'
+
+const LOCKUPS = { standalone: [standaloneLight, standaloneDark], audit: [auditLight, auditDark] } as const
 
 // Monaco 自带文字的语言要在它加载前设定，所以先加载语言包再加载工作区
 const Workspace = lazy(async () => {
@@ -61,11 +68,16 @@ function Welcome() {
   const { t } = useTranslation()
   const openConnection = useUi((s) => s.openConnection)
   const { newQuery } = useQueryActions()
-  const { hidden } = useHost()
+  const { hidden, edition = 'standalone' } = useHost()
+  const [light, dark] = LOCKUPS[edition]
   return (
     <div className="welcome">
-      <IconDatabase size={48} stroke={1.2} />
-      <div style={{ fontSize: 18, color: 'var(--text)' }}>{t('common.appName')}</div>
+      <img className="welcome-mascot" src={sloth} width={128} height={128} alt="" />
+      {/* 品牌组合用矢量原件整体缩放；深浅两张按 data-tone 显示一张 */}
+      <div className="welcome-brand" role="img" aria-label={t('common.appName')}>
+        <img className="brand-light" src={light} height={48} alt="" />
+        <img className="brand-dark" src={dark} height={48} alt="" />
+      </div>
       <div className="row" style={{ gap: 8 }}>
         {!hidden?.('new-connection') && (
           <Button type="primary" icon={<IconPlus size={14} />} onClick={() => openConnection(null)}>

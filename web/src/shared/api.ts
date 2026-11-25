@@ -101,7 +101,7 @@ function documentRequest(req: DocumentRequest): DocumentRequest {
   return req.source.kind === 'database' ? { ...req, source: withCatalog(req.source) } : req
 }
 
-/** 服务端的错误对象（dblens_core::Error），按 kind 区分。 */
+/** 服务端的错误对象（datluma_core::Error），按 kind 区分。 */
 export interface ErrorBody {
   kind: string
   message?: string
@@ -627,7 +627,7 @@ export interface FavoritePatch {
   move?: { parent_id: string | null; position: number }
 }
 
-/** 逻辑类型（dblens_core::LogicalType 的 JSON，按 kind 区分）。 */
+/** 逻辑类型（datluma_core::LogicalType 的 JSON，按 kind 区分）。 */
 export type LogicalType =
   | { kind: 'bool' | 'text' | 'blob' | 'date' | 'interval' | 'json' | 'uuid' | 'other' }
   | { kind: 'int' | 'u_int' | 'float'; bits: number }

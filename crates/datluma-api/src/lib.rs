@@ -1,0 +1,208 @@
+//! HTTP 接口：REST（连接配置、驱动、密码库、元数据、会话管理）和会话的 WebSocket 执行协议。
+//! 另提供前端页面的静态文件服务（`with_web`）。桌面模式和浏览器模式（`datluma-server`）共用。所有请求都要带访问令牌，浏览器请求还要通过 Origin 校验。
+
+mod ai;
+mod auth;
+mod design;
+mod diagrams;
+mod documents;
+mod error;
+mod exports;
+mod lang;
+mod lint;
+mod migrations;
+mod models;
+mod namespace;
+mod privileges;
+mod routes;
+mod tasks;
+mod web;
+mod ws;
+
+use std::sync::Arc;
+
+use axum::Router;
+use axum::middleware;
+use axum::routing::{delete, get, post, put};
+use datluma_service::Service;
+use tokio::net::TcpListener;
+
+pub use ai::fix_provider;
+pub use error::{ApiError, status_of};
+pub use lang::negotiate;
+pub use tasks::{DEFAULT_UPLOAD_LIMIT_MB, UPLOAD_LIMIT_SETTING};
+pub use web::with_web;
+pub use ws::{DEFAULT_MAX_ROWS, utf16_offset};
+
+/// 接口的配置。
+#[derive(Debug, Clone)]
+pub struct ApiConfig {
+    /// 访问令牌。
+    pub token: String,
+    /// 除同源外还允许的 Origin，如桌面模式的 `tauri://localhost`、前端开发服务器 `http://localhost:5173`。
+    pub allowed_origins: Vec<String>,
+    /// 页面和服务在同一台机器上（桌面程序、只监听本机地址的浏览器模式）：导出可以直接写到页面给出的路径，
+    /// 可以打开模型目录。监听其他地址的浏览器模式页面可能在另一台机器上，为 false，导出一律写临时文件后下载。
+    pub local_files: bool,
+    /// 交互查询每个结果集最多返回的行数，由服务端强制；`None` 表示不限制。
+    pub max_result_rows: Option<usize>,
+}
+
+/// 生成随机访问令牌（64 个十六进制字符）。
+pub fn new_token() -> String {
+    format!("{}{}", uuid::Uuid::new_v4().simple(), uuid::Uuid::new_v4().simple())
+}
+
+#[derive(Clone)]
+pub struct AppState {
+    pub service: Arc<Service>,
+    pub config: Arc<ApiConfig>,
+}
+
+/// 全部业务接口，不带鉴权和语言层，由调用方决定怎么包。
+pub fn api_routes() -> Router<AppState> {
+    Router::new()
+        .route("/drivers", get(routes::drivers))
+        .route("/drivers/{driver}/lib-dir", put(routes::set_lib_dir))
+        .route("/settings", get(routes::settings))
+        .route("/ai/config", get(ai::config).put(ai::set_config))
+        .route("/ai/key", put(ai::set_key))
+        .route("/ai/test", post(ai::test))
+        .route("/ai/ask", post(ai::ask))
+        .route("/client-log", post(routes::client_log))
+        .route("/settings/{key}", put(routes::set_setting))
+        .route("/history", get(routes::history).delete(routes::clear_history))
+        .route("/history/{id}", delete(routes::delete_history))
+        .route("/favorites", get(routes::favorites).post(routes::create_favorite))
+        .route("/favorites/{id}", put(routes::update_favorite).delete(routes::delete_favorite))
+        .route("/secrets", get(routes::secret_status))
+        .route("/secrets/init", post(routes::init_vault))
+        .route("/secrets/unlock", post(routes::unlock))
+        .route("/secrets/lock", post(routes::lock))
+        .route("/profiles", get(routes::profiles).post(routes::create_profile))
+        .route("/profiles/test", post(routes::test_connection))
+        .route("/profiles/databases", post(routes::list_databases))
+        .route(
+            "/profiles/{id}",
+            get(routes::profile).put(routes::update_profile).delete(routes::delete_profile),
+        )
+        .route("/profiles/{id}/password", put(routes::set_password))
+        .route("/profiles/{id}/refresh", post(routes::refresh))
+        .route("/profiles/{id}/catalogs", get(routes::catalogs))
+        .route("/profiles/{id}/schemas", get(routes::schemas))
+        .route("/profiles/{id}/schemas/{schema}/objects", get(routes::objects))
+        .route("/profiles/{id}/schemas/{schema}/tables", get(routes::tables))
+        .route("/profiles/{id}/schemas/{schema}/search", get(routes::search))
+        .route("/profiles/{id}/schemas/{schema}/views", get(routes::views))
+        .route("/profiles/{id}/schemas/{schema}/sequences", get(routes::sequences))
+        .route("/profiles/{id}/schemas/{schema}/routines", get(routes::routines))
+        .route("/profiles/{id}/schemas/{schema}/synonyms", get(routes::synonyms))
+        .route("/profiles/{id}/schemas/{schema}/source", get(routes::source))
+        .route("/profiles/{id}/schemas/{schema}/ddl", get(routes::ddl))
+        .route("/profiles/{id}/schemas/{schema}/generate", get(routes::generate))
+        .route("/profiles/{id}/schemas/{schema}/relations", get(routes::relations))
+        .route("/profiles/{id}/schemas/{schema}/data-sql", post(routes::data_sql))
+        .route("/profiles/{id}/ops", get(exports::ops))
+        .route("/profiles/{id}/namespace/caps", get(namespace::caps))
+        .route("/profiles/{id}/namespace/preview", post(namespace::preview))
+        .route("/profiles/{id}/namespace/apply", post(namespace::apply))
+        .route("/profiles/{id}/tablespaces", get(namespace::tablespaces))
+        .route("/profiles/{id}/privileges", get(privileges::overview))
+        .route("/profiles/{id}/privileges/principal", get(privileges::principal))
+        .route("/profiles/{id}/privileges/object", get(privileges::object))
+        .route("/profiles/{id}/privileges/preview", post(privileges::preview))
+        .route("/profiles/{id}/privileges/apply", post(privileges::apply))
+        .route("/profiles/{id}/privileges/preview_batch", post(privileges::preview_batch))
+        .route("/profiles/{id}/privileges/apply_batch", post(privileges::apply_batch))
+        .route("/profiles/{id}/changes/preview", post(routes::preview_changes))
+        .route("/profiles/{id}/design/caps", get(design::caps))
+        .route("/profiles/{id}/design/table", get(design::table))
+        .route("/profiles/{id}/design/preview", post(design::preview))
+        .route("/profiles/{id}/design/apply", post(design::apply))
+        .route("/profiles/{id}/design/drop", post(design::drop_table))
+        .route("/sessions/{id}/changes", post(routes::apply_changes))
+        .route("/models", get(models::list).post(models::create))
+        .route("/models/open", post(models::open))
+        .route("/models/reverse", post(models::reverse))
+        .route("/models/{id}", get(models::get).put(models::update).delete(models::close))
+        .route("/models/{id}/caps", get(models::caps))
+        .route("/models/{id}/tables", get(models::tables).post(models::save_table))
+        .route("/models/{id}/tables/preview", post(models::preview_table))
+        .route("/models/{id}/tables/{schema}/{name}", get(models::table).delete(models::delete_table))
+        .route("/models/{id}/tables/{schema}/{name}/rename", post(models::rename_table))
+        .route("/compare", post(models::compare))
+        .route("/compare/preview", post(models::sync_preview))
+        .route("/compare/sync", post(models::sync))
+        .route("/compare/script", post(models::save_script))
+        .route("/models/{id}/diagrams", get(diagrams::list).post(diagrams::create))
+        .route(
+            "/models/{id}/diagrams/{schema}/{name}",
+            get(diagrams::get).put(diagrams::save).delete(diagrams::delete),
+        )
+        .route("/models/{id}/diagrams/{schema}/{name}/rename", post(diagrams::rename))
+        .route("/models/{id}/tables/{schema}/{name}/logical-keys", post(diagrams::add_key))
+        .route("/models/{id}/tables/{schema}/{name}/logical-keys/{index}", delete(diagrams::delete_key))
+        .route("/files/image", post(diagrams::save_image))
+        .route("/lint/rulesets", get(lint::rulesets).post(lint::create_ruleset))
+        .route("/lint/rulesets/import", post(lint::import_ruleset))
+        .route(
+            "/lint/rulesets/{id}",
+            get(lint::ruleset).put(lint::update_ruleset).delete(lint::delete_ruleset),
+        )
+        .route("/lint/rulesets/{id}/reset", post(lint::reset_ruleset))
+        .route("/lint/rulesets/{id}/export", get(lint::export_ruleset))
+        .route("/lint/rules", get(lint::rules))
+        .route("/lint/table", post(lint::check_table))
+        .route("/lint/runs", get(lint::runs).post(lint::start_run))
+        .route("/lint/runs/{id}", get(lint::run).delete(lint::delete_run))
+        .route("/lint/runs/{id}/clauses/{clause}", put(lint::review))
+        .route("/lint/runs/{id}/clauses/{clause}/waivers", post(lint::waive).delete(lint::unwaive))
+        .route("/lint/runs/{id}/report", get(lint::report))
+        .route("/documents", post(documents::start))
+        .route("/documents/check", post(documents::check))
+        .route("/documents/templates/export", post(documents::export_template))
+        .route("/migrations", get(migrations::unfinished).post(migrations::start))
+        .route("/migrations/{id}/resume", post(migrations::resume))
+        .route("/migrations/{id}", delete(migrations::discard))
+        .route("/migrations/preview", post(migrations::preview))
+        .route("/exports", post(exports::create))
+        .route("/exports/{id}", get(exports::status).delete(exports::cancel_or_remove))
+        .route("/exports/{id}/file", get(exports::file))
+        .route("/uploads", post(tasks::upload))
+        .route("/imports/preview", post(tasks::preview))
+        .route("/imports", post(tasks::import))
+        .route("/profiles/{id}/imports/ddl", post(tasks::ddl))
+        .route("/sql-files", post(tasks::sql_file))
+        .route("/tasks/{id}", get(tasks::status).delete(tasks::cancel_or_remove))
+        .route("/tasks/{id}/confirm", post(tasks::confirm))
+        .route("/tasks/{id}/report", get(tasks::report).post(tasks::save_report))
+        .route("/tasks/{id}/statements/{n}", get(tasks::statement))
+        .route("/sessions", get(routes::sessions).post(routes::open_session))
+        .route("/sessions/{id}", get(routes::session).delete(routes::close_session))
+        .route("/sessions/{id}/autocommit", post(routes::set_autocommit))
+        .route("/sessions/{id}/schema", post(routes::set_schema))
+        .route("/sessions/{id}/commit", post(routes::commit))
+        .route("/sessions/{id}/rollback", post(routes::rollback))
+        .route("/sessions/{id}/reconnect", post(routes::reconnect))
+        .route("/sessions/{id}/cancel", post(routes::cancel))
+        .route("/sessions/{id}/ws", get(ws::upgrade))
+}
+
+/// 单机版的全部接口：令牌鉴权。
+pub fn router(service: Arc<Service>, config: ApiConfig) -> Router {
+    // 能打开本机文件时才能用 SQLite（数据库就是本机文件）
+    service.registry.allow_local_files(config.local_files);
+    let state = AppState { service, config: Arc::new(config) };
+    let api = api_routes()
+        .route("/capabilities", get(routes::capabilities))
+        .layer(middleware::from_fn_with_state(state.clone(), auth::guard))
+        // 最外层：令牌错误等也按请求语言输出
+        .layer(middleware::from_fn(lang::negotiate))
+        .with_state(state);
+    Router::new().nest("/api", api)
+}
+
+/// 在已绑定的端口上提供服务，直到出错（桌面模式绑定 `127.0.0.1:0` 的随机端口后调用）。
+pub async fn serve(listener: TcpListener, app: Router) -> std::io::Result<()> {
+    axum::serve(listener, app).await
+}

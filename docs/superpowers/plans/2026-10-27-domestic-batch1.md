@@ -19,7 +19,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条；日志不翻译。
 - 代码注释用中文（SQL 模板沿用英文注释）；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -44,14 +44,14 @@
 
 ```text
 vendor/{tokio-postgres, postgres-protocol}/, vendor/PATCHES.md; Cargo.toml; .gitignore   openGauss 的 SHA256 认证（新增）
-crates/dblens-dialect/src/{variant.rs, lib.rs, split.rs, ident.rs, changes.rs, import.rs, ops.rs, meta/template.rs, meta/assemble.rs, design/{catalog.rs, sql.rs, postgres.rs, rebuild.rs}}
-crates/dblens-dialect/sql/{tidb.sql, oceanbase.sql, kingbase.sql, opengauss.sql}, sql/ops/{tidb.sql, oceanbase.sql, opengauss.sql}（新增）; sql/postgres.sql
-crates/dblens-dialect/tests/{meta_live.rs, meta_snapshots.rs, fixtures/opengauss.sql, snapshots/}
-crates/dblens-driver-postgres/src/types.rs, tests/conformance.rs; crates/dblens-driver-mysql/src/error.rs, tests/conformance.rs
-crates/dblens-service/src/{registry.rs, session.rs, sqlfile.rs, profile.rs, store.rs}, tests/live.rs; crates/dblens-api/tests/live.rs
-crates/dblens-core/locales/app.json
+crates/datluma-dialect/src/{variant.rs, lib.rs, split.rs, ident.rs, changes.rs, import.rs, ops.rs, meta/template.rs, meta/assemble.rs, design/{catalog.rs, sql.rs, postgres.rs, rebuild.rs}}
+crates/datluma-dialect/sql/{tidb.sql, oceanbase.sql, kingbase.sql, opengauss.sql}, sql/ops/{tidb.sql, oceanbase.sql, opengauss.sql}（新增）; sql/postgres.sql
+crates/datluma-dialect/tests/{meta_live.rs, meta_snapshots.rs, fixtures/opengauss.sql, snapshots/}
+crates/datluma-driver-postgres/src/types.rs, tests/conformance.rs; crates/datluma-driver-mysql/src/error.rs, tests/conformance.rs
+crates/datluma-service/src/{registry.rs, session.rs, sqlfile.rs, profile.rs, store.rs}, tests/live.rs; crates/datluma-api/tests/live.rs
+crates/datluma-core/locales/app.json
 web/src/features/connections/{products.ts（新增）, form.ts, ConnectionDialog.tsx}; features/sql/{dialects.ts, provider.ts, checker.ts}; features/editor/{dialect.ts, QueryView.tsx}; features/data/DataView.tsx; features/design/OptionsPane.tsx; shared/api.ts; locales/{zh-CN,en}/{connections.json, design.json, editor.json}
-docs/notes/{domestic-batch1.md, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{domestic-batch1.md, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -80,7 +80,7 @@ Expected：输出中没有"查询失败"。2026-10-27 写计划时：共 80 个�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -109,21 +109,21 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 - 服务层：`DriverRegistry::connect` 记下探测到的模式名；`ServerSummary` 加 `compat`、`mode`、`unadapted_mode`。
 
 **Files:**
-- Create: `crates/dblens-dialect/sql/kingbase.sql`
-- Create: `crates/dblens-dialect/sql/opengauss.sql`
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Modify: `crates/dblens-dialect/src/meta/template.rs`
-- Modify: `crates/dblens-dialect/src/variant.rs`
-- Modify: `crates/dblens-service/src/registry.rs`
+- Create: `crates/datluma-dialect/sql/kingbase.sql`
+- Create: `crates/datluma-dialect/sql/opengauss.sql`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Modify: `crates/datluma-dialect/src/meta/template.rs`
+- Modify: `crates/datluma-dialect/src/variant.rs`
+- Modify: `crates/datluma-service/src/registry.rs`
 
 **Interfaces:**
 - Produces：
-  - `dblens_dialect::Compat::{Native, Oracle}`、`Compat::from_mode(&str) -> Compat`、`Compat::is_adapted_mode(&str) -> bool`；
+  - `datluma_dialect::Compat::{Native, Oracle}`、`Compat::from_mode(&str) -> Compat`、`Compat::is_adapted_mode(&str) -> bool`；
   - `Dialect::with_compat(self, Compat) -> Self`、`compat(&self) -> Compat`、`oracle_mode(&self) -> bool`；
   - crate 内：`meta::render(key, template, family, version, oracle_mode: bool, args)`；
-  - `dblens_service::ServerSummary { …, compat: Compat, mode: Option<String>, unadapted_mode: bool }`。
+  - `datluma_service::ServerSummary { …, compat: Compat, mode: Option<String>, unadapted_mode: bool }`。
 
-- [ ] **Step 1: 新建 `crates/dblens-dialect/sql/kingbase.sql`**
+- [ ] **Step 1: 新建 `crates/datluma-dialect/sql/kingbase.sql`**
 
 ```sql
 -- KingbaseES overrides on top of postgres.sql (only keys that differ). Tested on V9R2C16 in Oracle and PG mode.
@@ -134,7 +134,7 @@ SELECT current_setting('database_mode') AS mode,
        current_setting('server_version_num') AS version_num
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-dialect/sql/opengauss.sql`**
+- [ ] **Step 2: 新建 `crates/datluma-dialect/sql/opengauss.sql`**
 
 ```sql
 -- openGauss overrides on top of postgres.sql (only keys that differ). Based on PG 9.2; tested on 7.0.0-RC1
@@ -148,11 +148,11 @@ FROM pg_catalog.pg_database
 WHERE datname = current_database()
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -27,29 +27,38 @@ pub use import::{ImportStatement, MAX_PARAMS_PER_STATEMENT, MAX_ROWS_PER_STATEME
  pub use ops::{OpsCategory, OpsQuery};
  pub use session::may_change_schema;
@@ -308,11 +308,11 @@ WHERE datname = current_database()
          let probe =
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/src/meta/template.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/src/meta/template.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/template.rs
-+++ b/crates/dblens-dialect/src/meta/template.rs
+--- a/crates/datluma-dialect/src/meta/template.rs
++++ b/crates/datluma-dialect/src/meta/template.rs
 @@ -19,6 +19,8 @@ const MARIADB: &str = include_str!("../../sql/mariadb.sql");
  const POSTGRES: &str = include_str!("../../sql/postgres.sql");
  const ORACLE: &str = include_str!("../../sql/oracle.sql");
@@ -407,11 +407,11 @@ WHERE datname = current_database()
  }
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-dialect/src/variant.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-dialect/src/variant.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/variant.rs
-+++ b/crates/dblens-dialect/src/variant.rs
+--- a/crates/datluma-dialect/src/variant.rs
++++ b/crates/datluma-dialect/src/variant.rs
 @@ -17,6 +17,35 @@ pub enum Family {
      Dameng,
  }
@@ -450,26 +450,26 @@ WHERE datname = current_database()
  pub enum Variant {
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/registry.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/registry.rs`**
 
 ```diff
---- a/crates/dblens-service/src/registry.rs
-+++ b/crates/dblens-service/src/registry.rs
+--- a/crates/datluma-service/src/registry.rs
++++ b/crates/datluma-service/src/registry.rs
 @@ -8,7 +8,7 @@ use std::sync::Arc;
  
- use dblens_core::{Error, Msg, Result, msg};
- use dblens_dialect::meta::{MetaArgs, MetaKey, MetaRows};
--use dblens_dialect::{Dialect, Variant};
-+use dblens_dialect::{Compat, Dialect, Variant};
- use dblens_driver::native::{self, NativeLib};
- use dblens_driver::{ConnectParams, Connection, Driver, DriverId, collect_all};
+ use datluma_core::{Error, Msg, Result, msg};
+ use datluma_dialect::meta::{MetaArgs, MetaKey, MetaRows};
+-use datluma_dialect::{Dialect, Variant};
++use datluma_dialect::{Compat, Dialect, Variant};
+ use datluma_driver::native::{self, NativeLib};
+ use datluma_driver::{ConnectParams, Connection, Driver, DriverId, collect_all};
  use serde::{Deserialize, Serialize};
 @@ -42,8 +42,14 @@ pub struct ServerSummary {
      pub version: String,
      pub variant: Variant,
      pub variant_name: Msg,
--    /// 编码后的版本号（见 `dblens_dialect::parse_version`）。
-+    /// 编码后的版本号（见 `dblens_dialect::parse_version`）。人大金仓、openGauss 是所基于的 PG 版本。
+-    /// 编码后的版本号（见 `datluma_dialect::parse_version`）。
++    /// 编码后的版本号（见 `datluma_dialect::parse_version`）。人大金仓、openGauss 是所基于的 PG 版本。
      pub version_code: Option<u32>,
 +    /// 兼容模式（人大金仓、openGauss 可能是 Oracle 模式）。
 +    pub compat: Compat,
@@ -549,7 +549,7 @@ WHERE datname = current_database()
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 2 个）。
@@ -557,7 +557,7 @@ Expected: 全部测试通过（dialect 新增 2 个）。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-dialect/sql/kingbase.sql crates/dblens-dialect/sql/opengauss.sql crates/dblens-dialect/src/lib.rs crates/dblens-dialect/src/meta/template.rs crates/dblens-dialect/src/variant.rs crates/dblens-service/src/registry.rs
+git add crates/datluma-dialect/sql/kingbase.sql crates/datluma-dialect/sql/opengauss.sql crates/datluma-dialect/src/lib.rs crates/datluma-dialect/src/meta/template.rs crates/datluma-dialect/src/variant.rs crates/datluma-service/src/registry.rs
 git commit -m "feat(dialect): 人大金仓、openGauss 的兼容模式与所基于的 PG 版本" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -577,9 +577,9 @@ git commit -m "feat(dialect): 人大金仓、openGauss 的兼容模式与所基�
 - Create: `vendor/tokio-postgres/`、`vendor/postgres-protocol/`（复制自 crates.io，见下面的步骤）
 - Modify: `.gitignore`
 - Modify: `Cargo.toml`
-- Modify: `crates/dblens-driver-mysql/tests/conformance.rs`
-- Modify: `crates/dblens-driver-postgres/src/types.rs`
-- Modify: `crates/dblens-driver-postgres/tests/conformance.rs`
+- Modify: `crates/datluma-driver-mysql/tests/conformance.rs`
+- Modify: `crates/datluma-driver-postgres/src/types.rs`
+- Modify: `crates/datluma-driver-postgres/tests/conformance.rs`
 - Create: `vendor/PATCHES.md`
 - Create: `vendor/postgres-protocol/src/authentication/gauss.rs`
 
@@ -641,7 +641,7 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
          SaslMechanisms(&self.0)
      }
 +
-+    /// The raw body (DBLens patch): openGauss sends its SHA256 request with the same code as SASL.
++    /// The raw body (DATLUMA patch): openGauss sends its SHA256 request with the same code as SASL.
 +    #[inline]
 +    pub fn data(&self) -> &[u8] {
 +        &self.0
@@ -682,7 +682,7 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
              let output = authentication::md5_hash(user.as_bytes(), pass, body.salt());
              authenticate_password(stream, output.as_bytes()).await?;
          }
-+        // DBLens patch (vendor/PATCHES.md): openGauss sends its SHA256 request with the SASL code.
++        // DATLUMA patch (vendor/PATCHES.md): openGauss sends its SHA256 request with the SASL code.
 +        Some(Message::AuthenticationSasl(body))
 +            if authentication::gauss::parse_request(body.data()).is_some() =>
 +        {
@@ -717,7 +717,7 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
          Some(Message::AuthenticationSasl(body)) => {
              authenticate_sasl(stream, body, config).await?;
 +        }
-+        // DBLens patch: openGauss MD5_SHA256 (md5 in pg_hba, password stored as SHA256 only). The server
++        // DATLUMA patch: openGauss MD5_SHA256 (md5 in pg_hba, password stored as SHA256 only). The server
 +        // digests its stored string including an iteration suffix the client never receives, so this
 +        // cannot succeed; fail with a clear message instead of "unexpected message".
 +        Some(Message::AuthenticationSaslContinue(_)) => {
@@ -730,36 +730,36 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
          | Some(Message::AuthenticationScmCredential)
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-driver-mysql/tests/conformance.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-driver-mysql/tests/conformance.rs`**
 
 ```diff
---- a/crates/dblens-driver-mysql/tests/conformance.rs
-+++ b/crates/dblens-driver-mysql/tests/conformance.rs
+--- a/crates/datluma-driver-mysql/tests/conformance.rs
++++ b/crates/datluma-driver-mysql/tests/conformance.rs
 @@ -70,3 +70,14 @@ mod mariadb {
      use super::*;
-     dblens_driver::conformance_tests!("DBLENS_TEST_MARIADB_URL", mariadb_fixture);
+     datluma_driver::conformance_tests!("DATLUMA_TEST_MARIADB_URL", mariadb_fixture);
  }
 +
 +mod tidb {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_TIDB_URL", mysql_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_TIDB_URL", mysql_fixture);
 +}
 +
 +/// OceanBase 的 MySQL 模式；用户名写成 `用户@租户`（URL 中 `@` 写成 `%40`）。
 +mod oceanbase {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_OCEANBASE_URL", mysql_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_OCEANBASE_URL", mysql_fixture);
 +}
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-driver-postgres/tests/conformance.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-driver-postgres/tests/conformance.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/tests/conformance.rs
-+++ b/crates/dblens-driver-postgres/tests/conformance.rs
-@@ -4,7 +4,7 @@ use dblens_driver::ConnectParams;
- use dblens_driver::conformance::Fixture;
- use dblens_driver_postgres::PgDriver;
+--- a/crates/datluma-driver-postgres/tests/conformance.rs
++++ b/crates/datluma-driver-postgres/tests/conformance.rs
+@@ -4,7 +4,7 @@ use datluma_driver::ConnectParams;
+ use datluma_driver::conformance::Fixture;
+ use datluma_driver_postgres::PgDriver;
  
 -fn fixture(params: ConnectParams) -> Fixture {
 +fn base(params: ConnectParams, type_cases: Vec<(&'static str, Value)>) -> Fixture {
@@ -769,7 +769,7 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 @@ -18,45 +18,106 @@ fn fixture(params: ConnectParams) -> Fixture {
          select_name_by_id: |t| format!("SELECT name FROM {t} WHERE id = $1"),
          count_rows: |t| format!("SELECT COUNT(*) FROM {t}"),
-         missing_table_query: "SELECT * FROM dblens_no_such_table",
+         missing_table_query: "SELECT * FROM datluma_no_such_table",
 -        type_cases: vec![
 -            ("SELECT NULL::text", Value::Null),
 -            ("SELECT true", Value::Bool(true)),
@@ -782,7 +782,7 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 -                Value::Decimal("12345678901234567890.123456789".into()),
 -            ),
 -            ("SELECT 'NaN'::numeric", Value::Decimal("NaN".into())),
--            ("SELECT '数洞'::text", Value::String("数洞".into())),
+-            ("SELECT '数览'::text", Value::String("数览".into())),
 -            ("SELECT DATE '2024-02-29'", Value::Date(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap())),
 -            (
 -                "SELECT TIMESTAMP '2024-02-29 13:45:30.123456'",
@@ -816,7 +816,7 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 +            Value::Decimal("12345678901234567890.123456789".into()),
 +        ),
 +        ("SELECT 'NaN'::numeric", Value::Decimal("NaN".into())),
-+        ("SELECT '数洞'::text", Value::String("数洞".into())),
++        ("SELECT '数览'::text", Value::String("数览".into())),
 +        ("SELECT DATE '2024-02-29'", Value::Date(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap())),
 +        (
 +            "SELECT TIMESTAMP '2024-02-29 13:45:30.123456'",
@@ -864,8 +864,8 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 +    let dt = day.and_hms_opt(13, 45, 30).unwrap();
 +    cases.extend([
 +        ("SELECT CAST(1.5 AS NUMBER(10,2))", Value::Decimal("1.50".into())),
-+        ("SELECT CAST('数洞' AS VARCHAR2(10))", Value::String("数洞".into())),
-+        ("SELECT CAST('数洞' AS CLOB)", Value::String("数洞".into())),
++        ("SELECT CAST('数览' AS VARCHAR2(10))", Value::String("数览".into())),
++        ("SELECT CAST('数览' AS CLOB)", Value::String("数览".into())),
 +        // Oracle 模式的 DATE 带时间
 +        ("SELECT CAST(TIMESTAMP '2024-02-29 13:45:30' AS DATE)", Value::DateTime(dt)),
 +    ]);
@@ -880,36 +880,36 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 +    base(params, oracle_mode_cases())
  }
  
--dblens_driver::conformance_tests!("DBLENS_TEST_PG_URL", fixture);
+-datluma_driver::conformance_tests!("DATLUMA_TEST_PG_URL", fixture);
 +mod postgres {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_PG_URL", pg_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_PG_URL", pg_fixture);
 +}
 +
 +mod opengauss {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_OPENGAUSS_URL", pg_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_OPENGAUSS_URL", pg_fixture);
 +}
 +
 +/// 只存 SHA256 密码的账号：openGauss 自己的认证消息（vendor/PATCHES.md）。
 +mod opengauss_sha {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_OPENGAUSS_SHA_URL", pg_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_OPENGAUSS_SHA_URL", pg_fixture);
 +}
 +
 +mod opengauss_a {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_OPENGAUSS_A_URL", oracle_mode_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_OPENGAUSS_A_URL", oracle_mode_fixture);
 +}
 +
 +mod kingbase {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_KINGBASE_URL", oracle_mode_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_KINGBASE_URL", oracle_mode_fixture);
 +}
 +
 +mod kingbase_pg {
 +    use super::*;
-+    dblens_driver::conformance_tests!("DBLENS_TEST_KINGBASE_PG_URL", pg_fixture);
++    datluma_driver::conformance_tests!("DATLUMA_TEST_KINGBASE_PG_URL", pg_fixture);
 +}
 ```
 
@@ -919,9 +919,9 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 --- a/.gitignore
 +++ b/.gitignore
 @@ -13,3 +13,6 @@ node_modules/
- /crates/dblens-desktop/gen/
+ /crates/datluma-desktop/gen/
  # tauri-build 按 build.rs 中的命令列表自动生成的权限定义
- /crates/dblens-desktop/permissions/autogenerated/
+ /crates/datluma-desktop/permissions/autogenerated/
 +
 +# 单独测试 vendor/ 中的库时生成
 +/vendor/*/Cargo.lock
@@ -952,14 +952,14 @@ cp -r "$UP/postgres-protocol-0.6.12"/{src,Cargo.toml,LICENSE-MIT,LICENSE-APACHE,
 +tokio-postgres = { path = "vendor/tokio-postgres" }
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-driver-postgres/src/types.rs`**
+- [ ] **Step 11: 修改 `crates/datluma-driver-postgres/src/types.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/src/types.rs
-+++ b/crates/dblens-driver-postgres/src/types.rs
+--- a/crates/datluma-driver-postgres/src/types.rs
++++ b/crates/datluma-driver-postgres/src/types.rs
 @@ -2,7 +2,7 @@ use bytes::BytesMut;
  use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
- use dblens_core::{Error, Msg, Result, Value, msg};
+ use datluma_core::{Error, Msg, Result, Value, msg};
  use tokio_postgres::Row;
 -use tokio_postgres::types::{FromSql, IsNull, ToSql, Type, to_sql_checked};
 +use tokio_postgres::types::{FromSql, IsNull, Kind, ToSql, Type, to_sql_checked};
@@ -1088,13 +1088,13 @@ openGauss 用认证请求码 10（与 PostgreSQL 的 SASL 相同）发它自己�
 1. 从 crates.io 下载新版本（`cargo download` 或取 `$CARGO_HOME/registry/src/*/<库>-<版本>`），替换 `vendor/<库>/` 中除 `Cargo.toml` 改动以外的全部文件；
 2. 按上表重新套用改动（`gauss.rs` 整个文件复制过去；其余是几行的插入）；
 3. 更新上表中的上游版本；
-4. 运行 `cargo test --manifest-path vendor/postgres-protocol/Cargo.toml --lib authentication`，再用 `DBLENS_TEST_OPENGAUSS_SHA_URL` 跑 PG 驱动的一致性测试。
+4. 运行 `cargo test --manifest-path vendor/postgres-protocol/Cargo.toml --lib authentication`，再用 `DATLUMA_TEST_OPENGAUSS_SHA_URL` 跑 PG 驱动的一致性测试。
 ```
 
 - [ ] **Step 13: 新建 `vendor/postgres-protocol/src/authentication/gauss.rs`**
 
 ```rust
-//! openGauss password authentication (DBLens patch, see `vendor/PATCHES.md`).
+//! openGauss password authentication (DATLUMA patch, see `vendor/PATCHES.md`).
 //!
 //! openGauss reuses authentication request code 10 (`AUTH_REQ_SHA256`, the same code PostgreSQL uses for
 //! SASL) for its own RFC 5802-style exchange. The request body starts with a 4-byte password storage
@@ -1298,7 +1298,7 @@ mod test {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 ```bash
@@ -1306,7 +1306,7 @@ CARGO_TARGET_DIR=target cargo test --config "source.mirror.registry='sparse+http
 rm -f vendor/postgres-protocol/Cargo.lock
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`、库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`、库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。
 - 人大金仓的开发版授权最多 10 个连接：它的测试用 `-- kingbase --test-threads=1` 单独串行运行。
 - 达梦的测试与其他测试同在一个进程里运行时偶发"网络通讯失败"，失败时用 `-- dameng --test-threads=1` 单独重跑。
 
@@ -1315,7 +1315,7 @@ Expected: 全部测试通过（`gauss` 2 个；PG 驱动一致性测试 6 个目
 - [ ] **Step 15: 提交**
 
 ```bash
-git add .gitignore Cargo.lock Cargo.toml crates/dblens-driver-mysql/tests/conformance.rs crates/dblens-driver-postgres/src/types.rs crates/dblens-driver-postgres/tests/conformance.rs vendor/PATCHES.md vendor/postgres-protocol vendor/tokio-postgres
+git add .gitignore Cargo.lock Cargo.toml crates/datluma-driver-mysql/tests/conformance.rs crates/datluma-driver-postgres/src/types.rs crates/datluma-driver-postgres/tests/conformance.rs vendor/PATCHES.md vendor/postgres-protocol vendor/tokio-postgres
 git commit -m "feat(driver): openGauss 的 SHA256 认证与兼容库类型的读取" -m "tokio-postgres、postgres-protocol 复制到 vendor/ 并打补丁（见 vendor/PATCHES.md）。驱动一致性测试增加 TiDB、OceanBase、openGauss（PG、A 模式、纯 SHA256 账号）、人大金仓（Oracle、PG 模式）。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1336,50 +1336,50 @@ git commit -m "feat(driver): openGauss 的 SHA256 认证与兼容库类型的读
 快照文件（`tests/snapshots/`）随本任务给出；改了模板时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-dialect/sql/kingbase.sql`
-- Create: `crates/dblens-dialect/sql/oceanbase.sql`
-- Modify: `crates/dblens-dialect/sql/opengauss.sql`
-- Modify: `crates/dblens-dialect/sql/postgres.sql`
-- Create: `crates/dblens-dialect/sql/tidb.sql`
-- Modify: `crates/dblens-dialect/src/design/rebuild.rs`
-- Modify: `crates/dblens-dialect/src/ident.rs`
-- Modify: `crates/dblens-dialect/src/meta/assemble.rs`
-- Modify: `crates/dblens-dialect/src/meta/template.rs`
-- Create: `crates/dblens-dialect/tests/fixtures/opengauss.sql`
-- Modify: `crates/dblens-dialect/tests/meta_live.rs`
-- Modify: `crates/dblens-dialect/tests/meta_snapshots.rs`
-- Create: `crates/dblens-dialect/tests/snapshots/meta_snapshots__kingbase.snap`
-- Create: `crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`
-- Create: `crates/dblens-dialect/tests/snapshots/meta_snapshots__opengauss.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap`
-- Create: `crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap`
-- Modify: `crates/dblens-driver-postgres/src/types.rs`
+- Modify: `crates/datluma-dialect/sql/kingbase.sql`
+- Create: `crates/datluma-dialect/sql/oceanbase.sql`
+- Modify: `crates/datluma-dialect/sql/opengauss.sql`
+- Modify: `crates/datluma-dialect/sql/postgres.sql`
+- Create: `crates/datluma-dialect/sql/tidb.sql`
+- Modify: `crates/datluma-dialect/src/design/rebuild.rs`
+- Modify: `crates/datluma-dialect/src/ident.rs`
+- Modify: `crates/datluma-dialect/src/meta/assemble.rs`
+- Modify: `crates/datluma-dialect/src/meta/template.rs`
+- Create: `crates/datluma-dialect/tests/fixtures/opengauss.sql`
+- Modify: `crates/datluma-dialect/tests/meta_live.rs`
+- Modify: `crates/datluma-dialect/tests/meta_snapshots.rs`
+- Create: `crates/datluma-dialect/tests/snapshots/meta_snapshots__kingbase.snap`
+- Create: `crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`
+- Create: `crates/datluma-dialect/tests/snapshots/meta_snapshots__opengauss.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap`
+- Create: `crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap`
+- Modify: `crates/datluma-driver-postgres/src/types.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `oracle_mode`、任务 3 的驱动。
-- Produces：`dblens_dialect::meta::TableStorage.clustered: Option<bool>`。
+- Produces：`datluma_dialect::meta::TableStorage.clustered: Option<bool>`。
 
-- [ ] **Step 1: 新建 `crates/dblens-dialect/tests/fixtures/opengauss.sql`**
+- [ ] **Step 1: 新建 `crates/datluma-dialect/tests/fixtures/opengauss.sql`**
 
 ```sql
 -- openGauss（PG 与 A 兼容模式通用）：postgres.sql 的改写版。没有 IDENTITY 列，改用 serial；存储过程用 openGauss 的写法；
 -- 分区在建表时一并定义，LIST 分区键不能是 text；没有 EXCLUDE 约束；numeric 的小数位不能为负。
 -- @@ drop_schema
-DROP SCHEMA IF EXISTS dblens_meta CASCADE
+DROP SCHEMA IF EXISTS datluma_meta CASCADE
 -- @@ create_schema
-CREATE SCHEMA dblens_meta
+CREATE SCHEMA datluma_meta
 -- @@ dept
-CREATE TABLE dblens_meta.dept (id serial PRIMARY KEY, name varchar(50) NOT NULL UNIQUE, note text)
+CREATE TABLE datluma_meta.dept (id serial PRIMARY KEY, name varchar(50) NOT NULL UNIQUE, note text)
 -- @@ dept_c1
-COMMENT ON TABLE dblens_meta.dept IS '部门表'
+COMMENT ON TABLE datluma_meta.dept IS '部门表'
 -- @@ dept_c2
-COMMENT ON COLUMN dblens_meta.dept.id IS '部门编号'
+COMMENT ON COLUMN datluma_meta.dept.id IS '部门编号'
 -- @@ dept_c3
-COMMENT ON COLUMN dblens_meta.dept.name IS '部门名称'
+COMMENT ON COLUMN datluma_meta.dept.name IS '部门名称'
 -- @@ seq_meta
-CREATE SEQUENCE dblens_meta.seq_meta START 100 INCREMENT 5 MAXVALUE 99999 CYCLE CACHE 10
+CREATE SEQUENCE datluma_meta.seq_meta START 100 INCREMENT 5 MAXVALUE 99999 CYCLE CACHE 10
 -- @@ emp
-CREATE TABLE dblens_meta.emp (
+CREATE TABLE datluma_meta.emp (
   id bigint PRIMARY KEY,
   dept_id integer,
   manager_id bigint,
@@ -1391,73 +1391,73 @@ CREATE TABLE dblens_meta.emp (
   tags text[],
   serial_no serial,
   name_upper text GENERATED ALWAYS AS (upper(name)) STORED,
-  CONSTRAINT fk_emp_dept FOREIGN KEY (dept_id) REFERENCES dblens_meta.dept(id) ON DELETE CASCADE,
-  CONSTRAINT fk_emp_mgr FOREIGN KEY (manager_id) REFERENCES dblens_meta.emp(id) ON DELETE SET NULL ON UPDATE NO ACTION,
+  CONSTRAINT fk_emp_dept FOREIGN KEY (dept_id) REFERENCES datluma_meta.dept(id) ON DELETE CASCADE,
+  CONSTRAINT fk_emp_mgr FOREIGN KEY (manager_id) REFERENCES datluma_meta.emp(id) ON DELETE SET NULL ON UPDATE NO ACTION,
   CONSTRAINT uq_emp_dept_name UNIQUE (dept_id, name))
 -- @@ emp_c1
-COMMENT ON TABLE dblens_meta.emp IS '员工表 employees'
+COMMENT ON TABLE datluma_meta.emp IS '员工表 employees'
 -- @@ emp_c2
-COMMENT ON COLUMN dblens_meta.emp.name IS '员工姓名'
+COMMENT ON COLUMN datluma_meta.emp.name IS '员工姓名'
 -- @@ idx_created
-CREATE INDEX idx_emp_created ON dblens_meta.emp (created DESC)
+CREATE INDEX idx_emp_created ON datluma_meta.emp (created DESC)
 -- @@ idx_upper
-CREATE INDEX idx_emp_upper ON dblens_meta.emp (lower(name), dept_id)
+CREATE INDEX idx_emp_upper ON datluma_meta.emp (lower(name), dept_id)
 -- @@ idx_gin
-CREATE INDEX idx_emp_tags ON dblens_meta.emp USING gin (tags)
+CREATE INDEX idx_emp_tags ON datluma_meta.emp USING gin (tags)
 -- @@ idx_partial
-CREATE INDEX idx_emp_partial ON dblens_meta.emp (salary) WHERE salary > 1000
+CREATE INDEX idx_emp_partial ON datluma_meta.emp (salary) WHERE salary > 1000
 -- @@ trg_fn
-CREATE FUNCTION dblens_meta.trg_emp() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$
+CREATE FUNCTION datluma_meta.trg_emp() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RETURN NEW; END $$
 -- @@ trg
-CREATE TRIGGER trg_emp_biu BEFORE INSERT OR UPDATE ON dblens_meta.emp FOR EACH ROW EXECUTE FUNCTION dblens_meta.trg_emp()
+CREATE TRIGGER trg_emp_biu BEFORE INSERT OR UPDATE ON datluma_meta.emp FOR EACH ROW EXECUTE FUNCTION datluma_meta.trg_emp()
 -- @@ trg2
-CREATE TRIGGER trg_emp_trunc AFTER TRUNCATE ON dblens_meta.emp FOR EACH STATEMENT EXECUTE FUNCTION dblens_meta.trg_emp()
+CREATE TRIGGER trg_emp_trunc AFTER TRUNCATE ON datluma_meta.emp FOR EACH STATEMENT EXECUTE FUNCTION datluma_meta.trg_emp()
 -- @@ v_emp
-CREATE VIEW dblens_meta.v_emp AS SELECT e.id, e.name, d.name AS dept_name FROM dblens_meta.emp e LEFT JOIN dblens_meta.dept d ON d.id = e.dept_id
+CREATE VIEW datluma_meta.v_emp AS SELECT e.id, e.name, d.name AS dept_name FROM datluma_meta.emp e LEFT JOIN datluma_meta.dept d ON d.id = e.dept_id
 -- @@ v_emp_c
-COMMENT ON VIEW dblens_meta.v_emp IS '员工视图'
+COMMENT ON VIEW datluma_meta.v_emp IS '员工视图'
 -- @@ mv_dept
-CREATE MATERIALIZED VIEW dblens_meta.mv_dept AS SELECT d.id, d.name, count(e.id) AS cnt FROM dblens_meta.dept d LEFT JOIN dblens_meta.emp e ON e.dept_id = d.id GROUP BY d.id, d.name
+CREATE MATERIALIZED VIEW datluma_meta.mv_dept AS SELECT d.id, d.name, count(e.id) AS cnt FROM datluma_meta.dept d LEFT JOIN datluma_meta.emp e ON e.dept_id = d.id GROUP BY d.id, d.name
 -- @@ mv_dept_c
-COMMENT ON MATERIALIZED VIEW dblens_meta.mv_dept IS '部门统计物化视图'
+COMMENT ON MATERIALIZED VIEW datluma_meta.mv_dept IS '部门统计物化视图'
 -- @@ mv_dept_cc
-COMMENT ON COLUMN dblens_meta.mv_dept.cnt IS '员工数'
+COMMENT ON COLUMN datluma_meta.mv_dept.cnt IS '员工数'
 -- @@ p_meta
-CREATE PROCEDURE dblens_meta.p_meta(a integer) AS BEGIN NULL; END;
+CREATE PROCEDURE datluma_meta.p_meta(a integer) AS BEGIN NULL; END;
 -- @@ f_meta
-CREATE FUNCTION dblens_meta.f_meta(a integer) RETURNS integer LANGUAGE sql AS $$ SELECT a + 1 $$
+CREATE FUNCTION datluma_meta.f_meta(a integer) RETURNS integer LANGUAGE sql AS $$ SELECT a + 1 $$
 -- @@ f_meta2
-CREATE FUNCTION dblens_meta.f_meta(a text, b integer) RETURNS text LANGUAGE sql AS $$ SELECT a || b::text $$
+CREATE FUNCTION datluma_meta.f_meta(a text, b integer) RETURNS text LANGUAGE sql AS $$ SELECT a || b::text $$
 -- @@ f_meta_c
-COMMENT ON FUNCTION dblens_meta.f_meta(integer) IS '加一函数'
+COMMENT ON FUNCTION datluma_meta.f_meta(integer) IS '加一函数'
 -- @@ agg_fn
-CREATE FUNCTION dblens_meta.agg_sfunc(integer, integer) RETURNS integer LANGUAGE sql AS $$ SELECT $1 + $2 $$
+CREATE FUNCTION datluma_meta.agg_sfunc(integer, integer) RETURNS integer LANGUAGE sql AS $$ SELECT $1 + $2 $$
 -- @@ agg
-CREATE AGGREGATE dblens_meta.sum_meta(integer) (SFUNC = dblens_meta.agg_sfunc, STYPE = integer)
+CREATE AGGREGATE datluma_meta.sum_meta(integer) (SFUNC = datluma_meta.agg_sfunc, STYPE = integer)
 -- @@ part_t
-CREATE TABLE dblens_meta.part_t (id integer, created date NOT NULL, v text) PARTITION BY RANGE (created) (PARTITION part_t_2024 VALUES LESS THAN ('2025-01-01'), PARTITION part_t_2025 VALUES LESS THAN ('2026-01-01'))
+CREATE TABLE datluma_meta.part_t (id integer, created date NOT NULL, v text) PARTITION BY RANGE (created) (PARTITION part_t_2024 VALUES LESS THAN ('2025-01-01'), PARTITION part_t_2025 VALUES LESS THAN ('2026-01-01'))
 -- @@ part_h
-CREATE TABLE dblens_meta.part_h (id integer) PARTITION BY HASH (id) (PARTITION part_h0, PARTITION part_h1)
+CREATE TABLE datluma_meta.part_h (id integer) PARTITION BY HASH (id) (PARTITION part_h0, PARTITION part_h1)
 -- @@ part_l
-CREATE TABLE dblens_meta.part_l (id integer, region varchar(10)) PARTITION BY LIST (region) (PARTITION part_l_a VALUES ('a'))
+CREATE TABLE datluma_meta.part_l (id integer, region varchar(10)) PARTITION BY LIST (region) (PARTITION part_l_a VALUES ('a'))
 -- @@ inh_parent
-CREATE TABLE dblens_meta.inh_parent (id integer)
+CREATE TABLE datluma_meta.inh_parent (id integer)
 -- @@ inh_child
-CREATE TABLE dblens_meta.inh_child (extra integer) INHERITS (dblens_meta.inh_parent)
+CREATE TABLE datluma_meta.inh_child (extra integer) INHERITS (datluma_meta.inh_parent)
 -- @@ temp_t
 CREATE TEMP TABLE meta_tmp_probe (id integer)
 -- @@ unlogged_t
-CREATE UNLOGGED TABLE dblens_meta.unlogged_t (id integer)
+CREATE UNLOGGED TABLE datluma_meta.unlogged_t (id integer)
 -- @@ quoted
-CREATE TABLE dblens_meta."Mixed Case" ("select" integer PRIMARY KEY, "数洞" text, "Id" integer)
+CREATE TABLE datluma_meta."Mixed Case" ("select" integer PRIMARY KEY, "数览" text, "Id" integer)
 -- @@ uidx
-CREATE UNIQUE INDEX uidx_dept_note ON dblens_meta.dept (note) WHERE note IS NOT NULL
+CREATE UNIQUE INDEX uidx_dept_note ON datluma_meta.dept (note) WHERE note IS NOT NULL
 -- @@ enum_ty
-CREATE TYPE dblens_meta.mood AS ENUM ('sad','ok','happy')
+CREATE TYPE datluma_meta.mood AS ENUM ('sad','ok','happy')
 -- @@ dom_ty
-CREATE DOMAIN dblens_meta.posint AS integer CHECK (VALUE > 0)
+CREATE DOMAIN datluma_meta.posint AS integer CHECK (VALUE > 0)
 -- @@ ds_t
-CREATE TABLE dblens_meta.ds_t (
+CREATE TABLE datluma_meta.ds_t (
   c_smallint smallint, c_int integer, c_bigint bigint,
   c_numeric numeric, c_numeric_p numeric(10,2),
   c_real real, c_double double precision, c_float3 float(3),
@@ -1473,21 +1473,21 @@ CREATE TABLE dblens_meta.ds_t (
   c_tsvector tsvector, c_tsquery tsquery,
   c_point point, c_box box, c_int4range int4range, c_tstzrange tstzrange,
   c_int_arr integer[], c_text_arr text[], c_int_arr2 integer[][], c_varchar_arr varchar(20)[], c_ts_arr timestamp(3)[], c_numeric_arr numeric(8,3)[],
-  c_enum dblens_meta.mood, c_domain dblens_meta.posint, c_enum_arr dblens_meta.mood[],
+  c_enum datluma_meta.mood, c_domain datluma_meta.posint, c_enum_arr datluma_meta.mood[],
   c_oid oid, c_regclass regclass, c_serial serial, c_bigserial bigserial, c_smallserial smallserial)
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/tests/meta_live.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/tests/meta_live.rs`**
 
 ```diff
---- a/crates/dblens-dialect/tests/meta_live.rs
-+++ b/crates/dblens-dialect/tests/meta_live.rs
+--- a/crates/datluma-dialect/tests/meta_live.rs
++++ b/crates/datluma-dialect/tests/meta_live.rs
 @@ -1,7 +1,10 @@
  //! 元数据查询的实库测试。设置对应的环境变量时运行，否则直接通过（与驱动一致性测试相同的约定）：
--//! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL。
-+//! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL；
-+//! 国产库第一批：DBLENS_TEST_TIDB_URL、DBLENS_TEST_OCEANBASE_URL、DBLENS_TEST_OPENGAUSS_URL、
-+//! DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL。
+-//! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL。
++//! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL；
++//! 国产库第一批：DATLUMA_TEST_TIDB_URL、DATLUMA_TEST_OCEANBASE_URL、DATLUMA_TEST_OPENGAUSS_URL、
++//! DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL。
  //!
  //! 每个家族先执行 `tests/fixtures/<家族>.sql` 建测试对象，再用全部元数据查询读回来逐项核对。
 +//! 兼容库沿用所属家族的脚本，跳过不支持的段、替换写法不同的段（`run_script_with`）。
@@ -1575,7 +1575,7 @@ CREATE TABLE dblens_meta.ds_t (
 +    // OceanBase 默认 lower_case_table_names = 1，表名存成小写
 +    let mixed = all.iter().find(|t| has(&t.name, "Mixed Case")).expect("表 Mixed Case");
      assert!(live.d.qualified(Some(s), &mixed.name).ends_with(&live.d.quote_ident(&mixed.name)));
-     assert!(mixed.columns.iter().any(|c| c.name == "数洞"));
+     assert!(mixed.columns.iter().any(|c| c.name == "数览"));
      assert!(mixed.columns.iter().any(|c| c.name == "select") && mixed.primary_key.is_some());
 @@ -216,20 +243,22 @@ async fn check_common(live: &mut Live, fx: Fx) -> Vec<Table> {
          .unwrap();
@@ -1619,7 +1619,7 @@ CREATE TABLE dblens_meta.ds_t (
  }
  
 -async fn check_mysql_family(live: &mut Live) -> Vec<Table> {
--    let fx = Fx { schema: "dblens_meta", upper: false };
+-    let fx = Fx { schema: "datluma_meta", upper: false };
 +async fn check_mysql_family(live: &mut Live, fx: Fx) -> Vec<Table> {
      let all = check_common(live, fx).await;
      let emp = table(&all, "emp");
@@ -1629,7 +1629,7 @@ CREATE TABLE dblens_meta.ds_t (
      live.run_script(include_str!("fixtures/mysql.sql")).await;
      live.run_script(include_str!("fixtures/mysql_only.sql")).await;
 -    let all = check_mysql_family(&mut live).await;
-+    let all = check_mysql_family(&mut live, Fx::lower("dblens_meta")).await;
++    let all = check_mysql_family(&mut live, Fx::lower("datluma_meta")).await;
      let func = table(&all, "emp").indexes.iter().find(|i| i.name == "idx_emp_upper_name").unwrap();
      assert!(has(&func.columns[0].name, "upper"), "{func:?}");
      assert_eq!(logical(table(&all, "ds_t"), "c_json"), LogicalType::Json);
@@ -1638,15 +1638,15 @@ CREATE TABLE dblens_meta.ds_t (
      live.run_script(include_str!("fixtures/mysql.sql")).await;
      live.run_script(include_str!("fixtures/mariadb_only.sql")).await;
 -    let all = check_mysql_family(&mut live).await;
-+    let all = check_mysql_family(&mut live, Fx::lower("dblens_meta")).await;
++    let all = check_mysql_family(&mut live, Fx::lower("datluma_meta")).await;
      // MariaDB 的 JSON 是带检查约束的 longtext，这条隐式检查约束不应出现在 checks 中
      assert!(table(&all, "ds_t").checks.is_empty(), "{:?}", table(&all, "ds_t").checks);
      assert!(!live.d.has_meta(MetaKey::ReservedWords), "MariaDB 的 KEYWORDS 不区分是否保留");
 @@ -283,8 +311,32 @@ async fn mariadb_metadata() {
  async fn postgres_metadata() {
-     let Some(mut live) = connect("DBLENS_TEST_PG_URL").await else { return };
+     let Some(mut live) = connect("DATLUMA_TEST_PG_URL").await else { return };
      live.run_script(include_str!("fixtures/postgres.sql")).await;
--    let fx = Fx { schema: "dblens_meta", upper: false };
+-    let fx = Fx { schema: "datluma_meta", upper: false };
 -    let all = check_common(&mut live, fx).await;
 +    check_pg_family(&mut live, PgFx::FULL).await;
 +}
@@ -1672,7 +1672,7 @@ CREATE TABLE dblens_meta.ds_t (
 +    };
 +    assert!(schemas.iter().any(|x| x.name == builtin && x.is_system), "{schemas:?}");
 +    assert!(schemas.iter().any(|x| x.name == "public" && !x.is_system), "{schemas:?}");
-+    let fx = Fx::lower("dblens_meta");
++    let fx = Fx::lower("datluma_meta");
 +    let all = check_common(live, fx).await;
      let s = fx.schema;
  
@@ -1713,19 +1713,19 @@ CREATE TABLE dblens_meta.ds_t (
  
  #[tokio::test]
  async fn oracle_metadata() {
-     let Some(mut live) = connect("DBLENS_TEST_ORACLE_URL").await else { return };
+     let Some(mut live) = connect("DATLUMA_TEST_ORACLE_URL").await else { return };
      live.run_script(include_str!("fixtures/oracle.sql")).await;
--    let fx = Fx { schema: "DBLENS_TEST", upper: true };
-+    let fx = Fx::upper("DBLENS_TEST");
+-    let fx = Fx { schema: "DATLUMA_TEST", upper: true };
++    let fx = Fx::upper("DATLUMA_TEST");
      let all = check_common(&mut live, fx).await;
      let s = fx.schema;
  
 @@ -369,7 +426,7 @@ async fn oracle_metadata() {
  async fn dameng_metadata() {
-     let Some(mut live) = connect("DBLENS_TEST_DM_URL").await else { return };
+     let Some(mut live) = connect("DATLUMA_TEST_DM_URL").await else { return };
      live.run_script(include_str!("fixtures/dameng.sql")).await;
--    let fx = Fx { schema: "DBLENS_TEST", upper: true };
-+    let fx = Fx::upper("DBLENS_TEST");
+-    let fx = Fx { schema: "DATLUMA_TEST", upper: true };
++    let fx = Fx::upper("DATLUMA_TEST");
      let all = check_common(&mut live, fx).await;
      let s = fx.schema;
  
@@ -1738,13 +1738,13 @@ CREATE TABLE dblens_meta.ds_t (
 +const TIDB_SKIP: [&str; 4] = ["trg", "proc", "func", "idx_fulltext"];
 +
 +fn without_geometry(script: &str) -> String {
-+    let ds = script.lines().find(|l| l.starts_with("CREATE TABLE dblens_meta.ds_t")).unwrap();
++    let ds = script.lines().find(|l| l.starts_with("CREATE TABLE datluma_meta.ds_t")).unwrap();
 +    ds.replace(", c_geometry GEOMETRY", "")
 +}
 +
 +#[tokio::test]
 +async fn tidb_metadata() {
-+    let Some(mut live) = connect("DBLENS_TEST_TIDB_URL").await else { return };
++    let Some(mut live) = connect("DATLUMA_TEST_TIDB_URL").await else { return };
 +    assert_eq!(live.d.variant(), Variant::TiDb);
 +    // CHECK 约束默认只解析不保存，打开后才能读回
 +    live.run_script(
@@ -1755,21 +1755,21 @@ CREATE TABLE dblens_meta.ds_t (
 +    let script = include_str!("fixtures/mysql.sql");
 +    let ds = without_geometry(script);
 +    live.run_script_with(script, &TIDB_SKIP, &[("ds_t", &ds)]).await;
-+    let fx = Fx { triggers: false, routines: false, descending: false, ..Fx::lower("dblens_meta") };
++    let fx = Fx { triggers: false, routines: false, descending: false, ..Fx::lower("datluma_meta") };
 +    live.run_script(TIDB_ONLY).await;
 +    let all = check_mysql_family(&mut live, fx).await;
 +    assert!(table(&all, "emp").triggers.is_empty());
 +
 +    let ar = table(&all, "ar_t");
 +    assert!(ar.columns[0].auto_increment && !ar.columns[1].auto_increment, "AUTO_RANDOM：{ar:?}");
-+    let seq = meta::sequences(&live.rows(MetaKey::Sequences, &args("dblens_meta")).await).unwrap();
++    let seq = meta::sequences(&live.rows(MetaKey::Sequences, &args("datluma_meta")).await).unwrap();
 +    let q = seq.iter().find(|q| q.name == "seq_meta").unwrap();
 +    assert_eq!(
 +        (q.start.as_deref(), q.increment.as_deref(), q.cycle, q.cache),
 +        (Some("100"), Some("5"), true, Some(10))
 +    );
 +    for (t, clustered) in [("ar_t", true), ("nc_t", false)] {
-+        let a = MetaArgs { table: Some(t.into()), ..args("dblens_meta") };
++        let a = MetaArgs { table: Some(t.into()), ..args("datluma_meta") };
 +        let storage = meta::table_storage(&live.rows(MetaKey::TableStorage, &a).await).unwrap();
 +        assert_eq!(storage.clustered, Some(clustered), "{t}");
 +    }
@@ -1777,21 +1777,21 @@ CREATE TABLE dblens_meta.ds_t (
 +
 +/// 只在 TiDB 上建的对象：AUTO_RANDOM 主键、非聚簇主键、序列。
 +const TIDB_ONLY: &str = "-- @@ ar_t
-+CREATE TABLE dblens_meta.ar_t (id BIGINT AUTO_RANDOM PRIMARY KEY, v INT)
++CREATE TABLE datluma_meta.ar_t (id BIGINT AUTO_RANDOM PRIMARY KEY, v INT)
 +-- @@ nc_t
-+CREATE TABLE dblens_meta.nc_t (id INT PRIMARY KEY NONCLUSTERED, v INT)
++CREATE TABLE datluma_meta.nc_t (id INT PRIMARY KEY NONCLUSTERED, v INT)
 +-- @@ seq
-+CREATE SEQUENCE dblens_meta.seq_meta START 100 INCREMENT 5 CACHE 10 CYCLE
++CREATE SEQUENCE datluma_meta.seq_meta START 100 INCREMENT 5 CACHE 10 CYCLE
 +";
 +
 +#[tokio::test]
 +async fn oceanbase_metadata() {
-+    let Some(mut live) = connect("DBLENS_TEST_OCEANBASE_URL").await else { return };
++    let Some(mut live) = connect("DATLUMA_TEST_OCEANBASE_URL").await else { return };
 +    assert_eq!(live.d.variant(), Variant::OceanBase);
 +    let script = include_str!("fixtures/mysql.sql");
 +    let ds = without_geometry(script);
 +    live.run_script_with(script, &[], &[("ds_t", &ds)]).await;
-+    let all = check_mysql_family(&mut live, Fx { descending: false, ..Fx::lower("dblens_meta") }).await;
++    let all = check_mysql_family(&mut live, Fx { descending: false, ..Fx::lower("datluma_meta") }).await;
 +    // 全文索引在 STATISTICS 中只有隐藏列（__doc_id_*、__word_segment_*），去掉后不列出
 +    let emp = table(&all, "emp");
 +    assert!(emp.indexes.iter().all(|i| i.columns.iter().all(|c| !c.name.starts_with("__"))), "{emp:?}");
@@ -1799,7 +1799,7 @@ CREATE TABLE dblens_meta.ds_t (
 +
 +#[tokio::test]
 +async fn opengauss_metadata() {
-+    let Some(mut live) = connect("DBLENS_TEST_OPENGAUSS_URL").await else { return };
++    let Some(mut live) = connect("DATLUMA_TEST_OPENGAUSS_URL").await else { return };
 +    assert_eq!((live.d.variant(), live.d.oracle_mode()), (Variant::OpenGauss, false));
 +    live.run_script(include_str!("fixtures/opengauss.sql")).await;
 +    check_pg_family(&mut live, PgFx { sequence_cache: false, ..PgFx::FULL }).await;
@@ -1807,7 +1807,7 @@ CREATE TABLE dblens_meta.ds_t (
 +
 +#[tokio::test]
 +async fn opengauss_a_metadata() {
-+    let Some(mut live) = connect("DBLENS_TEST_OPENGAUSS_A_URL").await else { return };
++    let Some(mut live) = connect("DATLUMA_TEST_OPENGAUSS_A_URL").await else { return };
 +    assert_eq!((live.d.variant(), live.d.oracle_mode()), (Variant::OpenGauss, true));
 +    live.run_script(include_str!("fixtures/opengauss.sql")).await;
 +    check_pg_family(&mut live, PgFx { sequence_cache: false, ..PgFx::FULL }).await;
@@ -1820,7 +1820,7 @@ CREATE TABLE dblens_meta.ds_t (
 +    assert_eq!((live.d.variant(), live.d.oracle_mode()), (Variant::Kingbase, oracle_mode));
 +    let script = include_str!("fixtures/postgres.sql");
 +    let ds =
-+        script.lines().skip_while(|l| !l.starts_with("CREATE TABLE dblens_meta.ds_t")).collect::<Vec<_>>();
++        script.lines().skip_while(|l| !l.starts_with("CREATE TABLE datluma_meta.ds_t")).collect::<Vec<_>>();
 +    let ds = ds
 +        .join(
 +            "
@@ -1837,26 +1837,26 @@ CREATE TABLE dblens_meta.ds_t (
 +
 +#[tokio::test]
 +async fn kingbase_oracle_metadata() {
-+    kingbase_metadata("DBLENS_TEST_KINGBASE_URL", true).await;
++    kingbase_metadata("DATLUMA_TEST_KINGBASE_URL", true).await;
 +}
 +
 +#[tokio::test]
 +async fn kingbase_pg_metadata() {
-+    kingbase_metadata("DBLENS_TEST_KINGBASE_PG_URL", false).await;
++    kingbase_metadata("DATLUMA_TEST_KINGBASE_PG_URL", false).await;
 +}
 +
 +/// Oracle 兼容模式（人大金仓、openGauss 的 A 模式）：同义词与包。
 +const ORACLE_MODE_ONLY: &str = "-- @@ syn
-+CREATE OR REPLACE SYNONYM dblens_meta.syn_emp FOR dblens_meta.emp
++CREATE OR REPLACE SYNONYM datluma_meta.syn_emp FOR datluma_meta.emp
 +-- @@ pkg
-+CREATE OR REPLACE PACKAGE dblens_meta.pkg_meta AS FUNCTION f(a integer) RETURN integer; END pkg_meta;
++CREATE OR REPLACE PACKAGE datluma_meta.pkg_meta AS FUNCTION f(a integer) RETURN integer; END pkg_meta;
 +-- @@ pkg_body
-+CREATE OR REPLACE PACKAGE BODY dblens_meta.pkg_meta AS FUNCTION f(a integer) RETURN integer IS BEGIN RETURN a + 1; END; END pkg_meta;
++CREATE OR REPLACE PACKAGE BODY datluma_meta.pkg_meta AS FUNCTION f(a integer) RETURN integer IS BEGIN RETURN a + 1; END; END pkg_meta;
 +";
 +
 +async fn check_oracle_mode_objects(live: &mut Live) {
 +    live.run_script(ORACLE_MODE_ONLY).await;
-+    let s = "dblens_meta";
++    let s = "datluma_meta";
 +    let syn = meta::synonyms(&live.rows(MetaKey::Synonyms, &args(s)).await).unwrap();
 +    assert!(
 +        syn.iter()
@@ -1883,17 +1883,17 @@ CREATE TABLE dblens_meta.ds_t (
 +}
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/tests/meta_snapshots.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/tests/meta_snapshots.rs`**
 
 ```diff
---- a/crates/dblens-dialect/tests/meta_snapshots.rs
-+++ b/crates/dblens-dialect/tests/meta_snapshots.rs
+--- a/crates/datluma-dialect/tests/meta_snapshots.rs
++++ b/crates/datluma-dialect/tests/meta_snapshots.rs
 @@ -2,10 +2,20 @@
  //! 改动模板时在快照差异里审查生成的 SQL。新增或改动快照后用 `INSTA_UPDATE=always cargo test` 重新生成并审查。
  
- use dblens_dialect::meta::{MetaArgs, MetaKey};
--use dblens_dialect::{Dialect, Variant};
-+use dblens_dialect::{Dialect, Family, Variant};
+ use datluma_dialect::meta::{MetaArgs, MetaKey};
+-use datluma_dialect::{Dialect, Variant};
++use datluma_dialect::{Dialect, Family, Variant};
  
 -const VARIANTS: [Variant; 5] =
 -    [Variant::MySql, Variant::MariaDb, Variant::Postgres, Variant::Oracle, Variant::Dameng];
@@ -1936,11 +1936,11 @@ CREATE TABLE dblens_meta.ds_t (
      ] {
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/tests/snapshots/meta_snapshots__kingbase.snap`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/tests/snapshots/meta_snapshots__kingbase.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/tests/meta_snapshots.rs
+source: crates/datluma-dialect/tests/meta_snapshots.rs
 expression: out
 ---
 -- [schemas] []
@@ -2292,11 +2292,11 @@ WHERE n.nspname = $1
   AND c.relkind IN ('r', 'p')
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/tests/meta_snapshots.rs
+source: crates/datluma-dialect/tests/meta_snapshots.rs
 expression: out
 ---
 -- [schemas] []
@@ -2502,11 +2502,11 @@ WHERE t.TABLE_SCHEMA = ?
   AND t.TABLE_NAME = ?
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-dialect/tests/snapshots/meta_snapshots__opengauss.snap`**
+- [ ] **Step 6: 新建 `crates/datluma-dialect/tests/snapshots/meta_snapshots__opengauss.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/tests/meta_snapshots.rs
+source: crates/datluma-dialect/tests/meta_snapshots.rs
 expression: out
 ---
 -- [schemas] []
@@ -2857,11 +2857,11 @@ WHERE n.nspname = $1
   AND c.relkind IN ('r', 'p')
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap`**
+- [ ] **Step 7: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap
 @@ -81,20 +81,20 @@ GROUP BY p.proname, 2
  ORDER BY p.proname, 2
  
@@ -2889,11 +2889,11 @@ WHERE n.nspname = $1
  JOIN pg_catalog.pg_attribute a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
 ```
 
-- [ ] **Step 8: 新建 `crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap`**
+- [ ] **Step 8: 新建 `crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/tests/meta_snapshots.rs
+source: crates/datluma-dialect/tests/meta_snapshots.rs
 expression: out
 ---
 -- [schemas] []
@@ -3125,11 +3125,11 @@ WHERE t.TABLE_SCHEMA = ?
   AND t.TABLE_NAME = ?
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-dialect/sql/kingbase.sql`**
+- [ ] **Step 9: 修改 `crates/datluma-dialect/sql/kingbase.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/kingbase.sql
-+++ b/crates/dblens-dialect/sql/kingbase.sql
+--- a/crates/datluma-dialect/sql/kingbase.sql
++++ b/crates/datluma-dialect/sql/kingbase.sql
 @@ -4,3 +4,99 @@
  -- Compatibility mode (oracle / pg / mysql / sqlserver) and the PostgreSQL version the build is based on.
  SELECT current_setting('database_mode') AS mode,
@@ -3232,7 +3232,7 @@ WHERE t.TABLE_SCHEMA = ?
 +ORDER BY r.line
 ```
 
-- [ ] **Step 10: 新建 `crates/dblens-dialect/sql/oceanbase.sql`**
+- [ ] **Step 10: 新建 `crates/datluma-dialect/sql/oceanbase.sql`**
 
 ```sql
 -- OceanBase (MySQL mode) overrides on top of mysql.sql (only keys that differ). Tested on 4.4.2.1;
@@ -3298,11 +3298,11 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
 ORDER BY t.TABLE_NAME
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-dialect/sql/opengauss.sql`**
+- [ ] **Step 11: 修改 `crates/datluma-dialect/sql/opengauss.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/opengauss.sql
-+++ b/crates/dblens-dialect/sql/opengauss.sql
+--- a/crates/datluma-dialect/sql/opengauss.sql
++++ b/crates/datluma-dialect/sql/opengauss.sql
 @@ -1,5 +1,7 @@
  -- openGauss overrides on top of postgres.sql (only keys that differ). Based on PG 9.2; tested on 7.0.0-RC1
 --- with databases in A (Oracle-compatible) and PG compatibility.
@@ -3624,11 +3624,11 @@ ORDER BY t.TABLE_NAME
 +ORDER BY r.line
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-dialect/sql/postgres.sql`**
+- [ ] **Step 12: 修改 `crates/datluma-dialect/sql/postgres.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/postgres.sql
-+++ b/crates/dblens-dialect/sql/postgres.sql
+--- a/crates/datluma-dialect/sql/postgres.sql
++++ b/crates/datluma-dialect/sql/postgres.sql
 @@ -100,25 +100,25 @@ GROUP BY p.proname, 2
  ORDER BY p.proname, 2
  
@@ -3661,7 +3661,7 @@ ORDER BY t.TABLE_NAME
  {% endif %}
 ```
 
-- [ ] **Step 13: 新建 `crates/dblens-dialect/sql/tidb.sql`**
+- [ ] **Step 13: 新建 `crates/datluma-dialect/sql/tidb.sql`**
 
 ```sql
 -- TiDB overrides on top of mysql.sql (only keys that differ). Tested on v8.5.8; VERSION() reports 8.0.11.
@@ -3760,11 +3760,11 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
   AND t.TABLE_NAME = {{ bind("table") }}
 ```
 
-- [ ] **Step 14: 修改 `crates/dblens-dialect/src/design/rebuild.rs`**
+- [ ] **Step 14: 修改 `crates/datluma-dialect/src/design/rebuild.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/rebuild.rs
-+++ b/crates/dblens-dialect/src/design/rebuild.rs
+--- a/crates/datluma-dialect/src/design/rebuild.rs
++++ b/crates/datluma-dialect/src/design/rebuild.rs
 @@ -375,6 +375,7 @@ mod tests {
                  collation: Some("utf8mb4_0900_ai_ci".into()),
                  tablespace: None,
@@ -3775,11 +3775,11 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
          }
 ```
 
-- [ ] **Step 15: 修改 `crates/dblens-dialect/src/ident.rs`**
+- [ ] **Step 15: 修改 `crates/datluma-dialect/src/ident.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/ident.rs
-+++ b/crates/dblens-dialect/src/ident.rs
+--- a/crates/datluma-dialect/src/ident.rs
++++ b/crates/datluma-dialect/src/ident.rs
 @@ -55,7 +55,7 @@ fn is_reserved(family: Family, upper: &str) -> bool {
          || (family == Family::Dameng && DAMENG_RESERVED.binary_search(&upper).is_ok())
  }
@@ -3953,11 +3953,11 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
      "WHEN",
 ```
 
-- [ ] **Step 16: 修改 `crates/dblens-dialect/src/meta/assemble.rs`**
+- [ ] **Step 16: 修改 `crates/datluma-dialect/src/meta/assemble.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/assemble.rs
-+++ b/crates/dblens-dialect/src/meta/assemble.rs
+--- a/crates/datluma-dialect/src/meta/assemble.rs
++++ b/crates/datluma-dialect/src/meta/assemble.rs
 @@ -354,6 +354,8 @@ pub struct TableStorage {
      pub collation: Option<String>,
      pub tablespace: Option<String>,
@@ -3977,11 +3977,11 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
  }
 ```
 
-- [ ] **Step 17: 修改 `crates/dblens-dialect/src/meta/template.rs`**
+- [ ] **Step 17: 修改 `crates/datluma-dialect/src/meta/template.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/template.rs
-+++ b/crates/dblens-dialect/src/meta/template.rs
+--- a/crates/datluma-dialect/src/meta/template.rs
++++ b/crates/datluma-dialect/src/meta/template.rs
 @@ -21,6 +21,8 @@ const ORACLE: &str = include_str!("../../sql/oracle.sql");
  const DAMENG: &str = include_str!("../../sql/dameng.sql");
  const KINGBASE: &str = include_str!("../../sql/kingbase.sql");
@@ -4002,11 +4002,11 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
          _ => None,
 ```
 
-- [ ] **Step 18: 修改 `crates/dblens-driver-postgres/src/types.rs`**
+- [ ] **Step 18: 修改 `crates/datluma-driver-postgres/src/types.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/src/types.rs
-+++ b/crates/dblens-driver-postgres/src/types.rs
+--- a/crates/datluma-driver-postgres/src/types.rs
++++ b/crates/datluma-driver-postgres/src/types.rs
 @@ -120,7 +120,8 @@ impl<'a> FromSql<'a> for RawValue<'a> {
  
  /// 兼容库自定义的类型对应的标准类型：域类型取基础类型（人大金仓 Oracle 模式的 `date` 是 timestamp 上的域，
@@ -4048,10 +4048,10 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`、库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`、库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。
 - 人大金仓的开发版授权最多 10 个连接：它的测试用 `-- kingbase --test-threads=1` 单独串行运行。
 - 达梦的测试与其他测试同在一个进程里运行时偶发"网络通讯失败"，失败时用 `-- dameng --test-threads=1` 单独重跑。
 
@@ -4060,7 +4060,7 @@ Expected: 全部测试通过（元数据实库测试 11 个；快照 9 个，新
 - [ ] **Step 20: 提交**
 
 ```bash
-git add crates/dblens-dialect/sql/kingbase.sql crates/dblens-dialect/sql/oceanbase.sql crates/dblens-dialect/sql/opengauss.sql crates/dblens-dialect/sql/postgres.sql crates/dblens-dialect/sql/tidb.sql crates/dblens-dialect/src/design/rebuild.rs crates/dblens-dialect/src/ident.rs crates/dblens-dialect/src/meta/assemble.rs crates/dblens-dialect/src/meta/template.rs crates/dblens-dialect/tests/fixtures/opengauss.sql crates/dblens-dialect/tests/meta_live.rs crates/dblens-dialect/tests/meta_snapshots.rs crates/dblens-dialect/tests/snapshots/meta_snapshots__kingbase.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__opengauss.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap crates/dblens-driver-postgres/src/types.rs
+git add crates/datluma-dialect/sql/kingbase.sql crates/datluma-dialect/sql/oceanbase.sql crates/datluma-dialect/sql/opengauss.sql crates/datluma-dialect/sql/postgres.sql crates/datluma-dialect/sql/tidb.sql crates/datluma-dialect/src/design/rebuild.rs crates/datluma-dialect/src/ident.rs crates/datluma-dialect/src/meta/assemble.rs crates/datluma-dialect/src/meta/template.rs crates/datluma-dialect/tests/fixtures/opengauss.sql crates/datluma-dialect/tests/meta_live.rs crates/datluma-dialect/tests/meta_snapshots.rs crates/datluma-dialect/tests/snapshots/meta_snapshots__kingbase.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__opengauss.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap crates/datluma-driver-postgres/src/types.rs
 git commit -m "feat(dialect): 国产库第一批的元数据模板" -m "新增 tidb.sql、oceanbase.sql、kingbase.sql、opengauss.sql 覆盖文件：系统 schema、分区、检查约束、序列、AUTO_RANDOM 与聚簇主键、同义词与包；PG 模板去掉与空串的比较（Oracle 兼容模式下空串即 NULL）；补充保留字。元数据实库测试覆盖新目标。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4073,20 +4073,20 @@ git commit -m "feat(dialect): 国产库第一批的元数据模板" -m "新增 t
 - `Dialect::split` 与新加的 `Dialect::splitter()` 按兼容模式；执行 SQL 文件用 `dialect.splitter()`。
 
 **Files:**
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Modify: `crates/dblens-dialect/src/split.rs`
-- Modify: `crates/dblens-driver-mysql/src/error.rs`
-- Modify: `crates/dblens-service/src/sqlfile.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Modify: `crates/datluma-dialect/src/split.rs`
+- Modify: `crates/datluma-driver-mysql/src/error.rs`
+- Modify: `crates/datluma-service/src/sqlfile.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `oracle_mode`。
 - Produces：`StreamSplitter::with_oracle_blocks(self) -> Self`、`Dialect::splitter(&self) -> StreamSplitter`。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -26,6 +26,7 @@ pub use dml::DmlTemplate;
  pub use import::{ImportStatement, MAX_PARAMS_PER_STATEMENT, MAX_ROWS_PER_STATEMENT, WriteMode};
  pub use ops::{OpsCategory, OpsQuery};
@@ -4127,11 +4127,11 @@ git commit -m "feat(dialect): 国产库第一批的元数据模板" -m "新增 t
          assert!(
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/src/split.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/src/split.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/split.rs
-+++ b/crates/dblens-dialect/src/split.rs
+--- a/crates/datluma-dialect/src/split.rs
++++ b/crates/datluma-dialect/src/split.rs
 @@ -34,7 +34,11 @@ pub struct SqlStatement {
  
  /// 按家族的语法规则拆分多条语句。
@@ -4231,11 +4231,11 @@ git commit -m "feat(dialect): 国产库第一批的元数据模板" -m "新增 t
          let f = "CREATE FUNCTION f() RETURNS int AS $$ BEGIN RETURN 1; END; $$ LANGUAGE plpgsql; SELECT 1";
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-driver-mysql/src/error.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-driver-mysql/src/error.rs`**
 
 ```diff
---- a/crates/dblens-driver-mysql/src/error.rs
-+++ b/crates/dblens-driver-mysql/src/error.rs
+--- a/crates/datluma-driver-mysql/src/error.rs
++++ b/crates/datluma-driver-mysql/src/error.rs
 @@ -18,12 +18,12 @@ pub(crate) fn map_err(e: mysql_async::Error) -> Error {
      }
  }
@@ -4292,15 +4292,15 @@ git commit -m "feat(dialect): 国产库第一批的元数据模板" -m "新增 t
 +        let tidb = "You have an error in your SQL syntax; check the manual that corresponds to your TiDB version for the right syntax to use line 2 column 10 near \"FROM t\nWHERE x\" ";
 +        assert_eq!(at(sql, tidb).as_deref(), Some("FROM t\nWHERE x"));
          let e = Error::Sql { code: "1064".into(), message: syntax("FROM t", 1), position: None };
-         let Error::Sql { position, .. } = with_position(e, "SELECT '数洞', FROM t") else { panic!() };
+         let Error::Sql { position, .. } = with_position(e, "SELECT '数览', FROM t") else { panic!() };
          assert_eq!(position, Some(14));
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/sqlfile.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/sqlfile.rs`**
 
 ```diff
---- a/crates/dblens-service/src/sqlfile.rs
-+++ b/crates/dblens-service/src/sqlfile.rs
+--- a/crates/datluma-service/src/sqlfile.rs
++++ b/crates/datluma-service/src/sqlfile.rs
 @@ -113,7 +113,7 @@ impl Statements {
      fn open(file: &SourceFile, encoding: TextEncoding, dialect: Dialect) -> Self {
          Self {
@@ -4318,7 +4318,7 @@ git commit -m "feat(dialect): 国产库第一批的元数据模板" -m "新增 t
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（mysql 驱动、dialect 各新增断言）。
@@ -4326,7 +4326,7 @@ Expected: 全部测试通过（mysql 驱动、dialect 各新增断言）。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-dialect/src/lib.rs crates/dblens-dialect/src/split.rs crates/dblens-driver-mysql/src/error.rs crates/dblens-service/src/sqlfile.rs
+git add crates/datluma-dialect/src/lib.rs crates/datluma-dialect/src/split.rs crates/datluma-driver-mysql/src/error.rs crates/datluma-service/src/sqlfile.rs
 git commit -m "feat: TiDB、OceanBase 的出错位置；Oracle 兼容模式下的语句拆分" -m "出错位置认得 OceanBase 带追踪号的报错和 TiDB 的 line/column 写法；人大金仓、openGauss 的 Oracle 兼容模式识别 PL/SQL 块和独占一行的 /，$$ 写法照常。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4340,21 +4340,21 @@ git commit -m "feat: TiDB、OceanBase 的出错位置；Oracle 兼容模式下�
 - `sql/ops/opengauss.sql`：`sessions`、`running`（没有 `backend_type`、`wait_event_type`，有 `waiting`、`enqueue`）、`locks`（`pg_locks` 自连接，没有 `pg_blocking_pids`）、`slow_sql`（`dbe_perf.statement`，需要 MONADMIN）。
 
 **Files:**
-- Modify: `crates/dblens-dialect/sql/ops/mysql.sql`
-- Create: `crates/dblens-dialect/sql/ops/oceanbase.sql`
-- Create: `crates/dblens-dialect/sql/ops/opengauss.sql`
-- Modify: `crates/dblens-dialect/sql/ops/postgres.sql`
-- Create: `crates/dblens-dialect/sql/ops/tidb.sql`
-- Modify: `crates/dblens-dialect/src/ops.rs`
+- Modify: `crates/datluma-dialect/sql/ops/mysql.sql`
+- Create: `crates/datluma-dialect/sql/ops/oceanbase.sql`
+- Create: `crates/datluma-dialect/sql/ops/opengauss.sql`
+- Modify: `crates/datluma-dialect/sql/ops/postgres.sql`
+- Create: `crates/datluma-dialect/sql/ops/tidb.sql`
+- Modify: `crates/datluma-dialect/src/ops.rs`
 
 **Interfaces:**
 - Consumes：无。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/sql/ops/mysql.sql`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/sql/ops/mysql.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/ops/mysql.sql
-+++ b/crates/dblens-dialect/sql/ops/mysql.sql
+--- a/crates/datluma-dialect/sql/ops/mysql.sql
++++ b/crates/datluma-dialect/sql/ops/mysql.sql
 @@ -1,5 +1,5 @@
 --- MySQL ops queries (M1c3). Also used by TiDB, OceanBase and PolarDB, which may lack some of the views:
 --- the database's own error is shown in that case. Timers in performance_schema are picoseconds.
@@ -4365,7 +4365,7 @@ git commit -m "feat: TiDB、OceanBase 的出错位置；Oracle 兼容模式下�
  -- name.zh-CN: 会话列表
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-dialect/sql/ops/oceanbase.sql`**
+- [ ] **Step 2: 新建 `crates/datluma-dialect/sql/ops/oceanbase.sql`**
 
 ```sql
 -- OceanBase (MySQL mode) overrides of the MySQL ops queries. There is neither the sys schema nor
@@ -4401,7 +4401,7 @@ ORDER BY p.AVG_EXE_USEC DESC
 LIMIT 20
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-dialect/sql/ops/opengauss.sql`**
+- [ ] **Step 3: 新建 `crates/datluma-dialect/sql/ops/opengauss.sql`**
 
 ```sql
 -- openGauss overrides of the PostgreSQL ops queries. pg_stat_activity has no backend_type / wait_event_type
@@ -4466,11 +4466,11 @@ ORDER BY s.total_elapse_time / s.n_calls DESC
 LIMIT 20
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/sql/ops/postgres.sql`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/sql/ops/postgres.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/ops/postgres.sql
-+++ b/crates/dblens-dialect/sql/ops/postgres.sql
+--- a/crates/datluma-dialect/sql/ops/postgres.sql
++++ b/crates/datluma-dialect/sql/ops/postgres.sql
 @@ -1,5 +1,5 @@
 --- PostgreSQL ops queries (M1c3). Also used by KingbaseES, openGauss, GaussDB and HighGo, which may name
 --- some columns differently: the database's own error is shown in that case.
@@ -4481,7 +4481,7 @@ LIMIT 20
  -- [sessions]
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/sql/ops/tidb.sql`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/sql/ops/tidb.sql`**
 
 ```sql
 -- TiDB overrides of the MySQL ops queries. There is no sys schema; lock waits come from DATA_LOCK_WAITS
@@ -4502,11 +4502,11 @@ LEFT JOIN information_schema.CLUSTER_TIDB_TRX bt ON bt.ID = w.CURRENT_HOLDING_TR
 ORDER BY wait_seconds DESC
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-dialect/src/ops.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-dialect/src/ops.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/ops.rs
-+++ b/crates/dblens-dialect/src/ops.rs
+--- a/crates/datluma-dialect/src/ops.rs
++++ b/crates/datluma-dialect/src/ops.rs
 @@ -22,6 +22,9 @@ const MARIADB: &str = include_str!("../sql/ops/mariadb.sql");
  const POSTGRES: &str = include_str!("../sql/ops/postgres.sql");
  const ORACLE: &str = include_str!("../sql/ops/oracle.sql");
@@ -4557,7 +4557,7 @@ ORDER BY wait_seconds DESC
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过。
@@ -4565,7 +4565,7 @@ Expected: 全部测试通过。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-dialect/sql/ops/mysql.sql crates/dblens-dialect/sql/ops/oceanbase.sql crates/dblens-dialect/sql/ops/opengauss.sql crates/dblens-dialect/sql/ops/postgres.sql crates/dblens-dialect/sql/ops/tidb.sql crates/dblens-dialect/src/ops.rs
+git add crates/datluma-dialect/sql/ops/mysql.sql crates/datluma-dialect/sql/ops/oceanbase.sql crates/datluma-dialect/sql/ops/opengauss.sql crates/datluma-dialect/sql/ops/postgres.sql crates/datluma-dialect/sql/ops/tidb.sql crates/datluma-dialect/src/ops.rs
 git commit -m "feat(dialect): TiDB、OceanBase、openGauss 的运维查询" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4578,18 +4578,18 @@ git commit -m "feat(dialect): TiDB、OceanBase、openGauss 的运维查询" -m "
 - `changes.rs`：Oracle 兼容模式中定位行时原值为空串的写成 `IS NULL`。
 
 **Files:**
-- Modify: `crates/dblens-dialect/src/changes.rs`
-- Modify: `crates/dblens-dialect/src/import.rs`
-- Modify: `crates/dblens-driver-postgres/src/types.rs`
+- Modify: `crates/datluma-dialect/src/changes.rs`
+- Modify: `crates/datluma-dialect/src/import.rs`
+- Modify: `crates/datluma-driver-postgres/src/types.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `oracle_mode`、任务 3 的 `standard_type`。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/src/changes.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/src/changes.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/changes.rs
-+++ b/crates/dblens-dialect/src/changes.rs
+--- a/crates/datluma-dialect/src/changes.rs
++++ b/crates/datluma-dialect/src/changes.rs
 @@ -97,10 +97,12 @@ impl<'a> Builder<'a> {
          Ok(())
      }
@@ -4606,7 +4606,7 @@ git commit -m "feat(dialect): TiDB、OceanBase、openGauss 的运维查询" -m "
              Ok(())
          } else {
 @@ -248,7 +250,7 @@ mod tests {
-     use dblens_core::schema::{PrimaryKey, UniqueConstraint};
+     use datluma_core::schema::{PrimaryKey, UniqueConstraint};
  
      use super::*;
 -    use crate::Variant;
@@ -4639,13 +4639,13 @@ git commit -m "feat(dialect): TiDB、OceanBase、openGauss 的运维查询" -m "
          let changes = [
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/src/import.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/src/import.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/import.rs
-+++ b/crates/dblens-dialect/src/import.rs
-@@ -7,7 +7,7 @@ use dblens_core::schema::{Column, Table};
- use dblens_core::{Error, LogicalType, Result, Value, msg};
+--- a/crates/datluma-dialect/src/import.rs
++++ b/crates/datluma-dialect/src/import.rs
+@@ -7,7 +7,7 @@ use datluma_core::schema::{Column, Table};
+ use datluma_core::{Error, LogicalType, Result, Value, msg};
  use serde::{Deserialize, Serialize};
  
 -use crate::{Dialect, Family};
@@ -4685,11 +4685,11 @@ git commit -m "feat(dialect): TiDB、OceanBase、openGauss 的运维查询" -m "
          assert_eq!(ora.len(), 2);
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-driver-postgres/src/types.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-driver-postgres/src/types.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/src/types.rs
-+++ b/crates/dblens-driver-postgres/src/types.rs
+--- a/crates/datluma-driver-postgres/src/types.rs
++++ b/crates/datluma-driver-postgres/src/types.rs
 @@ -240,6 +240,10 @@ pub(crate) struct PgParam<'a>(pub &'a Value);
  
  impl ToSql for PgParam<'_> {
@@ -4717,7 +4717,7 @@ git commit -m "feat(dialect): TiDB、OceanBase、openGauss 的运维查询" -m "
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 1 个、断言 1 处）。
@@ -4725,7 +4725,7 @@ Expected: 全部测试通过（dialect 新增 1 个、断言 1 处）。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-dialect/src/changes.rs crates/dblens-dialect/src/import.rs crates/dblens-driver-postgres/src/types.rs
+git add crates/datluma-dialect/src/changes.rs crates/datluma-dialect/src/import.rs crates/datluma-driver-postgres/src/types.rs
 git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数按兼容库类型对应的标准类型编码（人大金仓 Oracle 模式的 DATE）；openGauss 的按主键更新用 ON DUPLICATE KEY UPDATE；Oracle 兼容模式下定位行时空串按 IS NULL。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4741,21 +4741,21 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
 后端词条加 `design.unsupported.clustered_pk`。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-dialect/sql/oceanbase.sql`
-- Modify: `crates/dblens-dialect/src/design/catalog.rs`
-- Modify: `crates/dblens-dialect/src/design/postgres.rs`
-- Modify: `crates/dblens-dialect/src/design/sql.rs`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-dialect/sql/oceanbase.sql`
+- Modify: `crates/datluma-dialect/src/design/catalog.rs`
+- Modify: `crates/datluma-dialect/src/design/postgres.rs`
+- Modify: `crates/datluma-dialect/src/design/sql.rs`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`
 
 **Interfaces:**
 - Consumes：任务 4 的 OceanBase 模板。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
 @@ -126,14 +126,13 @@ WHERE s.TABLE_SCHEMA = ?
  ORDER BY s.TABLE_NAME, s.INDEX_NAME, s.SEQ_IN_INDEX
  
@@ -4776,11 +4776,11 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
    AND t.EVENT_OBJECT_TABLE = ?
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 2: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -42,6 +42,7 @@
    "design.type_empty": {"zh-CN": "类型不能为空", "en": "Type is required"},
    "design.unknown_column": {"zh-CN": "列 %{column} 不存在", "en": "Column %{column} does not exist"},
@@ -4791,11 +4791,11 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
    "design.unsupported.reorder": {"zh-CN": "该库不能调整已有列的顺序或在指定位置加列", "en": "This database cannot reorder existing columns or add a column at a given position"},
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/sql/oceanbase.sql`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/sql/oceanbase.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/oceanbase.sql
-+++ b/crates/dblens-dialect/sql/oceanbase.sql
+--- a/crates/datluma-dialect/sql/oceanbase.sql
++++ b/crates/datluma-dialect/sql/oceanbase.sql
 @@ -59,3 +59,18 @@ WHERE t.TABLE_SCHEMA = {{ bind("schema") }}
         OR UPPER(COALESCE(t.TABLE_COMMENT, '')) LIKE UPPER({{ bind("filter") }}) ESCAPE '!')
  {% endif %}
@@ -4817,11 +4817,11 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
 +ORDER BY t.EVENT_OBJECT_TABLE, t.TRIGGER_NAME
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/src/design/catalog.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/src/design/catalog.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/catalog.rs
-+++ b/crates/dblens-dialect/src/design/catalog.rs
+--- a/crates/datluma-dialect/src/design/catalog.rs
++++ b/crates/datluma-dialect/src/design/catalog.rs
 @@ -103,6 +103,10 @@ const POSTGRES_TYPES: &[TypeEntry] = &[
      t("xml", N),
  ];
@@ -4910,19 +4910,19 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
      }
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-dialect/src/design/postgres.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-dialect/src/design/postgres.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/postgres.rs
-+++ b/crates/dblens-dialect/src/design/postgres.rs
+--- a/crates/datluma-dialect/src/design/postgres.rs
++++ b/crates/datluma-dialect/src/design/postgres.rs
 @@ -1,5 +1,5 @@
  //! PG 家族（PostgreSQL、金仓、openGauss、GaussDB、瀚高）的设计器 DDL（M3 设计文档 4.3 节）。
 -//! 每项改动一条或几条语句，整体放在一个事务中执行。
 +//! 每项改动一条或几条语句，整体放在一个事务中执行。openGauss 没有标识列，自增列用 serial 和序列。
  
- use dblens_core::Result;
- use dblens_core::schema::{Column, Index, Table};
-@@ -7,11 +7,24 @@ use dblens_core::schema::{Column, Index, Table};
+ use datluma_core::Result;
+ use datluma_core::schema::{Column, Index, Table};
+@@ -7,11 +7,24 @@ use datluma_core::schema::{Column, Index, Table};
  use super::TableChange as C;
  use super::diff::{same_type, text};
  use super::sql::{DesignStatement, stmt};
@@ -4981,11 +4981,11 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
                      .into(),
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-dialect/src/design/sql.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-dialect/src/design/sql.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/sql.rs
-+++ b/crates/dblens-dialect/src/design/sql.rs
+--- a/crates/datluma-dialect/src/design/sql.rs
++++ b/crates/datluma-dialect/src/design/sql.rs
 @@ -7,7 +7,7 @@ use serde::Serialize;
  
  use super::diff::{is_expression, text};
@@ -5016,7 +5016,7 @@ git commit -m "feat: 国产库的数据编辑与导入" -m "PG 驱动的参数�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 设计器能力的断言增加）。
@@ -5024,7 +5024,7 @@ Expected: 全部测试通过（dialect 设计器能力的断言增加）。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/sql/oceanbase.sql crates/dblens-dialect/src/design/catalog.rs crates/dblens-dialect/src/design/postgres.rs crates/dblens-dialect/src/design/sql.rs crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/sql/oceanbase.sql crates/datluma-dialect/src/design/catalog.rs crates/datluma-dialect/src/design/postgres.rs crates/datluma-dialect/src/design/sql.rs crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
 git commit -m "feat(dialect): 国产库的表设计器" -m "能力表按变体与兼容模式给出；openGauss 的自增列用 serial 和序列；TiDB 更换主键时重建；OceanBase 的触发器定义按它的 ACTION_STATEMENT 读取。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5036,18 +5036,18 @@ git commit -m "feat(dialect): 国产库的表设计器" -m "能力表按变体�
 - 实库测试中 `ProfileInput` 的字面量补 `product: None`。
 
 **Files:**
-- Modify: `crates/dblens-service/src/profile.rs`
-- Modify: `crates/dblens-service/src/store.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-service/src/profile.rs`
+- Modify: `crates/datluma-service/src/store.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
-- Produces：`dblens_service::ProfileInput.product: Option<Variant>`。
+- Produces：`datluma_service::ProfileInput.product: Option<Variant>`。
 
-- [ ] **Step 1: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -66,6 +66,7 @@ async fn setup(env: &str) -> Option<Live> {
          environment: Environment::Test,
          color: None,
@@ -5058,11 +5058,11 @@ git commit -m "feat(dialect): 国产库的表设计器" -m "能力表按变体�
      eprintln!("{env}：{} {:?} {:?}", summary.variant_name.current(), summary.version_code, summary.version);
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/src/profile.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/src/profile.rs`**
 
 ```diff
---- a/crates/dblens-service/src/profile.rs
-+++ b/crates/dblens-service/src/profile.rs
+--- a/crates/datluma-service/src/profile.rs
++++ b/crates/datluma-service/src/profile.rs
 @@ -62,6 +62,10 @@ pub struct ProfileInput {
      pub color: Option<String>,
      #[serde(default = "default_timeout")]
@@ -5185,11 +5185,11 @@ git commit -m "feat(dialect): 国产库的表设计器" -m "能力表按变体�
          let s = Store::open_in_memory().unwrap();
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/store.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/store.rs`**
 
 ```diff
---- a/crates/dblens-service/src/store.rs
-+++ b/crates/dblens-service/src/store.rs
+--- a/crates/datluma-service/src/store.rs
++++ b/crates/datluma-service/src/store.rs
 @@ -73,6 +73,8 @@ const MIGRATIONS: &[&str] = &[
          updated_at INTEGER NOT NULL
      );
@@ -5207,7 +5207,7 @@ git commit -m "feat(dialect): 国产库的表设计器" -m "能力表按变体�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 1 个）。
@@ -5215,7 +5215,7 @@ Expected: 全部测试通过（service 新增 1 个）。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service/src/profile.rs crates/dblens-service/src/store.rs crates/dblens-service/tests/live.rs
+git add crates/datluma-service/src/profile.rs crates/datluma-service/src/store.rs crates/datluma-service/tests/live.rs
 git commit -m "feat(service): 连接配置记录新建时选的产品" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5223,28 +5223,28 @@ git commit -m "feat(service): 连接配置记录新建时选的产品" -m "Co-Au
 
 ### Task 10: 服务层、接口层的实库测试覆盖国产库第一批
 
-- `dblens-service/tests/live.rs`：`Live` 记下变体和兼容模式；`adapt`（openGauss 把 `INT GENERATED BY DEFAULT AS IDENTITY` 换成 `SERIAL`）；`domestic_flows!` 为 6 个目标生成 flow、workbench、cancel、objects、ops、export、editing、import、sql_file、design 十个测试；TiDB 的 SQL 文件不用存储过程，Oracle 兼容模式用 Oracle 风格的过程块和 `/`；设计器测试中 TiDB、OceanBase 不用降序索引，TiDB 不建触发器、自增值只要求大于原最大值。
-- `dblens-api/tests/live.rs`：`flow(env, tls)`，TLS 只对开了 TLS 的 MySQL、MariaDB、PG 测试库要求；加 6 个目标。
+- `datluma-service/tests/live.rs`：`Live` 记下变体和兼容模式；`adapt`（openGauss 把 `INT GENERATED BY DEFAULT AS IDENTITY` 换成 `SERIAL`）；`domestic_flows!` 为 6 个目标生成 flow、workbench、cancel、objects、ops、export、editing、import、sql_file、design 十个测试；TiDB 的 SQL 文件不用存储过程，Oracle 兼容模式用 Oracle 风格的过程块和 `/`；设计器测试中 TiDB、OceanBase 不用降序索引，TiDB 不建触发器、自增值只要求大于原最大值。
+- `datluma-api/tests/live.rs`：`flow(env, tls)`，TLS 只对开了 TLS 的 MySQL、MariaDB、PG 测试库要求；加 6 个目标。
 - 测试库上的准备（不在仓库中）：openGauss 的 `admin` 授予 MONADMIN（`ALTER USER admin MONADMIN`）。
 
 **Files:**
-- Modify: `crates/dblens-api/tests/live.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-api/tests/live.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 2–9 的全部改动。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/live.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/live.rs
-+++ b/crates/dblens-api/tests/live.rs
+--- a/crates/datluma-api/tests/live.rs
++++ b/crates/datluma-api/tests/live.rs
 @@ -1,7 +1,9 @@
  //! 接口的实库测试。设置对应的环境变量时运行，否则直接通过：
--//! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL。
-+//! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL；
-+//! 国产库第一批：DBLENS_TEST_TIDB_URL、DBLENS_TEST_OCEANBASE_URL、DBLENS_TEST_OPENGAUSS_URL、
-+//! DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL。
+-//! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL。
++//! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL；
++//! 国产库第一批：DATLUMA_TEST_TIDB_URL、DATLUMA_TEST_OCEANBASE_URL、DATLUMA_TEST_OPENGAUSS_URL、
++//! DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL。
  //!
 -//! 通过 REST 保存连接配置（MySQL 系和 PG 走 TLS）、测试连接、浏览元数据、打开会话，
 +//! 通过 REST 保存连接配置（MySQL、MariaDB、PG 的测试库开了 TLS，要求走 TLS）、测试连接、浏览元数据、打开会话，
@@ -5274,87 +5274,87 @@ git commit -m "feat(service): 连接配置记录新建时选的产品" -m "Co-Au
  
  #[tokio::test]
  async fn mysql() {
--    flow("DBLENS_TEST_MYSQL_URL").await;
-+    flow("DBLENS_TEST_MYSQL_URL", true).await;
+-    flow("DATLUMA_TEST_MYSQL_URL").await;
++    flow("DATLUMA_TEST_MYSQL_URL", true).await;
  }
  
  #[tokio::test]
  async fn mariadb() {
--    flow("DBLENS_TEST_MARIADB_URL").await;
-+    flow("DBLENS_TEST_MARIADB_URL", true).await;
+-    flow("DATLUMA_TEST_MARIADB_URL").await;
++    flow("DATLUMA_TEST_MARIADB_URL", true).await;
  }
  
  #[tokio::test]
  async fn postgres() {
--    flow("DBLENS_TEST_PG_URL").await;
-+    flow("DBLENS_TEST_PG_URL", true).await;
+-    flow("DATLUMA_TEST_PG_URL").await;
++    flow("DATLUMA_TEST_PG_URL", true).await;
  }
  
  #[tokio::test]
  async fn oracle() {
--    flow("DBLENS_TEST_ORACLE_URL").await;
-+    flow("DBLENS_TEST_ORACLE_URL", false).await;
+-    flow("DATLUMA_TEST_ORACLE_URL").await;
++    flow("DATLUMA_TEST_ORACLE_URL", false).await;
  }
  
  #[tokio::test]
  async fn dameng() {
--    flow("DBLENS_TEST_DM_URL").await;
-+    flow("DBLENS_TEST_DM_URL", false).await;
+-    flow("DATLUMA_TEST_DM_URL").await;
++    flow("DATLUMA_TEST_DM_URL", false).await;
 +}
 +
 +#[tokio::test]
 +async fn tidb() {
-+    flow("DBLENS_TEST_TIDB_URL", false).await;
++    flow("DATLUMA_TEST_TIDB_URL", false).await;
 +}
 +
 +#[tokio::test]
 +async fn oceanbase() {
-+    flow("DBLENS_TEST_OCEANBASE_URL", false).await;
++    flow("DATLUMA_TEST_OCEANBASE_URL", false).await;
 +}
 +
 +#[tokio::test]
 +async fn opengauss() {
-+    flow("DBLENS_TEST_OPENGAUSS_URL", false).await;
++    flow("DATLUMA_TEST_OPENGAUSS_URL", false).await;
 +}
 +
 +#[tokio::test]
 +async fn opengauss_a() {
-+    flow("DBLENS_TEST_OPENGAUSS_A_URL", false).await;
++    flow("DATLUMA_TEST_OPENGAUSS_A_URL", false).await;
 +}
 +
 +#[tokio::test]
 +async fn kingbase() {
-+    flow("DBLENS_TEST_KINGBASE_URL", false).await;
++    flow("DATLUMA_TEST_KINGBASE_URL", false).await;
 +}
 +
 +#[tokio::test]
 +async fn kingbase_pg() {
-+    flow("DBLENS_TEST_KINGBASE_PG_URL", false).await;
++    flow("DATLUMA_TEST_KINGBASE_PG_URL", false).await;
  }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -1,5 +1,7 @@
  //! 服务层的实库测试。设置对应的环境变量时运行，否则直接通过：
--//! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL。
-+//! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL；
-+//! 国产库第一批（文件末尾的 `domestic_flows!`）：DBLENS_TEST_TIDB_URL、DBLENS_TEST_OCEANBASE_URL、
-+//! DBLENS_TEST_OPENGAUSS_URL、DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL。
+-//! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL。
++//! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL；
++//! 国产库第一批（文件末尾的 `domestic_flows!`）：DATLUMA_TEST_TIDB_URL、DATLUMA_TEST_OCEANBASE_URL、
++//! DATLUMA_TEST_OPENGAUSS_URL、DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL。
  //!
  //! 走一遍完整流程：保存连接配置（密码放本地密码库）→ 测试连接 → 打开会话执行 → 浏览元数据 →
  //! 会话中执行 DDL 后元数据缓存失效 → 取消长查询；查询工作台用到的执行计划、出错位置、切换 schema。
-@@ -12,7 +14,7 @@ use dblens_core::schema::{CheckConstraint, Column, Index, IndexColumn, PrimaryKe
- use dblens_core::{ColumnType, Error, LogicalType, Value};
- use dblens_dialect::design::{Renames, TableChange, diff_table};
- use dblens_dialect::meta::{MetaArgs, MetaKey};
--use dblens_dialect::{DdlKind, Direction, RowChange, WriteMode};
-+use dblens_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
- use dblens_driver::{ConnectParams, DriverId};
- use dblens_service::{
+@@ -12,7 +14,7 @@ use datluma_core::schema::{CheckConstraint, Column, Index, IndexColumn, PrimaryKe
+ use datluma_core::{ColumnType, Error, LogicalType, Value};
+ use datluma_dialect::design::{Renames, TableChange, diff_table};
+ use datluma_dialect::meta::{MetaArgs, MetaKey};
+-use datluma_dialect::{DdlKind, Direction, RowChange, WriteMode};
++use datluma_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
+ use datluma_driver::{ConnectParams, DriverId};
+ use datluma_service::{
      ChangeSet, ColumnMapping, DEFAULT_BATCH, DataOrder, DefaultPolicy, DesignRequest, DriverRegistry,
 @@ -27,6 +29,9 @@ struct Live {
      service: Arc<Service>,
@@ -5471,7 +5471,7 @@ git commit -m "feat(service): 连接配置记录新建时选的产品" -m "Co-Au
          let profile = s.profile(&live.profile_id).unwrap();
 @@ -1394,3 +1435,66 @@ async fn oracle_design() {
  async fn dameng_design() {
-     design_flow("DBLENS_TEST_DM_URL").await;
+     design_flow("DATLUMA_TEST_DM_URL").await;
  }
 +
 +/// MySQL 驱动的取消测试用的耗时查询（SLEEP() 被 KILL QUERY 打断时返回 1 而不报错）。
@@ -5528,13 +5528,13 @@ git commit -m "feat(service): 连接配置记录新建时选的产品" -m "Co-Au
 +}
 +
 +domestic_flows! {
-+    tidb: "DBLENS_TEST_TIDB_URL", slow = MYSQL_SLOW, ops = &[];
-+    oceanbase: "DBLENS_TEST_OCEANBASE_URL", slow = MYSQL_SLOW, ops = &[];
-+    opengauss: "DBLENS_TEST_OPENGAUSS_URL", slow = "SELECT pg_sleep(20)", ops = &[];
-+    opengauss_a: "DBLENS_TEST_OPENGAUSS_A_URL", slow = "SELECT pg_sleep(20)", ops = &[];
++    tidb: "DATLUMA_TEST_TIDB_URL", slow = MYSQL_SLOW, ops = &[];
++    oceanbase: "DATLUMA_TEST_OCEANBASE_URL", slow = MYSQL_SLOW, ops = &[];
++    opengauss: "DATLUMA_TEST_OPENGAUSS_URL", slow = "SELECT pg_sleep(20)", ops = &[];
++    opengauss_a: "DATLUMA_TEST_OPENGAUSS_A_URL", slow = "SELECT pg_sleep(20)", ops = &[];
 +    // 人大金仓：与 PG 测试库一样没有加载 sys_stat_statements；开发版授权最多 10 个连接，要串行运行
-+    kingbase: "DBLENS_TEST_KINGBASE_URL", slow = "SELECT pg_sleep(20)", ops = &["slow_sql"];
-+    kingbase_pg: "DBLENS_TEST_KINGBASE_PG_URL", slow = "SELECT pg_sleep(20)", ops = &["slow_sql"];
++    kingbase: "DATLUMA_TEST_KINGBASE_URL", slow = "SELECT pg_sleep(20)", ops = &["slow_sql"];
++    kingbase_pg: "DATLUMA_TEST_KINGBASE_PG_URL", slow = "SELECT pg_sleep(20)", ops = &["slow_sql"];
 +}
 ```
 
@@ -5544,10 +5544,10 @@ git commit -m "feat(service): 连接配置记录新建时选的产品" -m "Co-Au
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`、库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`、库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。
 - 人大金仓的开发版授权最多 10 个连接：它的测试用 `-- kingbase --test-threads=1` 单独串行运行。
 - 达梦的测试与其他测试同在一个进程里运行时偶发"网络通讯失败"，失败时用 `-- dameng --test-threads=1` 单独重跑。
 
@@ -5556,7 +5556,7 @@ Expected: 全部测试通过：服务层实库测试新增 60 个，接口层新
 - [ ] **Step 4: 提交**
 
 ```bash
-git add crates/dblens-api/tests/live.rs crates/dblens-service/tests/live.rs
+git add crates/datluma-api/tests/live.rs crates/datluma-service/tests/live.rs
 git commit -m "test: 服务层、接口层的实库测试覆盖国产库第一批" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5574,7 +5574,7 @@ git commit -m "test: 服务层、接口层的实库测试覆盖国产库第一�
 - 词条：`connections.product.*`、`connections.dialog.modeOracle` / `modeNative` / `modeUnadapted` / `productMismatch`，`driverType` 改为"数据库"；`design.option.clustered`；`editor.data.edit.emptyIsNull`。
 
 **Files:**
-- Modify: `crates/dblens-service/src/session.rs`
+- Modify: `crates/datluma-service/src/session.rs`
 - Modify: `web/src/features/connections/ConnectionDialog.tsx`
 - Modify: `web/src/features/connections/form.test.ts`
 - Modify: `web/src/features/connections/form.ts`
@@ -5707,18 +5707,18 @@ git commit -m "test: 服务层、接口层的实库测试覆盖国产库第一�
      expect(sqlDialect('mysql')).toEqual({ dialect: 'mysql', strict: false, grammar: 'MySQL' })
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/session.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/session.rs`**
 
 ```diff
---- a/crates/dblens-service/src/session.rs
-+++ b/crates/dblens-service/src/session.rs
+--- a/crates/datluma-service/src/session.rs
++++ b/crates/datluma-service/src/session.rs
 @@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
  use std::time::{Instant, SystemTime, UNIX_EPOCH};
  
- use dblens_core::{Error, Msg, Result, Row, Value, msg};
--use dblens_dialect::{ChangeStatement, Dialect, SqlStatement, Variant, may_change_schema};
-+use dblens_dialect::{ChangeStatement, Compat, Dialect, SqlStatement, Variant, may_change_schema};
- use dblens_driver::{CancelHandle, ColumnMeta, Connection, ExecEvent};
+ use datluma_core::{Error, Msg, Result, Row, Value, msg};
+-use datluma_dialect::{ChangeStatement, Dialect, SqlStatement, Variant, may_change_schema};
++use datluma_dialect::{ChangeStatement, Compat, Dialect, SqlStatement, Variant, may_change_schema};
+ use datluma_driver::{CancelHandle, ColumnMeta, Connection, ExecEvent};
  use serde::{Deserialize, Serialize};
  use tokio::sync::{mpsc, oneshot};
 @@ -77,6 +77,8 @@ pub struct SessionInfo {
@@ -6213,7 +6213,7 @@ export function productNote(id: ProductId): string {
 +    "modeOracle": "Compatibility mode: {{mode}} (Oracle rules: empty string is NULL, DATE has a time)",
 +    "modeNative": "Compatibility mode: {{mode}}",
 +    "modeUnadapted": "Compatibility mode {{mode}} is not supported yet; native rules are used and some features may fail",
-+    "productMismatch": "{{chosen}} was selected but the server is {{detected}}; DBLens follows the detected server"
++    "productMismatch": "{{chosen}} was selected but the server is {{detected}}; DATLUMA follows the detected server"
    },
    "general": {
      "name": "Name",
@@ -6411,7 +6411,7 @@ export function productNote(id: ProductId): string {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -6425,7 +6425,7 @@ Expected: 全部通过（前端新增 3 个测试）。
 - [ ] **Step 23: 提交**
 
 ```bash
-git add crates/dblens-service/src/session.rs web/src/features/connections/ConnectionDialog.tsx web/src/features/connections/form.test.ts web/src/features/connections/form.ts web/src/features/connections/products.ts web/src/features/data/DataView.tsx web/src/features/design/OptionsPane.tsx web/src/features/editor/QueryView.tsx web/src/features/editor/dialect.ts web/src/features/editor/runner.test.ts web/src/features/sql/checker.ts web/src/features/sql/dialects.test.ts web/src/features/sql/dialects.ts web/src/features/sql/provider.ts web/src/locales/en/connections.json web/src/locales/en/design.json web/src/locales/en/editor.json web/src/locales/zh-CN/connections.json web/src/locales/zh-CN/design.json web/src/locales/zh-CN/editor.json web/src/shared/api.ts
+git add crates/datluma-service/src/session.rs web/src/features/connections/ConnectionDialog.tsx web/src/features/connections/form.test.ts web/src/features/connections/form.ts web/src/features/connections/products.ts web/src/features/data/DataView.tsx web/src/features/design/OptionsPane.tsx web/src/features/editor/QueryView.tsx web/src/features/editor/dialect.ts web/src/features/editor/runner.test.ts web/src/features/sql/checker.ts web/src/features/sql/dialects.test.ts web/src/features/sql/dialects.ts web/src/features/sql/provider.ts web/src/locales/en/connections.json web/src/locales/en/design.json web/src/locales/en/editor.json web/src/locales/zh-CN/connections.json web/src/locales/zh-CN/design.json web/src/locales/zh-CN/editor.json web/src/shared/api.ts
 git commit -m "feat(web): 新建连接按产品选；编辑器按兼容模式切换" -m "连接对话框列出 MySQL、MariaDB、TiDB、OceanBase、PostgreSQL、人大金仓、openGauss、Oracle、达梦，带默认端口和提示；测试连接显示兼容模式与识别结果不一致的提示；会话信息带兼容模式，Oracle 兼容模式下编辑器按 PL/SQL 的语法、补全和拆分；数据标签提示空串按 NULL 存储；设计器显示 TiDB 的聚簇主键。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -6440,7 +6440,7 @@ git commit -m "feat(web): 新建连接按产品选；编辑器按兼容模式切
 **Files:**
 - Create: `docs/notes/domestic-batch1.md`
 - Modify: `docs/notes/m0-4b-api.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 新建 `docs/notes/domestic-batch1.md`**
 
@@ -6454,7 +6454,7 @@ git commit -m "feat(web): 新建连接按产品选；编辑器按兼容模式切
 ## 结构
 
 ```text
-crates/dblens-dialect/
+crates/datluma-dialect/
   src/variant.rs      Compat（Native / Oracle）
   src/lib.rs          Dialect 带兼容模式；refine 读探测结果（模式、server_version_num）；split / splitter 按模式
   src/split.rs        StreamSplitter::with_oracle_blocks：PG 家族的 Oracle 兼容模式识别 PL/SQL 块和独占一行的 /
@@ -6462,9 +6462,9 @@ crates/dblens-dialect/
   sql/ops/tidb.sql、oceanbase.sql、opengauss.sql             运维查询的覆盖文件
   src/design/catalog.rs、sql.rs、postgres.rs                  设计器的能力表、TiDB 主键、openGauss 的 serial
   src/import.rs、changes.rs                                   openGauss 的按主键更新；Oracle 模式下空串按 IS NULL 定位
-crates/dblens-driver-postgres/src/types.rs   兼容库类型（域、clob、int1、int16 等）按标准类型读写
-crates/dblens-driver-mysql/src/error.rs      OceanBase、TiDB 报错的出错位置
-crates/dblens-service/src/registry.rs        测试连接返回兼容模式；profile.rs、store.rs 记录产品（迁移版本 4）
+crates/datluma-driver-postgres/src/types.rs   兼容库类型（域、clob、int1、int16 等）按标准类型读写
+crates/datluma-driver-mysql/src/error.rs      OceanBase、TiDB 报错的出错位置
+crates/datluma-service/src/registry.rs        测试连接返回兼容模式；profile.rs、store.rs 记录产品（迁移版本 4）
 vendor/tokio-postgres、vendor/postgres-protocol   openGauss 的 SHA256 认证补丁（vendor/PATCHES.md）
 web/src/features/connections/products.ts      按产品新建连接
 web/src/features/sql/dialects.ts、editor/dialect.ts   Oracle 兼容模式按 PL/SQL 的语法、补全、拆分、高亮
@@ -6531,13 +6531,13 @@ openGauss（7.0.0-RC1，基于 PG 9.2.4）：
 
 ## 测试库
 
-在测试虚拟机 192.168.139.106 上（密码在虚拟机 root 的 `/root/dblens-test/creds.env`，不进仓库；运行测试时以环境变量传入）：
+在测试虚拟机 192.168.139.106 上（密码在虚拟机 root 的 `/root/datluma-test/creds.env`，不进仓库；运行测试时以环境变量传入）：
 
 | 目标 | 端口 | 部署 |
 |---|---|---|
 | TiDB v8.5.8 | 4000 | tiup 镜像站的官方二进制，单个 tidb-server（`-store unistore -path /data/tidb`），systemd `tidb`，`WorkingDirectory=/data/tidb`（慢日志用相对路径） |
 | OceanBase CE 4.4.2.1 | 2881 | `quay.io/oceanbase/oceanbase-ce:4.4.2-lts`，`MODE=mini`，必须加 `OB_SERVER_IP=127.0.0.1` 和 `--ulimit nofile=65535:65535`，租户 `test` |
-| openGauss 7.0.0-RC1 | 5433 | Docker Hub 的 `opengauss/opengauss:7.0.0-RC1`（经华为云 SWR 同步副本拉取；quay.io 的 7.0.0-RC3 镜像缺动态库）；`password_encryption_type = 1`，远程认证 sha256；库 `dblens_test`（PG）、`dblens_test_a`（A）；账号 `admin`（MONADMIN）、`admin_sha`（只存 SHA256）、`admin_m5s`（pg_hba 为 md5，用于确认不支持的报错） |
+| openGauss 7.0.0-RC1 | 5433 | Docker Hub 的 `opengauss/opengauss:7.0.0-RC1`（经华为云 SWR 同步副本拉取；quay.io 的 7.0.0-RC3 镜像缺动态库）；`password_encryption_type = 1`，远程认证 sha256；库 `datluma_test`（PG）、`datluma_test_a`（A）；账号 `admin`（MONADMIN）、`admin_sha`（只存 SHA256）、`admin_m5s`（pg_hba 为 md5，用于确认不支持的报错） |
 | 人大金仓 V9R2C16 | 54321 / 54322 | 官方 DEB 包，开发版授权（365 天）；Oracle 模式 systemd `kingbased`，PG 模式第二个实例 `kingbased-pg`（`initdb -m pg`） |
 
 实库测试的环境变量见设计文档 9.1 节。人大金仓的测试要串行运行（`--test-threads=1`，授权限制 10 个连接）；TiDB 的元数据测试会把 `tidb_enable_check_constraint` 设为 ON。
@@ -6587,11 +6587,11 @@ openGauss（7.0.0-RC1，基于 PG 9.2.4）：
  | POST | `/sessions/{id}/commit` | 提交 |
 ```
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -329,6 +329,7 @@ trait Policy: Send + Sync {
  - M2b 已完成（设计 `docs/superpowers/specs/2026-10-27-m2b-import-design.md`，详细计划 `docs/superpowers/plans/2026-10-27-m2b-import.md`，说明 `docs/notes/m2b-import.md`），M2 完成。
  - M3 已完成（设计 `docs/superpowers/specs/2026-10-27-m3-table-designer-design.md`，详细计划 `docs/superpowers/plans/2026-10-27-m3-table-designer.md`，说明 `docs/notes/m3-table-designer.md`）。
@@ -6611,6 +6611,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/domestic-batch1.md docs/notes/m0-4b-api.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/domestic-batch1.md docs/notes/m0-4b-api.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: 国产库第一批的说明文档、接口说明与进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

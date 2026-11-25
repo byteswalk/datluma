@@ -5,22 +5,22 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/design/sqlserver.rs  设计器的变更语句：带名字的默认值（DF_表_列）、执行时查名删除默认值约束、sp_rename、扩展属性注释
-crates/dblens-dialect/src/design/sql.rs        SQL Server 分支、可回滚（design_transactional）、rename_table_sql
-crates/dblens-dialect/src/design/rebuild.rs    重建：文件组 ON […]、IDENTITY_INSERT、sp_rename 改回原名并把默认值约束改回按原表名命名、sp_refreshview
-crates/dblens-dialect/src/design/diff.rs       NONCLUSTERED 是默认的索引方法
-crates/dblens-dialect/src/import.rs            每条语句的参数上限由方言给出（SQL Server 2000）、多行 MERGE、NULL 直接写进语句
-crates/dblens-dialect/src/changes.rs           表数据编辑：NULL 直接写进语句
-crates/dblens-dialect/src/variant.rs           Family::terminate：脚本中一条语句的写法（SQL Server 后接 GO）
-crates/dblens-dialect/src/lib.rs               schema_switch_sql：SQL Server 不切换 schema
-crates/dblens-dialect/src/compare/sync.rs      同步脚本的表改名用 rename_table_sql
-crates/dblens-dialect/src/migrate/             序列（AS BIGINT、NO CACHE / NO CYCLE）、默认值（时间、UUID、布尔）、源表达式的方括号和 N''、
+crates/datluma-dialect/src/design/sqlserver.rs  设计器的变更语句：带名字的默认值（DF_表_列）、执行时查名删除默认值约束、sp_rename、扩展属性注释
+crates/datluma-dialect/src/design/sql.rs        SQL Server 分支、可回滚（design_transactional）、rename_table_sql
+crates/datluma-dialect/src/design/rebuild.rs    重建：文件组 ON […]、IDENTITY_INSERT、sp_rename 改回原名并把默认值约束改回按原表名命名、sp_refreshview
+crates/datluma-dialect/src/design/diff.rs       NONCLUSTERED 是默认的索引方法
+crates/datluma-dialect/src/import.rs            每条语句的参数上限由方言给出（SQL Server 2000）、多行 MERGE、NULL 直接写进语句
+crates/datluma-dialect/src/changes.rs           表数据编辑：NULL 直接写进语句
+crates/datluma-dialect/src/variant.rs           Family::terminate：脚本中一条语句的写法（SQL Server 后接 GO）
+crates/datluma-dialect/src/lib.rs               schema_switch_sql：SQL Server 不切换 schema
+crates/datluma-dialect/src/compare/sync.rs      同步脚本的表改名用 rename_table_sql
+crates/datluma-dialect/src/migrate/             序列（AS BIGINT、NO CACHE / NO CYCLE）、默认值（时间、UUID、布尔）、源表达式的方括号和 N''、
                                                NEXT VALUE FOR 带 schema、script_text 按目标结束语句
-crates/dblens-service/src/service.rs           scoped_profile（替代 feature_profile，不再拦截）
-crates/dblens-service/src/{design,import/job,compare,document/job,migrate/mod,model/ops}.rs  请求加 catalog
-crates/dblens-service/src/import/job.rs        映射了自增列时包上 IDENTITY_INSERT
-crates/dblens-service/src/migrate/values.rs    时间按目标精度截断后再写
-crates/dblens-api/src/{design,tasks}.rs        读原表、建表语句预览的 catalog 参数
+crates/datluma-service/src/service.rs           scoped_profile（替代 feature_profile，不再拦截）
+crates/datluma-service/src/{design,import/job,compare,document/job,migrate/mod,model/ops}.rs  请求加 catalog
+crates/datluma-service/src/import/job.rs        映射了自增列时包上 IDENTITY_INSERT
+crates/datluma-service/src/migrate/values.rs    时间按目标精度截断后再写
+crates/datluma-api/src/{design,tasks}.rs        读原表、建表语句预览的 catalog 参数
 web/src/shared/api.ts                          withCatalog、planEnds：请求和保存的方案中拆开合成的 schema
 web/src/shared/schemaOptions.ts                连接下可选的 schema（SQL Server 列出各用户库的架构）
 web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取消置灰、下拉框、GO、库.架构 的显示
@@ -51,7 +51,7 @@ web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取�
 
 ## 已知限制
 
-- 非 Unicode 的 `varchar`、`char` 列在默认排序规则下存不了中文（数据库的限制）；DBLens 生成的字符串列一律是 `nvarchar`。
+- 非 Unicode 的 `varchar`、`char` 列在默认排序规则下存不了中文（数据库的限制）；DATLUMA 生成的字符串列一律是 `nvarchar`。
 - 改列类型时，若有索引、检查约束、计算列引用该列，由服务器报错、整体回滚；不自动删除再重建。
 - 带 `SCHEMABINDING` 的视图引用的表不能重建（删表失败、整体回滚）。
 - 触发器定义中不带 schema 的表名按执行者的默认架构解析（重建时原样执行触发器 DDL）。
@@ -60,7 +60,7 @@ web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取�
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（不连库 837 个）。按任务拆分的每个提交都单独跑过 fmt、clippy 和全部测试。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（不连库 837 个）。按任务拆分的每个提交都单独跑过 fmt、clippy 和全部测试。
   - 方言层：SQL Server 的建表、全部变更、改列、重建快照；默认值约束名、计算列表达式；2000 个参数的拆分、多行 MERGE（NULL 直接写）；脚本的 GO；
     迁移的 PG → SQL Server 快照、布尔和时间默认值、来源表达式的方括号和 N''。
 - 实库（串行）：
@@ -71,5 +71,5 @@ web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取�
   - SQL Server 2025 Express（Win11 测试虚拟机 192.168.139.103，中文环境）：上面 SQL Server 的测试和 10 条迁移路线全部通过。
 - 前端：tsc、Vitest 287 个（库名拆分、迁移方案、反向生成的库检查、设计器脚本的 GO）、打包通过。
 - 浏览器：对象树中 SQL Server 的菜单不再置灰；设计器读原表（标题 `库.架构.表`）、加列的预览（一个事务）、保存执行后列已加上，再删掉；
-  比对的 schema 下拉框列出 `dblens_test.dblens_meta`、`dblens_test.dbo`，同一个架构与自身比对没有差异；从对象树"迁移到…" MySQL，读取结构后列出表和需要处理的不支持映射。
+  比对的 schema 下拉框列出 `datluma_test.datluma_meta`、`datluma_test.dbo`，同一个架构与自身比对没有差异；从对象树"迁移到…" MySQL，读取结构后列出表和需要处理的不支持映射。
 - 未验证：桌面程序（Tauri）中的这些功能；文档导出和导入在浏览器中的完整操作（接口转换有单元测试，后端有实库测试）；SQL Server 2017。

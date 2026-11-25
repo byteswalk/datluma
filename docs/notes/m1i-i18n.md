@@ -5,15 +5,15 @@
 ## 结构
 
 ```text
-crates/dblens-core/
-  src/lang.rs             语言：请求范围内的当前语言（task_local）、进程默认语言（设置 ui.lang / DBLENS_LANG / 系统）
+crates/datluma-core/
+  src/lang.rs             语言：请求范围内的当前语言（task_local）、进程默认语言（设置 ui.lang / DATLUMA_LANG / 系统）
   src/msg.rs              Msg（词条键 + 参数，或原文）、msg! 宏；序列化时按当前语言渲染
   src/error.rs            Error 的文字字段都是 Msg；Display 按当前语言
   locales/app.json        全部后端词条，每条一行，含中英文
   build.rs                词条文件变化时重新编译（rust-i18n 在编译时嵌入词条）
   tests/catalog.rs        词条检查：键存在、参数一致、没有多余词条、源码里没有给用户看的中文
-crates/dblens-api/src/lang.rs   请求语言：查询参数 lang 优先，其次 Accept-Language
-crates/dblens-service/          Service::apply_lang_setting；Profile.variant（迁移版本 2）
+crates/datluma-api/src/lang.rs   请求语言：查询参数 lang 优先，其次 Accept-Language
+crates/datluma-service/          Service::apply_lang_setting；Profile.variant（迁移版本 2）
 web/src/
   shared/i18n.ts          i18next 初始化、语言设置 ui.lang、currentLang / applyLang / t
   shared/i18next.d.ts     词条键的类型，以中文词条为准
@@ -39,10 +39,10 @@ web/src/
 ## 怎么加一条文字
 
 后端：
-- 写 `msg!("模块.名称", 参数 = 值)`，在 `crates/dblens-core/locales/app.json` 里加一行中英文。
+- 写 `msg!("模块.名称", 参数 = 值)`，在 `crates/datluma-core/locales/app.json` 里加一行中英文。
 - 参数可以是实现了 `Display` 的值，也可以是另一个 `Msg`（与外层按同一种语言翻译）。
 - 数据库返回的原文用 `Msg::raw(…)`，不翻译。
-- `cargo test -p dblens-core --test catalog` 会检查键、参数和源码里残留的中文。
+- `cargo test -p datluma-core --test catalog` 会检查键、参数和源码里残留的中文。
 
 前端：
 - 组件里 `const { t } = useTranslation()`；不是组件的模块 `import { t } from '../shared/i18n'`，并且在调用时才翻译，不能在模块加载时缓存。
@@ -54,8 +54,8 @@ web/src/
 - 前端：设置 `ui.lang`（`auto` / `zh-CN` / `en`），`auto` 时按浏览器首选语言，`zh` 开头的取中文，其余取英文。
 - 前端发请求时带上当前语言：REST 用 `Accept-Language`，WebSocket 用地址参数 `lang`。
 - 后端在接口层用这个语言渲染响应和事件里的文字，所以 JSON 格式不变。
-- 没有请求语言的场合用默认语言：日志、`dblens-server` 的命令行输出、桌面版的更新对话框和 macOS 菜单。
-  - 按设置 `ui.lang`；为 `auto` 时看环境变量 `DBLENS_LANG`，再看系统语言。
+- 没有请求语言的场合用默认语言：日志、`datluma-server` 的命令行输出、桌面版的更新对话框和 macOS 菜单。
+  - 按设置 `ui.lang`；为 `auto` 时看环境变量 `DATLUMA_LANG`，再看系统语言。
 - 不翻译：数据库自身的报错原文、日志、文档和注释。
 
 ## 数据库图标
@@ -73,7 +73,7 @@ web/src/
 
 ## 实现中发现的问题
 
-- rust-i18n 在编译时嵌入词条，但不会因为词条文件变化而重新编译。需要 `dblens-core/build.rs` 声明 `rerun-if-changed=locales`，否则改了词条后渲染出来的还是键名。
+- rust-i18n 在编译时嵌入词条，但不会因为词条文件变化而重新编译。需要 `datluma-core/build.rs` 声明 `rerun-if-changed=locales`，否则改了词条后渲染出来的还是键名。
 - `Msg` 有意不实现 `Display`，避免被当作普通文字提前按默认语言渲染。日志等场合显式调用 `.current()`。
 - 当前语言放在 `tokio::task_local` 中。
   - 接口层的中间件包住整个请求，令牌错误也按请求语言输出。
@@ -83,13 +83,13 @@ web/src/
 - 生成 SQL 中的注释（Oracle 没有可插入列时的 INSERT）按请求语言生成。
 - 测试：
   - 前端测试默认用中文（`src/test-setup.ts`）。
-  - 后端的命令行测试给子进程设 `DBLENS_LANG=zh-CN`。
-  - 后端全部测试在 `DBLENS_LANG=en` 下也要通过，确保没有测试依赖系统语言。
+  - 后端的命令行测试给子进程设 `DATLUMA_LANG=zh-CN`。
+  - 后端全部测试在 `DATLUMA_LANG=en` 下也要通过，确保没有测试依赖系统语言。
 - 已经产生的文字不随语言切换：已打开编辑器的右键菜单、消息标签里已有的行、桌面程序启动时生成的窗口标题和 macOS 菜单。新产生的内容用新语言。
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过（345 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过（345 个）。
 - 前端：tsc 通过；20 个测试文件、89 个测试通过；打包通过。
 - 浏览器实测：
   - 中文与英文界面都检查过；在设置里切换后立即生效，只剩语言选项里的“中文”是中文。

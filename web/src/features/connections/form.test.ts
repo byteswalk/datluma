@@ -49,7 +49,7 @@ describe('连接表单', () => {
       user: 'app',
       tls: 'verify' as const,
       tlsCa: 'C:\\ca.pem',
-      extra: 'application_name=dblens\n\n',
+      extra: 'application_name=datluma\n\n',
     }
     expect(toProfileInput(f)).toEqual({
       name: 'dev-pg',
@@ -58,7 +58,7 @@ describe('连接表单', () => {
       port: 5432,
       user: 'app',
       database: null,
-      options: { application_name: 'dblens', tls: 'verify', tls_ca: 'C:\\ca.pem' },
+      options: { application_name: 'datluma', tls: 'verify', tls_ca: 'C:\\ca.pem' },
       environment: 'none',
       color: null,
       connect_timeout_secs: 10,

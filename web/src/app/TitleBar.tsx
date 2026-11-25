@@ -64,7 +64,7 @@ import logo from './logo.svg'
 import { type SideKey, useUi } from './ui'
 import { useShellInfo } from './useShellInfo'
 
-const RELEASES = 'https://github.com/byteswalk/dblens/releases'
+const RELEASES = 'https://github.com/byteswalk/datluma/releases'
 
 const MENU_ICONS: Record<string, Icon> = {
   'new-connection': IconPlug,
@@ -143,7 +143,7 @@ export default function TitleBar() {
   const { data: profiles } = useQuery({ queryKey: ['profiles'], queryFn: () => api.profiles() })
   const tab = useTabs((s) => s.tabs.find((t) => t.id === s.active))
   const profile = profiles?.find((p) => p.id === tab?.profileId)
-  // 标题："当前标签 · 连接 — DBLENS 数洞"
+  // 标题："当前标签 · 连接 — DATLUMA 数览"
   const appName = t('common.appName')
   const title = !tab
     ? appName

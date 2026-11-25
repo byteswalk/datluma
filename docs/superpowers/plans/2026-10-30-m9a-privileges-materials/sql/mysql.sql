@@ -1,4 +1,4 @@
--- 账号与权限（M9a）。列名约定见 crates/dblens-dialect/src/privilege/mod.rs。
+-- 账号与权限（M9a）。列名约定见 crates/datluma-dialect/src/privilege/mod.rs。
 -- 主体 id 与 information_schema 的 GRANTEE 同形：'user'@'host'。@limited 段在主查询报 SQL 错误时使用。
 
 -- [caps]

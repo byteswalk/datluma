@@ -31,7 +31,7 @@ M6a 让 SQL Server 能连、能看、能查，写入类功能对它置灰。M6b 
 
 ## 3. 表设计器
 
-新文件 `dblens-dialect/src/design/sqlserver.rs`（与 `mysql.rs`、`postgres.rs`、`oracle.rs` 并列），`design_sql` 的 SQL Server 分支调用它。
+新文件 `datluma-dialect/src/design/sqlserver.rs`（与 `mysql.rs`、`postgres.rs`、`oracle.rs` 并列），`design_sql` 的 SQL Server 分支调用它。
 
 ### 3.1 变更语句
 
@@ -99,7 +99,7 @@ IF @df IS NOT NULL EXEC (N'ALTER TABLE [架构].[表] DROP CONSTRAINT ' + QUOTEN
 - SQL Server：每条语句后接单独一行 `GO`（`CREATE VIEW`、`CREATE TRIGGER`、`CREATE PROCEDURE` 必须是批中第一条，3.2 的语句用了变量）；
 - 其他库不变（分号；Oracle 的 PL/SQL 块后接 `/`）。
 
-在 DBLens 中直接执行不受影响：语句本来就逐条发送。
+在 DATLUMA 中直接执行不受影响：语句本来就逐条发送。
 
 ### 5.2 比对与模型
 

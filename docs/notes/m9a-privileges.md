@@ -5,13 +5,13 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/sql/privilege/*.sql      各方言模板，直接输出统一列名；段名带 @limited 的是低权限退路
-crates/dblens-dialect/src/privilege/mod.rs     模型、模板加载、Dialect::privilege_query、public_grantees
-crates/dblens-dialect/src/privilege/rows.rs    结果行解析、caps
-crates/dblens-dialect/src/privilege/effective.rs  角色路径、实际权限、对象反查（纯函数）
-crates/dblens-service/src/privilege.rs         取数、退级、Coverage
-crates/dblens-service/tests/privilege_live.rs  实库测试（夹具建在测试库，结束时清理并断言）
-crates/dblens-api/src/privileges.rs            三个 GET 接口
+crates/datluma-dialect/sql/privilege/*.sql      各方言模板，直接输出统一列名；段名带 @limited 的是低权限退路
+crates/datluma-dialect/src/privilege/mod.rs     模型、模板加载、Dialect::privilege_query、public_grantees
+crates/datluma-dialect/src/privilege/rows.rs    结果行解析、caps
+crates/datluma-dialect/src/privilege/effective.rs  角色路径、实际权限、对象反查（纯函数）
+crates/datluma-service/src/privilege.rs         取数、退级、Coverage
+crates/datluma-service/tests/privilege_live.rs  实库测试（夹具建在测试库，结束时清理并断言）
+crates/datluma-api/src/privileges.rs            三个 GET 接口
 web/src/features/privileges/                   标签页和纯逻辑
 ```
 

@@ -3,11 +3,11 @@
 ## 结构
 
 ```text
-dblens（Rust）── stdin/stdout 帧 ──> dblens-bridge（Java 进程）── JDBC ──> 数据库
+datluma（Rust）── stdin/stdout 帧 ──> datluma-bridge（Java 进程）── JDBC ──> 数据库
 ```
 
 - `bridge/`：Java 进程，没有第三方依赖。全应用一个进程，第一次连接时启动，stdin 关闭时退出。
-- `crates/dblens-driver-jdbc`：帧协议（`frame.rs`，Java 端是 `Frame.java`，两边要同时改）、进程管理、连接、各数据库的适配。
+- `crates/datluma-driver-jdbc`：帧协议（`frame.rs`，Java 端是 `Frame.java`，两边要同时改）、进程管理、连接、各数据库的适配。
 - 驱动 jar 用独立的类加载器，从连接选项 `jdbc_dir` 或程序自带的 `clients/jdbc/` 加载。
 
 ## 哪些数据库走桥接

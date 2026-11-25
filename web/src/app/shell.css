@@ -106,7 +106,7 @@
   --scroll-hover: #c9aeb9;
   --bg: #f7eff2;
   --bar: #f7eff2;
-  /* 内容区（编辑器、表格、设计器）也带一点粉，比侧栏浅一档；和 monaco.ts 的 dblens-rose 编辑器底色一致 */
+  /* 内容区（编辑器、表格、设计器）也带一点粉，比侧栏浅一档；和 monaco.ts 的 datluma-rose 编辑器底色一致 */
   --panel: #fdf8fa;
   --panel-2: #f9f1f4;
   --mark: #a84a70;
@@ -617,6 +617,26 @@ body {
   position: relative;
   isolation: isolate;
   overflow: hidden;
+}
+/* 树懒形象（平面 2D 版）和品牌组合；组合按原比例缩放，深色主题换 -dark 版 */
+.welcome-mascot {
+  display: block;
+  margin-bottom: 4px;
+}
+.welcome-brand {
+  margin-bottom: 12px;
+}
+.welcome-brand img {
+  width: auto;
+  height: 48px;
+}
+.welcome-brand .brand-light,
+:root[data-tone='dark'] .welcome-brand .brand-dark {
+  display: block;
+}
+.welcome-brand .brand-dark,
+:root[data-tone='dark'] .welcome-brand .brand-light {
+  display: none;
 }
 /* 空白工作区的底纹：细网格（每 5 格一条稍深的线），中间最清楚、向四周淡出；中心一点很淡的主色光晕。颜色都取自主题变量 */
 .welcome::before,

@@ -16,8 +16,8 @@ VM .106 上的 Docker 容器，镜像是金仓官网的 Docker 包（只含数�
 | V009R001C010B0004 | sqlserver | `kb91sqlserver` | 54344 |
 
 - 镜像的入口脚本默认 `ENABLE_CI=yes`（大小写不敏感）；oracle、pg 模式建库时改成 `no`，和原来的测试库一致。mysql、sqlserver 模式强制大小写不敏感。
-- 每个实例有超级用户 `admin` 和库 `dblens_test`，密码在 VM 的 `creds.env`（`KB86_*`、`KB86PG_*`、`KB91ORA_*`、`KB91PG_*`、`KB91MYS_*`、`KB91SQL_*`）。
-- 本机连接串 `DBLENS_TEST_KB86_URL`、`KB86PG`、`KB91ORA`、`KB91PG`、`KB91MYS`、`KB91SQL`。跑测试时赋给 `DBLENS_TEST_KINGBASE_URL`（oracle 模式）、`DBLENS_TEST_KINGBASE_PG_URL`（pg 模式；mysql、sqlserver 模式也按这一组测试跑），驱动一致性测试另有 `DBLENS_TEST_KINGBASE_MYSQL_URL`、`DBLENS_TEST_KINGBASE_SQLSERVER_URL`。
+- 每个实例有超级用户 `admin` 和库 `datluma_test`，密码在 VM 的 `creds.env`（`KB86_*`、`KB86PG_*`、`KB91ORA_*`、`KB91PG_*`、`KB91MYS_*`、`KB91SQL_*`）。
+- 本机连接串 `DATLUMA_TEST_KB86_URL`、`KB86PG`、`KB91ORA`、`KB91PG`、`KB91MYS`、`KB91SQL`。跑测试时赋给 `DATLUMA_TEST_KINGBASE_URL`（oracle 模式）、`DATLUMA_TEST_KINGBASE_PG_URL`（pg 模式；mysql、sqlserver 模式也按这一组测试跑），驱动一致性测试另有 `DATLUMA_TEST_KINGBASE_MYSQL_URL`、`DATLUMA_TEST_KINGBASE_SQLSERVER_URL`。
 
 ## MySQL 模式
 

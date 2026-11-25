@@ -126,7 +126,7 @@ impl<'a> QueryStream<'a> {
 
             match item {
                 Some(ReceivedToken::NewResultset(_)) => break,
-                // DBLens 补丁：结果集之前的行数和 INFO 消息也要交给调用方，不能跳过
+                // DATLUMA 补丁：结果集之前的行数和 INFO 消息也要交给调用方，不能跳过
                 Some(ReceivedToken::Info(_)) => break,
                 Some(ReceivedToken::Done(done) | ReceivedToken::DoneInProc(done)) if done.has_count() => break,
                 Some(_) => {
@@ -334,13 +334,13 @@ pub enum QueryItem {
     Row(Row),
     /// Information of the upcoming row data.
     Metadata(ResultMetadata),
-    /// DBLens 补丁：语句结束，带影响（或返回）的行数（DONE / DONEINPROC 设置了 DONE_COUNT）。
+    /// DATLUMA 补丁：语句结束，带影响（或返回）的行数（DONE / DONEINPROC 设置了 DONE_COUNT）。
     Done(u64),
-    /// DBLens 补丁：服务器的 INFO 消息（`PRINT`、级别 10 及以下的 `RAISERROR`）。
+    /// DATLUMA 补丁：服务器的 INFO 消息（`PRINT`、级别 10 及以下的 `RAISERROR`）。
     Info(InfoMessage),
 }
 
-/// DBLens 补丁：服务器的 INFO 消息。
+/// DATLUMA 补丁：服务器的 INFO 消息。
 #[derive(Debug, Clone)]
 pub struct InfoMessage {
     /// 消息号。
@@ -446,7 +446,7 @@ impl<'a> Stream for QueryStream<'a> {
 
                     Poll::Ready(Some(Ok(QueryItem::Row(row))))
                 }
-                // DBLens 补丁：带行数的 DONE / DONEINPROC，以及 INFO 消息
+                // DATLUMA 补丁：带行数的 DONE / DONEINPROC，以及 INFO 消息
                 ReceivedToken::Done(done) | ReceivedToken::DoneInProc(done) if done.has_count() => {
                     Poll::Ready(Some(Ok(QueryItem::Done(done.rows()))))
                 }

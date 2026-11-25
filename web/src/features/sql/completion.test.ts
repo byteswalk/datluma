@@ -99,7 +99,7 @@ describe('quoteIdent', () => {
     ['Emp', 'postgres', '"Emp"'],
     ['my table', 'mysql', '`my table`'],
     ['Emp', 'mysql', 'Emp'],
-    ['数洞表', 'plsql', '"数洞表"'],
+    ['数览表', 'plsql', '"数览表"'],
   ] as const)('%s（%s）→ %s', (name, d, out) => {
     expect(quoteIdent(name, d)).toBe(out)
   })

@@ -21,7 +21,7 @@ function stmt(p: Partial<StatementState>): StatementState {
 }
 
 describe('错误标记', () => {
-  const text = "select 1;\nselect '数洞', from t;\nupdate x set a = 1"
+  const text = "select 1;\nselect '数览', from t;\nupdate x set a = 1"
   const second = text.indexOf("select '")
   const err = { kind: 'sql', code: '42601', message: 'syntax error' }
 

@@ -191,7 +191,7 @@ where
             let output = authentication::md5_hash(user.as_bytes(), pass, body.salt());
             authenticate_password(stream, output.as_bytes()).await?;
         }
-        // DBLens patch (vendor/PATCHES.md): openGauss sends its SHA256 request with the SASL code.
+        // DATLUMA patch (vendor/PATCHES.md): openGauss sends its SHA256 request with the SASL code.
         Some(Message::AuthenticationSasl(body))
             if authentication::gauss::parse_request(body.data()).is_some() =>
         {
@@ -226,7 +226,7 @@ where
         Some(Message::AuthenticationSasl(body)) => {
             authenticate_sasl(stream, body, config).await?;
         }
-        // DBLens patch: openGauss MD5_SHA256 (md5 in pg_hba, password stored as SHA256 only). The server
+        // DATLUMA patch: openGauss MD5_SHA256 (md5 in pg_hba, password stored as SHA256 only). The server
         // digests its stored string including an iteration suffix the client never receives, so this
         // cannot succeed; fail with a clear message instead of "unexpected message".
         Some(Message::AuthenticationSaslContinue(_)) => {

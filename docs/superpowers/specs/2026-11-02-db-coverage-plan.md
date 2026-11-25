@@ -73,7 +73,7 @@
 | 19c | 用户提供的 19.3 企业版 rpm，装在 centos:7 容器 `ora19c` |
 | 21c | `gvenzl/oracle-xe:21` |
 
-已知要改：11g 没有 `OFFSET … FETCH`，分页要改 ROWNUM（`dblens-dialect/src/literal.rs` 写明未实现）；12c 以前没有自增列和 `ALL_IDENTITY_COLUMNS`；12.2 以前标识符最长 30 字节。客户端兼容也要验证：新版 Instant Client 对老库的支持范围要核实，不行就让 11g 走 JDBC 桥接。
+已知要改：11g 没有 `OFFSET … FETCH`，分页要改 ROWNUM（`datluma-dialect/src/literal.rs` 写明未实现）；12c 以前没有自增列和 `ALL_IDENTITY_COLUMNS`；12.2 以前标识符最长 30 字节。客户端兼容也要验证：新版 Instant Client 对老库的支持范围要核实，不行就让 11g 走 JDBC 桥接。
 
 ### MySQL、PostgreSQL 老版本
 

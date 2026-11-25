@@ -33,8 +33,8 @@
 - 国内工具 NineData 的 ChatDBA 文档同样强调利用库/表/字段/**注释**信息来提升 SQL 生成准确率 — [NineData 文档](https://docs.ninedata.cloud/en/aigc/text2sql/)
 
 ### Inferences
-- 对 DBLens 这类通用客户端，“开箱即用”的准确率更接近 Spider 2.0 的情况（陌生 schema、没有证据），而不是 BIRD 的 80%。因此产品价值应来自**上下文工程**：自动收集表/列注释、外键、样本值、用户的历史查询（本地查询历史即 few-shot 来源），并允许用户为库或表编写“业务说明”。
-- “生成 → EXPLAIN（不执行）→ 根据报错自我修正”的循环成本低、各数据库都支持（达梦/金仓/OceanBase 均有 EXPLAIN），是 DBLens 最值得做的准确率增强手段。
+- 对 DATLUMA 这类通用客户端，“开箱即用”的准确率更接近 Spider 2.0 的情况（陌生 schema、没有证据），而不是 BIRD 的 80%。因此产品价值应来自**上下文工程**：自动收集表/列注释、外键、样本值、用户的历史查询（本地查询历史即 few-shot 来源），并允许用户为库或表编写“业务说明”。
+- “生成 → EXPLAIN（不执行）→ 根据报错自我修正”的循环成本低、各数据库都支持（达梦/金仓/OceanBase 均有 EXPLAIN），是 DATLUMA 最值得做的准确率增强手段。
 - 多候选 + 执行结果聚类只适合只读查询，且会多次访问数据库，客户端场景应设为可选。
 
 ### Gaps
@@ -57,7 +57,7 @@
 - 迁移/方言转换：在国产化迁移方面，搜索到的多为厂商工具（金仓 KDTS/KEMCC、达梦兼容模式；复杂游标、自定义聚合仍需人工调整），没有找到达梦/金仓官方的“大模型辅助 Oracle 迁移”产品资料（CSDN 二手文章，可信度一般）— [CSDN damodev](https://damodev.csdn.net/6a43271f662f9a54cb860d2d.html)；[天翼云迁移文档](https://www.ctyun.cn/document/10044068/10406225)。海外有用 GenAI 辅助 Oracle→Azure SQL 迁移（评估、转换、验证）的会议议题 — [SQLBits 2025](https://test.sqlbits.com/sessions/event2025/Accelerating_Your_Oracle_Modernization_Journey_to_Azure_SQL_using_Gen_AI_capabilities)
 
 ### Inferences
-- DBLens 的 AI 优先级建议：① 报错解释与修复（高频、低风险、上下文明确）；② 解释 SQL；③ NL→SQL（带 schema/注释/历史上下文）；④ 表/字段注释生成（国产库存量系统普遍缺注释，并且能反哺 ③）；⑤ Oracle→达梦/金仓 方言改写（差异化点，但必须配合 EXPLAIN/试编译验证）。结果总结/图表、数据画像是锦上添花。
+- DATLUMA 的 AI 优先级建议：① 报错解释与修复（高频、低风险、上下文明确）；② 解释 SQL；③ NL→SQL（带 schema/注释/历史上下文）；④ 表/字段注释生成（国产库存量系统普遍缺注释，并且能反哺 ③）；⑤ Oracle→达梦/金仓 方言改写（差异化点，但必须配合 EXPLAIN/试编译验证）。结果总结/图表、数据画像是锦上添花。
 - 信任下降意味着 UI 必须“可审查”：显示 diff、引用了哪些表、EXPLAIN 是否通过，默认不自动执行。
 
 ### Gaps
@@ -80,8 +80,8 @@
 - DBeaver 26.2（2026-09）为 Ollama 增加了 function（工具调用）支持 — [DBeaver Ultimate 26.2](https://dbeaver.com/dbeaver-ultimate-26-2/)
 
 ### Inferences
-- DBLens 的差异化方向可以是**“客户端即 MCP Server”**：复用客户端已保存的连接（含 SSH、国产库驱动），以只读、限行、超时、按连接授权的方式暴露给 Claude/Cursor。现有 MCP 服务器几乎都不支持达梦/金仓（Toolbox 支持 Oracle，但没有看到达梦/金仓），这是空白。
-- 同时 DBLens 自身的 AI 助手内部也可以用“工具调用”架构（list_tables / describe / explain / run_readonly），与 MCP 工具定义复用。
+- DATLUMA 的差异化方向可以是**“客户端即 MCP Server”**：复用客户端已保存的连接（含 SSH、国产库驱动），以只读、限行、超时、按连接授权的方式暴露给 Claude/Cursor。现有 MCP 服务器几乎都不支持达梦/金仓（Toolbox 支持 Oracle，但没有看到达梦/金仓），这是空白。
+- 同时 DATLUMA 自身的 AI 助手内部也可以用“工具调用”架构（list_tables / describe / explain / run_readonly），与 MCP 工具定义复用。
 
 ### Gaps
 - 没有搜索到达梦、人大金仓官方的 MCP Server 或大模型助手发布信息（2026-10 前）。
@@ -103,7 +103,7 @@
 - 有中文文章指出，把表结构等上下文手动交给通用大模型存在数据安全问题，这是私有化部署的动机之一（CSDN，二手）— [CSDN DeepSeek 社区](https://deepseek.csdn.net/6a58beb810ee7a33f28e2ceb.html)
 
 ### Inferences
-- DBLens 的默认安全策略建议：
+- DATLUMA 的默认安全策略建议：
   - AI 只拿 schema 和注释，样本值、结果集默认不发送，需按连接显式开启。
   - AI 生成的 SQL 一律进编辑器由人执行，或在“只读事务/只读账号”内执行。
   - 写操作（DML/DDL）需二次确认，生产连接打标并强制审批。
@@ -127,7 +127,7 @@
 - XiYanSQL 模型可通过 DashScope（需申请）或 ModelScope 本地部署 — [XiYan MCP Server](https://glama.ai/mcp/servers/XGenerationLab/xiyan_mcp_server)
 
 ### Inferences
-- DBLens 建议：不托管模型，只做 BYO-key。内置 OpenAI 兼容协议（覆盖 DeepSeek、Qwen/DashScope、GLM/智谱、Moonshot、vLLM、Ollama）+ Anthropic + Gemini 适配。免费版就提供 AI（成本由用户承担），在竞品中构成差异（DBeaver 高级 AI 在 PRO 版）。
+- DATLUMA 建议：不托管模型，只做 BYO-key。内置 OpenAI 兼容协议（覆盖 DeepSeek、Qwen/DashScope、GLM/智谱、Moonshot、vLLM、Ollama）+ Anthropic + Gemini 适配。免费版就提供 AI（成本由用户承担），在竞品中构成差异（DBeaver 高级 AI 在 PRO 版）。
 - 可以支持“按功能选模型”：补全用本地小模型，NL→SQL 和迁移用强模型。
 
 ### Gaps

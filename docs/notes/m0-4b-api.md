@@ -1,6 +1,6 @@
-# DBLens 接口说明（M0-4b）
+# DATLUMA 接口说明（M0-4b）
 
-桌面模式和浏览器模式共用同一套接口，由 `dblens-api` 实现，路径都在 `/api` 下，请求和响应都是 JSON。
+桌面模式和浏览器模式共用同一套接口，由 `datluma-api` 实现，路径都在 `/api` 下，请求和响应都是 JSON。
 
 ## 鉴权
 
@@ -8,10 +8,10 @@
   - 优先用请求头 `Authorization: Bearer <令牌>`；
   - 浏览器的 WebSocket 不能设请求头，所以也接受查询参数 `?token=<令牌>`。
 - 令牌的来源：
-  - 浏览器模式：`dblens-server` 启动时打印；
+  - 浏览器模式：`datluma-server` 启动时打印；
   - 桌面模式：由 Tauri 注入前端（M0-4c）。
 - 浏览器发出的请求（带 `Origin` 头）必须同源，或来源在 `allowed_origins` 列表中。
-  - 前端开发服务器要用 `dblens-server --allow-origin http://localhost:5173` 放行。
+  - 前端开发服务器要用 `datluma-server --allow-origin http://localhost:5173` 放行。
 - 令牌缺失或错误时返回 401，响应体为 `{"kind":"auth",…}`。
 
 ## 语言（M1i 加入）
@@ -19,7 +19,7 @@
 - 响应和事件中给用户看的文字（错误、确认原因、驱动提示、数据库名称）按请求的语言输出，JSON 结构不变。
 - 请求的语言：查询参数 `lang`（WebSocket 用）优先，其次请求头 `Accept-Language` 中的第一个语言。
   - `zh` 开头的取中文，其余取英文。
-  - 都没有时用默认语言：设置 `ui.lang`，为 `auto` 时看环境变量 `DBLENS_LANG`，再看系统语言。
+  - 都没有时用默认语言：设置 `ui.lang`，为 `auto` 时看环境变量 `DATLUMA_LANG`，再看系统语言。
 - 数据库返回的报错原文不翻译。
 - 修改设置 `ui.lang` 后，服务的默认语言随之改变。
 
@@ -220,7 +220,7 @@
 
 ### 模型与比对（M4a 加入）
 
-模型目录是服务所在机器上的路径：`/models` 下的接口和 `/compare/script` 只在页面和服务在同一台机器上（桌面程序、只监听本机地址的 `dblens-server`）时可用，否则 403。
+模型目录是服务所在机器上的路径：`/models` 下的接口和 `/compare/script` 只在页面和服务在同一台机器上（桌面程序、只监听本机地址的 `datluma-server`）时可用，否则 403。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|

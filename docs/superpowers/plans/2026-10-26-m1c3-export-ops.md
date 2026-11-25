@@ -4,7 +4,7 @@
 
 **Goal:** 查询结果和数据标签可以导出为 CSV、xlsx、INSERT、JSON（后端重新执行，读完整大字段）；新增按方言的运维查询侧栏。
 
-**Architecture:** 驱动连接增加大字段读取上限；`dblens-service` 的导出任务另开连接执行、边读边写文件，前端轮询进度，桌面版写到"另存为"选的路径，浏览器模式写临时文件后下载。运维查询是 `dblens-dialect` 中按方言的 SQL 模板，接口按连接的变体列出，前端点击后新开标签执行。
+**Architecture:** 驱动连接增加大字段读取上限；`datluma-service` 的导出任务另开连接执行、边读边写文件，前端轮询进度，桌面版写到"另存为"选的路径，浏览器模式写临时文件后下载。运维查询是 `datluma-dialect` 中按方言的 SQL 模板，接口按连接的变体列出，前端点击后新开标签执行。
 
 **Tech Stack:** Rust（axum、tokio、csv、rust_xlsxwriter、Tauri 的 dialog 插件）；React 19 + TypeScript、antd 6（Modal、notification）、zustand、@tanstack/react-query 5、Vitest。
 
@@ -19,7 +19,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级。本里程碑新增 `csv` 1.4.0、`rust_xlsxwriter` 0.100.0。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -37,14 +37,14 @@
 ## 文件结构
 
 ```text
-crates/dblens-driver/src/{traits.rs, blocking.rs, conformance.rs}     大字段读取上限
-crates/dblens-driver-{mysql,postgres,oracle,dameng}/src/            各驱动按上限读取
-crates/dblens-dialect/sql/ops/*.sql; src/ops.rs                     运维查询模板（新增）
-crates/dblens-service/src/export/{mod.rs, write.rs, job.rs}         导出（新增）
-crates/dblens-service/src/{service.rs, lib.rs, fake.rs}; tests/live.rs   Service::ops、组装、假驱动、实库测试
-crates/dblens-api/src/exports.rs; src/lib.rs; tests/api.rs          接口（新增）
-crates/dblens-desktop/src/shell.rs; build.rs; capabilities/main.json   另存为、在文件夹中显示
-crates/dblens-core/locales/app.json                                 后端词条
+crates/datluma-driver/src/{traits.rs, blocking.rs, conformance.rs}     大字段读取上限
+crates/datluma-driver-{mysql,postgres,oracle,dameng}/src/            各驱动按上限读取
+crates/datluma-dialect/sql/ops/*.sql; src/ops.rs                     运维查询模板（新增）
+crates/datluma-service/src/export/{mod.rs, write.rs, job.rs}         导出（新增）
+crates/datluma-service/src/{service.rs, lib.rs, fake.rs}; tests/live.rs   Service::ops、组装、假驱动、实库测试
+crates/datluma-api/src/exports.rs; src/lib.rs; tests/api.rs          接口（新增）
+crates/datluma-desktop/src/shell.rs; build.rs; capabilities/main.json   另存为、在文件夹中显示
+crates/datluma-core/locales/app.json                                 后端词条
 docs/notes/m0-4b-api.md                                             接口说明
 web/src/shared/{api.ts, shell.ts}                                    接口客户端、原生能力
 web/src/features/export/                                            导出对话框（新增）
@@ -78,7 +78,7 @@ Expected：2026-10-26 写计划时：共 75 个直接依赖，0 个可升级（�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -107,34 +107,34 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 - 一致性测试增加 `lob_limit_reads_full_value`：放宽后读出 100000 字节的完整文本，改回默认后又是预览。
 
 **Files:**
-- Modify: `crates/dblens-driver-dameng/src/conn.rs`
-- Modify: `crates/dblens-driver-dameng/src/types.rs`
-- Modify: `crates/dblens-driver-mysql/src/conn.rs`
-- Modify: `crates/dblens-driver-mysql/src/exec.rs`
-- Modify: `crates/dblens-driver-mysql/src/lib.rs`
-- Modify: `crates/dblens-driver-oracle/src/conn.rs`
-- Modify: `crates/dblens-driver-oracle/src/value.rs`
-- Modify: `crates/dblens-driver-postgres/src/conn.rs`
-- Modify: `crates/dblens-driver-postgres/src/exec.rs`
-- Modify: `crates/dblens-driver-postgres/src/lib.rs`
-- Modify: `crates/dblens-driver/src/blocking.rs`
-- Modify: `crates/dblens-driver/src/conformance.rs`
-- Modify: `crates/dblens-driver/src/traits.rs`
-- Modify: `crates/dblens-driver/tests/blocking.rs`
-- Modify: `crates/dblens-driver/tests/fake_driver.rs`
-- Modify: `crates/dblens-service/src/fake.rs`
+- Modify: `crates/datluma-driver-dameng/src/conn.rs`
+- Modify: `crates/datluma-driver-dameng/src/types.rs`
+- Modify: `crates/datluma-driver-mysql/src/conn.rs`
+- Modify: `crates/datluma-driver-mysql/src/exec.rs`
+- Modify: `crates/datluma-driver-mysql/src/lib.rs`
+- Modify: `crates/datluma-driver-oracle/src/conn.rs`
+- Modify: `crates/datluma-driver-oracle/src/value.rs`
+- Modify: `crates/datluma-driver-postgres/src/conn.rs`
+- Modify: `crates/datluma-driver-postgres/src/exec.rs`
+- Modify: `crates/datluma-driver-postgres/src/lib.rs`
+- Modify: `crates/datluma-driver/src/blocking.rs`
+- Modify: `crates/datluma-driver/src/conformance.rs`
+- Modify: `crates/datluma-driver/src/traits.rs`
+- Modify: `crates/datluma-driver/tests/blocking.rs`
+- Modify: `crates/datluma-driver/tests/fake_driver.rs`
+- Modify: `crates/datluma-service/src/fake.rs`
 
 **Interfaces:**
-- Produces（`dblens_driver`）：
+- Produces（`datluma_driver`）：
   - `Connection::set_lob_limit(&mut self, bytes: usize)`（同步方法，只影响之后执行的语句）；
   - `BlockingConnection::set_lob_limit(&mut self, bytes: usize)`；
-  - 测试用的假连接（`dblens-driver/tests`、`dblens-service/src/fake.rs`）都实现它；服务层的假连接把它记进日志 `lob_limit <字节数>`。
+  - 测试用的假连接（`datluma-driver/tests`、`datluma-service/src/fake.rs`）都实现它；服务层的假连接把它记进日志 `lob_limit <字节数>`。
 
-- [ ] **Step 1: 修改 `crates/dblens-driver/tests/blocking.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-driver/tests/blocking.rs`**
 
 ```diff
---- a/crates/dblens-driver/tests/blocking.rs
-+++ b/crates/dblens-driver/tests/blocking.rs
+--- a/crates/datluma-driver/tests/blocking.rs
++++ b/crates/datluma-driver/tests/blocking.rs
 @@ -38,6 +38,8 @@ impl BlockingExec for FakeExec {
  }
  
@@ -146,11 +146,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
          self.log.lock().unwrap().push(format!("{thread}:{sql}"));
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-driver/tests/fake_driver.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-driver/tests/fake_driver.rs`**
 
 ```diff
---- a/crates/dblens-driver/tests/fake_driver.rs
-+++ b/crates/dblens-driver/tests/fake_driver.rs
+--- a/crates/datluma-driver/tests/fake_driver.rs
++++ b/crates/datluma-driver/tests/fake_driver.rs
 @@ -58,6 +58,8 @@ impl Connection for FakeConn {
              started: false,
          }))
@@ -162,12 +162,12 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
          CancelHandle::new(move || {
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-driver-dameng/src/conn.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-driver-dameng/src/conn.rs`**
 
 ```diff
---- a/crates/dblens-driver-dameng/src/conn.rs
-+++ b/crates/dblens-driver-dameng/src/conn.rs
-@@ -11,7 +11,7 @@ use dblens_driver::{CancelHandle, ColumnMeta, ExecEvent, ServerInfo};
+--- a/crates/datluma-driver-dameng/src/conn.rs
++++ b/crates/datluma-driver-dameng/src/conn.rs
+@@ -11,7 +11,7 @@ use datluma_driver::{CancelHandle, ColumnMeta, ExecEvent, ServerInfo};
  use crate::ffi::*;
  use crate::handles::{ColDesc, Con, Stmt, succeeded};
  use crate::position::with_position;
@@ -188,7 +188,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
              current: Arc::new(Mutex::new(None)),
              cancelled: Arc::new(AtomicBool::new(false)),
              autocommit: true,
-+            lob_limit: dblens_core::DEFAULT_LOB_PREVIEW_BYTES,
++            lob_limit: datluma_core::DEFAULT_LOB_PREVIEW_BYTES,
          }
      }
  
@@ -234,17 +234,17 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
  
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-driver-dameng/src/types.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-driver-dameng/src/types.rs`**
 
 ```diff
---- a/crates/dblens-driver-dameng/src/types.rs
-+++ b/crates/dblens-driver-dameng/src/types.rs
+--- a/crates/datluma-driver-dameng/src/types.rs
++++ b/crates/datluma-driver-dameng/src/types.rs
 @@ -4,7 +4,7 @@
  use base64::Engine;
  use base64::engine::general_purpose::STANDARD;
  use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
--use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, LobPreview, Result, Value, msg};
-+use dblens_core::{Error, LobPreview, Result, Value, msg};
+-use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, LobPreview, Result, Value, msg};
++use datluma_core::{Error, LobPreview, Result, Value, msg};
  
  use crate::ffi::*;
  
@@ -258,11 +258,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
  pub(crate) enum ParamData {
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-driver-mysql/src/conn.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-driver-mysql/src/conn.rs`**
 
 ```diff
---- a/crates/dblens-driver-mysql/src/conn.rs
-+++ b/crates/dblens-driver-mysql/src/conn.rs
+--- a/crates/datluma-driver-mysql/src/conn.rs
++++ b/crates/datluma-driver-mysql/src/conn.rs
 @@ -11,6 +11,7 @@ use crate::value::to_mysql_param;
  pub struct MySqlConnection {
      pub(crate) conn: Conn,
@@ -295,18 +295,18 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
          let opts = self.opts.clone();
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-driver-mysql/src/exec.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-driver-mysql/src/exec.rs`**
 
 ```diff
---- a/crates/dblens-driver-mysql/src/exec.rs
-+++ b/crates/dblens-driver-mysql/src/exec.rs
+--- a/crates/datluma-driver-mysql/src/exec.rs
++++ b/crates/datluma-driver-mysql/src/exec.rs
 @@ -1,7 +1,7 @@
  use std::sync::Arc;
  
  use async_trait::async_trait;
--use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Result, Row};
-+use dblens_core::{Result, Row};
- use dblens_driver::{ExecEvent, ExecStream};
+-use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Result, Row};
++use datluma_core::{Result, Row};
+ use datluma_driver::{ExecEvent, ExecStream};
  use mysql_async::prelude::Protocol;
  use mysql_async::{Column, QueryResult};
 @@ -23,20 +23,17 @@ pub(crate) struct MyExec<'a, P: Protocol> {
@@ -346,27 +346,27 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
                              break;
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-driver-mysql/src/lib.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-driver-mysql/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-driver-mysql/src/lib.rs
-+++ b/crates/dblens-driver-mysql/src/lib.rs
+--- a/crates/datluma-driver-mysql/src/lib.rs
++++ b/crates/datluma-driver-mysql/src/lib.rs
 @@ -76,7 +76,7 @@ impl Driver for MySqlDriver {
                  Error::connect(msg!("driver.connect_timeout", seconds = p.connect_timeout.as_secs()))
              })?
              .map_err(map_err)?;
 -        Ok(Box::new(MySqlConnection { conn, opts }))
-+        Ok(Box::new(MySqlConnection { conn, opts, lob_limit: dblens_core::DEFAULT_LOB_PREVIEW_BYTES }))
++        Ok(Box::new(MySqlConnection { conn, opts, lob_limit: datluma_core::DEFAULT_LOB_PREVIEW_BYTES }))
      }
  }
  
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-driver-oracle/src/conn.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-driver-oracle/src/conn.rs`**
 
 ```diff
---- a/crates/dblens-driver-oracle/src/conn.rs
-+++ b/crates/dblens-driver-oracle/src/conn.rs
+--- a/crates/datluma-driver-oracle/src/conn.rs
++++ b/crates/datluma-driver-oracle/src/conn.rs
 @@ -19,11 +19,12 @@ pub(crate) struct OracleConnection {
      conn: Arc<oracle::Connection>,
      /// 自行维护的自动提交标志（`oracle::Connection::set_autocommit` 需要 &mut，而连接要与取消句柄共享）。
@@ -377,7 +377,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
  impl OracleConnection {
      pub(crate) fn new(conn: Arc<oracle::Connection>) -> Self {
 -        OracleConnection { conn, autocommit: true }
-+        OracleConnection { conn, autocommit: true, lob_limit: dblens_core::DEFAULT_LOB_PREVIEW_BYTES }
++        OracleConnection { conn, autocommit: true, lob_limit: datluma_core::DEFAULT_LOB_PREVIEW_BYTES }
      }
  }
  
@@ -394,7 +394,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
      // 这里再统一截断 LONG、LONG RAW 和超长 VARCHAR2 等非 LOB 的大值，与 MySQL、PG、达梦驱动一致
 -    row.sql_values()
 -        .iter()
--        .map(|v| oracle_value(v).map(|v| v.cap_large(dblens_core::DEFAULT_LOB_PREVIEW_BYTES)))
+-        .map(|v| oracle_value(v).map(|v| v.cap_large(datluma_core::DEFAULT_LOB_PREVIEW_BYTES)))
 -        .collect()
 +    row.sql_values().iter().map(|v| oracle_value(v, lob_limit).map(|v| v.cap_large(lob_limit))).collect()
  }
@@ -439,18 +439,18 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
      fn set_autocommit(&mut self, on: bool) -> Result<()> {
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-driver-oracle/src/value.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-driver-oracle/src/value.rs`**
 
 ```diff
---- a/crates/dblens-driver-oracle/src/value.rs
-+++ b/crates/dblens-driver-oracle/src/value.rs
+--- a/crates/datluma-driver-oracle/src/value.rs
++++ b/crates/datluma-driver-oracle/src/value.rs
 @@ -3,7 +3,7 @@
  use std::io::Read;
  
  use chrono::{DateTime, FixedOffset, NaiveDateTime};
--use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value, msg};
-+use dblens_core::{Error, Result, Value, msg};
- use dblens_driver::ColumnMeta;
+-use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value, msg};
++use datluma_core::{Error, Result, Value, msg};
+ use datluma_driver::ColumnMeta;
  use oracle::sql_type::{Blob, Clob, Lob, Nclob, OracleType, ToSql};
  use oracle::{ColumnInfo, SqlValue};
 @@ -38,7 +38,7 @@ pub(crate) fn column_meta(info: &ColumnInfo) -> ColumnMeta {
@@ -518,11 +518,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
      };
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-driver-postgres/src/conn.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-driver-postgres/src/conn.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/src/conn.rs
-+++ b/crates/dblens-driver-postgres/src/conn.rs
+--- a/crates/datluma-driver-postgres/src/conn.rs
++++ b/crates/datluma-driver-postgres/src/conn.rs
 @@ -17,6 +17,7 @@ pub struct PgConnection {
      pub(crate) in_tx: bool,
      /// 加密连接时的 TLS 连接器；取消请求也要用它建立连接（服务器可能只接受加密连接）。
@@ -549,11 +549,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
          let tls = self.tls.clone();
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-driver-postgres/src/exec.rs`**
+- [ ] **Step 11: 修改 `crates/datluma-driver-postgres/src/exec.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/src/exec.rs
-+++ b/crates/dblens-driver-postgres/src/exec.rs
+--- a/crates/datluma-driver-postgres/src/exec.rs
++++ b/crates/datluma-driver-postgres/src/exec.rs
 @@ -23,24 +23,26 @@ pub(crate) struct PgExec<'a> {
      notices: &'a mut UnboundedReceiver<String>,
      rows: Option<Pin<Box<RowStream>>>,
@@ -596,11 +596,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
                              break;
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-driver-postgres/src/lib.rs`**
+- [ ] **Step 12: 修改 `crates/datluma-driver-postgres/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-driver-postgres/src/lib.rs
-+++ b/crates/dblens-driver-postgres/src/lib.rs
+--- a/crates/datluma-driver-postgres/src/lib.rs
++++ b/crates/datluma-driver-postgres/src/lib.rs
 @@ -84,6 +84,14 @@ impl Driver for PgDriver {
                  (client, spawn_connection(connection))
              }
@@ -613,17 +613,17 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 +            autocommit: true,
 +            in_tx: false,
 +            tls,
-+            lob_limit: dblens_core::DEFAULT_LOB_PREVIEW_BYTES,
++            lob_limit: datluma_core::DEFAULT_LOB_PREVIEW_BYTES,
 +        }))
      }
  }
 ```
 
-- [ ] **Step 13: 修改 `crates/dblens-driver/src/blocking.rs`**
+- [ ] **Step 13: 修改 `crates/datluma-driver/src/blocking.rs`**
 
 ```diff
---- a/crates/dblens-driver/src/blocking.rs
-+++ b/crates/dblens-driver/src/blocking.rs
+--- a/crates/datluma-driver/src/blocking.rs
++++ b/crates/datluma-driver/src/blocking.rs
 @@ -19,6 +19,9 @@ pub trait BlockingExec {
  /// 同步的连接。所有方法都只在该连接的专用线程上调用。
  pub trait BlockingConnection: Send + 'static {
@@ -677,11 +677,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
      }
 ```
 
-- [ ] **Step 14: 修改 `crates/dblens-driver/src/conformance.rs`**
+- [ ] **Step 14: 修改 `crates/datluma-driver/src/conformance.rs`**
 
 ```diff
---- a/crates/dblens-driver/src/conformance.rs
-+++ b/crates/dblens-driver/src/conformance.rs
+--- a/crates/datluma-driver/src/conformance.rs
++++ b/crates/datluma-driver/src/conformance.rs
 @@ -202,6 +202,19 @@ pub async fn large_text_becomes_lob_preview(f: &Fixture) {
      }
  }
@@ -694,7 +694,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 +        other => panic!("期望完整的文本，实际：{other:?}"),
 +    }
 +    // 改回默认后又是预览
-+    c.set_lob_limit(dblens_core::DEFAULT_LOB_PREVIEW_BYTES);
++    c.set_lob_limit(datluma_core::DEFAULT_LOB_PREVIEW_BYTES);
 +    let v = single_value(&run(c.as_mut(), f.large_text, &[]).await.expect("执行失败"));
 +    assert!(matches!(v, Value::Lob(_)), "{v:?}");
 +}
@@ -717,11 +717,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
                      $crate::conformance::type_round_trip(&f).await;
 ```
 
-- [ ] **Step 15: 修改 `crates/dblens-driver/src/traits.rs`**
+- [ ] **Step 15: 修改 `crates/datluma-driver/src/traits.rs`**
 
 ```diff
---- a/crates/dblens-driver/src/traits.rs
-+++ b/crates/dblens-driver/src/traits.rs
+--- a/crates/datluma-driver/src/traits.rs
++++ b/crates/datluma-driver/src/traits.rs
 @@ -19,6 +19,9 @@ pub trait Connection: Send {
      -> Result<Box<dyn ExecStream + 'a>>;
      /// 返回可以从其他任务调用的取消句柄。
@@ -734,11 +734,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
      async fn commit(&mut self) -> Result<()>;
 ```
 
-- [ ] **Step 16: 修改 `crates/dblens-service/src/fake.rs`**
+- [ ] **Step 16: 修改 `crates/datluma-service/src/fake.rs`**
 
 ```diff
---- a/crates/dblens-service/src/fake.rs
-+++ b/crates/dblens-service/src/fake.rs
+--- a/crates/datluma-service/src/fake.rs
++++ b/crates/datluma-service/src/fake.rs
 @@ -104,6 +104,10 @@ impl ExecStream for FakeStream {
  
  #[async_trait]
@@ -758,17 +758,17 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`（密码不写进任何文件）。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`（密码不写进任何文件）。
 
 Expected: 全部测试通过；4 个驱动 crate 的 `lob_limit_reads_full_value` 在 5 个实库上通过（MySQL、MariaDB 共用 MySQL 驱动）。
 
 - [ ] **Step 18: 提交**
 
 ```bash
-git add crates/dblens-driver-dameng/src/conn.rs crates/dblens-driver-dameng/src/types.rs crates/dblens-driver-mysql/src/conn.rs crates/dblens-driver-mysql/src/exec.rs crates/dblens-driver-mysql/src/lib.rs crates/dblens-driver-oracle/src/conn.rs crates/dblens-driver-oracle/src/value.rs crates/dblens-driver-postgres/src/conn.rs crates/dblens-driver-postgres/src/exec.rs crates/dblens-driver-postgres/src/lib.rs crates/dblens-driver/src/blocking.rs crates/dblens-driver/src/conformance.rs crates/dblens-driver/src/traits.rs crates/dblens-driver/tests/blocking.rs crates/dblens-driver/tests/fake_driver.rs crates/dblens-service/src/fake.rs
+git add crates/datluma-driver-dameng/src/conn.rs crates/datluma-driver-dameng/src/types.rs crates/datluma-driver-mysql/src/conn.rs crates/datluma-driver-mysql/src/exec.rs crates/datluma-driver-mysql/src/lib.rs crates/datluma-driver-oracle/src/conn.rs crates/datluma-driver-oracle/src/value.rs crates/datluma-driver-postgres/src/conn.rs crates/datluma-driver-postgres/src/exec.rs crates/datluma-driver-postgres/src/lib.rs crates/datluma-driver/src/blocking.rs crates/datluma-driver/src/conformance.rs crates/datluma-driver/src/traits.rs crates/datluma-driver/tests/blocking.rs crates/datluma-driver/tests/fake_driver.rs crates/datluma-service/src/fake.rs
 git commit -m "feat(driver): 连接可设置大字段的读取上限（导出时读完整内容）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -776,30 +776,30 @@ git commit -m "feat(driver): 连接可设置大字段的读取上限（导出时
 
 ### Task 3: 方言：运维查询模板
 
-运维查询放在 `dblens-dialect/sql/ops/<方言>.sql`，按 `-- [key]` 分段，段首注释写中英文名称和分类（`session` / `lock` / `storage` / `sql`），解析时保持文件中的顺序。
+运维查询放在 `datluma-dialect/sql/ops/<方言>.sql`，按 `-- [key]` 分段，段首注释写中英文名称和分类（`session` / `lock` / `storage` / `sql`），解析时保持文件中的顺序。
 - 每种数据库 6 项：`sessions`、`running`、`locks`、`storage`、`largest_tables`、`slow_sql`；会话和锁的查询带 `kill_sql` 列。
 - MariaDB 没有 sys 库，`mariadb.sql` 只覆盖 `locks`（原位替换）；其余兼容库用所属家族的模板。
 - Oracle、达梦的列别名加双引号，保持小写列名。
 
 **Files:**
-- Create: `crates/dblens-dialect/sql/ops/dameng.sql`
-- Create: `crates/dblens-dialect/sql/ops/mariadb.sql`
-- Create: `crates/dblens-dialect/sql/ops/mysql.sql`
-- Create: `crates/dblens-dialect/sql/ops/oracle.sql`
-- Create: `crates/dblens-dialect/sql/ops/postgres.sql`
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Modify: `crates/dblens-dialect/src/meta/mod.rs`
-- Modify: `crates/dblens-dialect/src/meta/template.rs`
-- Create: `crates/dblens-dialect/src/ops.rs`
+- Create: `crates/datluma-dialect/sql/ops/dameng.sql`
+- Create: `crates/datluma-dialect/sql/ops/mariadb.sql`
+- Create: `crates/datluma-dialect/sql/ops/mysql.sql`
+- Create: `crates/datluma-dialect/sql/ops/oracle.sql`
+- Create: `crates/datluma-dialect/sql/ops/postgres.sql`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Modify: `crates/datluma-dialect/src/meta/mod.rs`
+- Modify: `crates/datluma-dialect/src/meta/template.rs`
+- Create: `crates/datluma-dialect/src/ops.rs`
 
 **Interfaces:**
-- Produces（`dblens_dialect`）：
+- Produces（`datluma_dialect`）：
   - `OpsCategory::{Session, Lock, Storage, Sql}`（serde snake_case）；
   - `OpsQuery { key, name_zh, name_en, category, sql }`；
   - `Dialect::ops_queries(&self) -> &'static [OpsQuery]`；
   - `meta::template::ALL_VARIANTS` 改为 `pub(crate)`。
 
-- [ ] **Step 1: 新建 `crates/dblens-dialect/sql/ops/dameng.sql`**
+- [ ] **Step 1: 新建 `crates/datluma-dialect/sql/ops/dameng.sql`**
 
 ```
 -- DM (Dameng) ops queries (M1c3). They read V$ dynamic views and DBA_ views: users without the DBA role
@@ -886,7 +886,7 @@ ORDER BY l.EXEC_TIME DESC
 LIMIT 20
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-dialect/sql/ops/mariadb.sql`**
+- [ ] **Step 2: 新建 `crates/datluma-dialect/sql/ops/mariadb.sql`**
 
 ```
 -- MariaDB overrides of the MySQL ops queries (M1c3). MariaDB has no sys schema; lock waits come from
@@ -908,7 +908,7 @@ LEFT JOIN information_schema.INNODB_LOCKS l ON l.lock_id = w.requested_lock_id
 ORDER BY wait_seconds DESC
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-dialect/sql/ops/mysql.sql`**
+- [ ] **Step 3: 新建 `crates/datluma-dialect/sql/ops/mysql.sql`**
 
 ```
 -- MySQL ops queries (M1c3). Also used by TiDB, OceanBase and PolarDB, which may lack some of the views:
@@ -986,7 +986,7 @@ ORDER BY d.AVG_TIMER_WAIT DESC
 LIMIT 20
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/sql/ops/oracle.sql`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/sql/ops/oracle.sql`**
 
 ```
 -- Oracle ops queries (M1c3). They read V$ and DBA_ views: users without SELECT_CATALOG_ROLE (or
@@ -1084,7 +1084,7 @@ SELECT * FROM (
 ) WHERE ROWNUM <= 20
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/sql/ops/postgres.sql`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/sql/ops/postgres.sql`**
 
 ```
 -- PostgreSQL ops queries (M1c3). Also used by KingbaseES, openGauss, GaussDB and HighGo, which may name
@@ -1168,11 +1168,11 @@ ORDER BY s.mean_exec_time DESC
 LIMIT 20
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -6,6 +6,7 @@ mod dml;
  pub mod ident;
  pub mod literal;
@@ -1181,7 +1181,7 @@ LIMIT 20
  mod session;
  mod split;
  pub mod types;
-@@ -18,6 +19,7 @@ use dblens_driver::{DriverId, ServerInfo};
+@@ -18,6 +19,7 @@ use datluma_driver::{DriverId, ServerInfo};
  pub use browse::{Direction, Relation, relations};
  pub use ddl::{DdlKind, ddl_text, normalize_ddl};
  pub use dml::DmlTemplate;
@@ -1191,11 +1191,11 @@ LIMIT 20
  pub use variant::{Family, Variant};
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-dialect/src/meta/mod.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-dialect/src/meta/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/mod.rs
-+++ b/crates/dblens-dialect/src/meta/mod.rs
+--- a/crates/datluma-dialect/src/meta/mod.rs
++++ b/crates/datluma-dialect/src/meta/mod.rs
 @@ -4,7 +4,7 @@
  
  mod assemble;
@@ -1207,11 +1207,11 @@ LIMIT 20
  
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-dialect/src/meta/template.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-dialect/src/meta/template.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/template.rs
-+++ b/crates/dblens-dialect/src/meta/template.rs
+--- a/crates/datluma-dialect/src/meta/template.rs
++++ b/crates/datluma-dialect/src/meta/template.rs
 @@ -20,7 +20,7 @@ const POSTGRES: &str = include_str!("../../sql/postgres.sql");
  const ORACLE: &str = include_str!("../../sql/oracle.sql");
  const DAMENG: &str = include_str!("../../sql/dameng.sql");
@@ -1223,7 +1223,7 @@ LIMIT 20
      Variant::TiDb,
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-dialect/src/ops.rs`**
+- [ ] **Step 9: 新建 `crates/datluma-dialect/src/ops.rs`**
 
 ````rust
 //! 运维查询（M1c3 设计文档第 5 节）：每个家族一个 `sql/ops/<家族>.sql`，兼容库可以有只含差异 key 的覆盖文件。
@@ -1431,7 +1431,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 3 个：每个变体都有全部 6 项且会话、锁带 kill_sql；解析保持顺序；MariaDB 原位覆盖、兼容库回退）。SQL 本身在任务 4 的实库测试中逐个执行。
@@ -1439,7 +1439,7 @@ Expected: 全部测试通过（dialect 新增 3 个：每个变体都有全部 6
 - [ ] **Step 11: 提交**
 
 ```bash
-git add crates/dblens-dialect/sql/ops/dameng.sql crates/dblens-dialect/sql/ops/mariadb.sql crates/dblens-dialect/sql/ops/mysql.sql crates/dblens-dialect/sql/ops/oracle.sql crates/dblens-dialect/sql/ops/postgres.sql crates/dblens-dialect/src/lib.rs crates/dblens-dialect/src/meta/mod.rs crates/dblens-dialect/src/meta/template.rs crates/dblens-dialect/src/ops.rs
+git add crates/datluma-dialect/sql/ops/dameng.sql crates/datluma-dialect/sql/ops/mariadb.sql crates/datluma-dialect/sql/ops/mysql.sql crates/datluma-dialect/sql/ops/oracle.sql crates/datluma-dialect/sql/ops/postgres.sql crates/datluma-dialect/src/lib.rs crates/datluma-dialect/src/meta/mod.rs crates/datluma-dialect/src/meta/template.rs crates/datluma-dialect/src/ops.rs
 git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语句、锁等待、存储、最大的表、慢 SQL" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1457,19 +1457,19 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
 
 **Files:**
 - Modify: `Cargo.toml`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/Cargo.toml`
-- Create: `crates/dblens-service/src/export/job.rs`
-- Create: `crates/dblens-service/src/export/mod.rs`
-- Create: `crates/dblens-service/src/export/write.rs`
-- Modify: `crates/dblens-service/src/fake.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/service.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/Cargo.toml`
+- Create: `crates/datluma-service/src/export/job.rs`
+- Create: `crates/datluma-service/src/export/mod.rs`
+- Create: `crates/datluma-service/src/export/write.rs`
+- Modify: `crates/datluma-service/src/fake.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/service.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `set_lob_limit`；任务 3 的 `Dialect::ops_queries`；已有的 `MetadataService::data_sql`、`policy::classify`、`HistoryLog`。
-- Produces（`dblens_service`）：
+- Produces（`datluma_service`）：
   - `ExportFormat::{Csv, Xlsx, Insert, Json}`、`ExportOptions { delimiter, header, bom, null_text, table, rows_per_insert }`（`#[serde(default)]`）、`ExportWarnings { lob_truncated, cell_truncated }`；
   - `ExportSource::{Sql(String), Data { schema, object, filter, order }}`、`ExportRequest { profile_id, source, format, options, path, file_name }`；
   - `ExportState::{Running, Done, Failed, Cancelled}`、`ExportStatus { id, state, rows, warnings, error: Option<Error>, file_name, path }`；
@@ -1478,15 +1478,15 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
   - `Service::ops(&self, profile_id) -> Result<&'static [OpsQuery]>`；
   - 后端词条 `export.*`。
 
-- [ ] **Step 1: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
-@@ -13,13 +13,14 @@ use dblens_dialect::meta::MetaKey;
- use dblens_dialect::{DdlKind, Direction};
- use dblens_driver::{ConnectParams, DriverId};
- use dblens_service::{
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
+@@ -13,13 +13,14 @@ use datluma_dialect::meta::MetaKey;
+ use datluma_dialect::{DdlKind, Direction};
+ use datluma_driver::{ConnectParams, DriverId};
+ use datluma_service::{
 -    DataOrder, DefaultPolicy, DriverRegistry, Environment, ExecRequest, GenerateKind, ObjectKind,
 -    ProfileInput, SecretBackend, Secrets, Service, SessionEvent, SessionId, Store,
 +    DataOrder, DefaultPolicy, DriverRegistry, Environment, ExecRequest, ExportFormat, ExportOptions,
@@ -1512,7 +1512,7 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
      let schema = match driver {
 @@ -457,3 +458,158 @@ async fn oracle_objects() {
  async fn dameng_objects() {
-     objects_flow("DBLENS_TEST_DM_URL").await;
+     objects_flow("DATLUMA_TEST_DM_URL").await;
  }
 +
 +/// 运维查询（M1c3）：逐个执行。`allowed_failures` 是测试库上已知会失败的（如没有安装 pg_stat_statements）。
@@ -1538,28 +1538,28 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
 +
 +#[tokio::test]
 +async fn mysql_ops() {
-+    ops_flow("DBLENS_TEST_MYSQL_URL", &[]).await;
++    ops_flow("DATLUMA_TEST_MYSQL_URL", &[]).await;
 +}
 +
 +#[tokio::test]
 +async fn mariadb_ops() {
-+    ops_flow("DBLENS_TEST_MARIADB_URL", &[]).await;
++    ops_flow("DATLUMA_TEST_MARIADB_URL", &[]).await;
 +}
 +
 +#[tokio::test]
 +async fn postgres_ops() {
 +    // 测试库没有安装 pg_stat_statements 扩展
-+    ops_flow("DBLENS_TEST_PG_URL", &["slow_sql"]).await;
++    ops_flow("DATLUMA_TEST_PG_URL", &["slow_sql"]).await;
 +}
 +
 +#[tokio::test]
 +async fn oracle_ops() {
-+    ops_flow("DBLENS_TEST_ORACLE_URL", &[]).await;
++    ops_flow("DATLUMA_TEST_ORACLE_URL", &[]).await;
 +}
 +
 +#[tokio::test]
 +async fn dameng_ops() {
-+    ops_flow("DBLENS_TEST_DM_URL", &[]).await;
++    ops_flow("DATLUMA_TEST_DM_URL", &[]).await;
 +}
 +
 +/// 导出（M1c3）：一行含中文和超过 64 KB 的大字段，四种格式都写出完整内容；另导出多行核对行数。
@@ -1647,27 +1647,27 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
 +
 +#[tokio::test]
 +async fn mysql_export() {
-+    export_flow("DBLENS_TEST_MYSQL_URL").await;
++    export_flow("DATLUMA_TEST_MYSQL_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn mariadb_export() {
-+    export_flow("DBLENS_TEST_MARIADB_URL").await;
++    export_flow("DATLUMA_TEST_MARIADB_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn postgres_export() {
-+    export_flow("DBLENS_TEST_PG_URL").await;
++    export_flow("DATLUMA_TEST_PG_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn oracle_export() {
-+    export_flow("DBLENS_TEST_ORACLE_URL").await;
++    export_flow("DATLUMA_TEST_ORACLE_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn dameng_export() {
-+    export_flow("DBLENS_TEST_DM_URL").await;
++    export_flow("DATLUMA_TEST_DM_URL").await;
 +}
 ```
 
@@ -1694,11 +1694,11 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
  semver = "1.0.28"
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 3: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -40,6 +40,16 @@
    "error.kind.not_found": {"zh-CN": "找不到%{what}", "en": "Not found: %{what}"},
    "error.kind.sql": {"zh-CN": "SQL 错误 [%{code}]：%{message}", "en": "SQL error [%{code}]: %{message}"},
@@ -1718,11 +1718,11 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
    "favorite.name_required": {"zh-CN": "名称不能为空", "en": "The name is required"},
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/Cargo.toml`**
+- [ ] **Step 4: 修改 `crates/datluma-service/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-service/Cargo.toml
-+++ b/crates/dblens-service/Cargo.toml
+--- a/crates/datluma-service/Cargo.toml
++++ b/crates/datluma-service/Cargo.toml
 @@ -17,8 +17,10 @@ testing = []
  [dependencies]
  argon2.workspace = true
@@ -1731,10 +1731,10 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
  chacha20poly1305.workspace = true
  chrono.workspace = true
 +csv.workspace = true
- dblens-core.workspace = true
- dblens-dialect.workspace = true
- dblens-driver.workspace = true
-@@ -29,6 +31,7 @@ dblens-driver-postgres = { workspace = true, optional = true }
+ datluma-core.workspace = true
+ datluma-dialect.workspace = true
+ datluma-driver.workspace = true
+@@ -29,6 +31,7 @@ datluma-driver-postgres = { workspace = true, optional = true }
  directories.workspace = true
  keyring.workspace = true
  rusqlite.workspace = true
@@ -1750,7 +1750,7 @@ git commit -m "feat(dialect): 运维查询模板：会话、正在执行的语�
  tempfile.workspace = true
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-service/src/export/job.rs`**
+- [ ] **Step 5: 新建 `crates/datluma-service/src/export/job.rs`**
 
 ```rust
 //! 导出任务（M1c3 设计文档 3.1、3.2 节）：后台另开一个连接，重新执行查询，边读边写文件；前端轮询进度。
@@ -1762,8 +1762,8 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
-use dblens_core::{Error, Result, msg};
-use dblens_driver::{CancelHandle, ExecEvent};
+use datluma_core::{Error, Result, msg};
+use datluma_driver::{CancelHandle, ExecEvent};
 use serde::{Deserialize, Serialize};
 
 use super::write::{ExportFormat, ExportOptions, ExportWarnings, writer};
@@ -1862,7 +1862,7 @@ fn not_found(id: &str) -> Error {
 
 impl Default for ExportManager {
     fn default() -> Self {
-        Self::new(std::env::temp_dir().join("dblens-exports"))
+        Self::new(std::env::temp_dir().join("datluma-exports"))
     }
 }
 
@@ -2249,7 +2249,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-service/src/export/mod.rs`**
+- [ ] **Step 6: 新建 `crates/datluma-service/src/export/mod.rs`**
 
 ```rust
 //! 导出查询结果（M1c3 设计文档第 3 节）。
@@ -2264,7 +2264,7 @@ pub use job::{
 pub use write::{ExportFormat, ExportOptions, ExportWarnings};
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-service/src/export/write.rs`**
+- [ ] **Step 7: 新建 `crates/datluma-service/src/export/write.rs`**
 
 ```rust
 //! 导出文件的写入（M1c3 设计文档 3.4 节）：CSV、xlsx、INSERT、JSON。只管把列和行写进文件，不涉及数据库。
@@ -2276,9 +2276,9 @@ use std::path::Path;
 
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
-use dblens_core::{Error, Result, Row, Value, msg};
-use dblens_dialect::Dialect;
-use dblens_driver::ColumnMeta;
+use datluma_core::{Error, Result, Row, Value, msg};
+use datluma_dialect::Dialect;
+use datluma_driver::ColumnMeta;
 use rust_xlsxwriter::{Format, Workbook, XlsxError};
 use serde::{Deserialize, Serialize};
 
@@ -2752,8 +2752,8 @@ impl RowWriter for JsonWriter {
 #[cfg(test)]
 mod tests {
     use chrono::NaiveDate;
-    use dblens_core::LobPreview;
-    use dblens_dialect::Variant;
+    use datluma_core::LobPreview;
+    use datluma_dialect::Variant;
 
     use super::*;
 
@@ -2875,11 +2875,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-service/src/fake.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-service/src/fake.rs`**
 
 ```diff
---- a/crates/dblens-service/src/fake.rs
-+++ b/crates/dblens-service/src/fake.rs
+--- a/crates/datluma-service/src/fake.rs
++++ b/crates/datluma-service/src/fake.rs
 @@ -111,6 +111,11 @@ impl Connection for FakeConn {
      async fn execute<'a>(&'a mut self, sql: &'a str, _: &'a [Value]) -> Result<Box<dyn ExecStream + 'a>> {
          let sql = sql.trim();
@@ -2894,16 +2894,16 @@ mod tests {
              "FAIL" => {
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -1,5 +1,6 @@
- //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `dblens-api` 使用，自身不处理 HTTP。
+ //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `datluma-api` 使用，自身不处理 HTTP。
  
 +mod export;
- /// 测试用的假驱动，供本 crate 和 `dblens-api` 的测试使用（feature `testing`）。
+ /// 测试用的假驱动，供本 crate 和 `datluma-api` 的测试使用（feature `testing`）。
  #[cfg(any(test, feature = "testing"))]
  pub mod fake;
 @@ -15,6 +16,10 @@ mod service;
@@ -2919,16 +2919,16 @@ mod tests {
      DEFAULT_HISTORY_LIMIT, HISTORY_ENABLED_SETTING, HISTORY_LIMIT_SETTING, HistoryItem, HistoryLog,
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-service/src/service.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-service/src/service.rs`**
 
 ```diff
---- a/crates/dblens-service/src/service.rs
-+++ b/crates/dblens-service/src/service.rs
+--- a/crates/datluma-service/src/service.rs
++++ b/crates/datluma-service/src/service.rs
 @@ -4,7 +4,9 @@ use std::path::Path;
  use std::sync::Arc;
  
- use dblens_core::{Lang, Result, set_default_lang};
-+use dblens_dialect::{Dialect, OpsQuery, Variant};
+ use datluma_core::{Lang, Result, set_default_lang};
++use datluma_dialect::{Dialect, OpsQuery, Variant};
  
 +use crate::export::ExportManager;
  use crate::history::HistoryLog;
@@ -2986,17 +2986,17 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`（密码不写进任何文件）。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`（密码不写进任何文件）。
 
 Expected: 全部测试通过（服务层新增写入器 6 个、导出任务 4 个）；`*_export` 和 `*_ops` 在 5 个实库上通过。
 
 - [ ] **Step 12: 提交**
 
 ```bash
-git add Cargo.lock Cargo.toml crates/dblens-core/locales/app.json crates/dblens-service/Cargo.toml crates/dblens-service/src/export/job.rs crates/dblens-service/src/export/mod.rs crates/dblens-service/src/export/write.rs crates/dblens-service/src/fake.rs crates/dblens-service/src/lib.rs crates/dblens-service/src/service.rs crates/dblens-service/tests/live.rs
+git add Cargo.lock Cargo.toml crates/datluma-core/locales/app.json crates/datluma-service/Cargo.toml crates/datluma-service/src/export/job.rs crates/datluma-service/src/export/mod.rs crates/datluma-service/src/export/write.rs crates/datluma-service/src/fake.rs crates/datluma-service/src/lib.rs crates/datluma-service/src/service.rs crates/datluma-service/tests/live.rs
 git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开连接读完整大字段）与运维查询列表" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3005,25 +3005,25 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
 ### Task 5: 接口与桌面原生能力
 
 - 接口：`POST /exports`、`GET/DELETE /exports/{id}`、`GET /exports/{id}/file`（流式传输，传完或中断后删除临时文件；`Content-Disposition` 带 RFC 5987 文件名）、`GET /profiles/{id}/ops`（名称按请求语言）。
-- `ApiConfig` 增加 `local_files`：桌面程序为 true（导出可以写到页面给的路径），`dblens-server` 为 false。各处构造都要补上这个字段。
-- `dblens-api` 的 tokio 多开 `fs`、`io-util` 特性。
+- `ApiConfig` 增加 `local_files`：桌面程序为 true（导出可以写到页面给的路径），`datluma-server` 为 false。各处构造都要补上这个字段。
+- `datluma-api` 的 tokio 多开 `fs`、`io-util` 特性。
 - 桌面：`save_dialog`（tauri-plugin-dialog 的另存为）、`reveal_in_folder`（Windows 用 `explorer /select,"路径"`，macOS `open -R`，其他 `xdg-open` 所在目录）；`build.rs` 和 `capabilities/main.json` 放行这两个命令。
 - 接口说明补充导出和运维查询。
 
 **Files:**
-- Modify: `crates/dblens-api/Cargo.toml`
-- Create: `crates/dblens-api/src/exports.rs`
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/tests/api.rs`
-- Modify: `crates/dblens-api/tests/library.rs`
-- Modify: `crates/dblens-api/tests/live.rs`
-- Modify: `crates/dblens-api/tests/settings.rs`
-- Modify: `crates/dblens-api/tests/web.rs`
-- Modify: `crates/dblens-desktop/build.rs`
-- Modify: `crates/dblens-desktop/capabilities/main.json`
-- Modify: `crates/dblens-desktop/src/main.rs`
-- Modify: `crates/dblens-desktop/src/shell.rs`
-- Modify: `crates/dblens-server/src/main.rs`
+- Modify: `crates/datluma-api/Cargo.toml`
+- Create: `crates/datluma-api/src/exports.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/tests/api.rs`
+- Modify: `crates/datluma-api/tests/library.rs`
+- Modify: `crates/datluma-api/tests/live.rs`
+- Modify: `crates/datluma-api/tests/settings.rs`
+- Modify: `crates/datluma-api/tests/web.rs`
+- Modify: `crates/datluma-desktop/build.rs`
+- Modify: `crates/datluma-desktop/capabilities/main.json`
+- Modify: `crates/datluma-desktop/src/main.rs`
+- Modify: `crates/datluma-desktop/src/shell.rs`
+- Modify: `crates/datluma-server/src/main.rs`
 - Modify: `docs/notes/m0-4b-api.md`
 
 **Interfaces:**
@@ -3033,11 +3033,11 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
   - `ApiConfig { token, allowed_origins, local_files }`；
   - Tauri 命令 `save_dialog(default_name, filters: [{name, extensions}]) -> Option<String>`、`reveal_in_folder(path) -> Result<(), String>`。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/api.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/api.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/api.rs
-+++ b/crates/dblens-api/tests/api.rs
+--- a/crates/datluma-api/tests/api.rs
++++ b/crates/datluma-api/tests/api.rs
 @@ -24,7 +24,11 @@ fn app() -> (Router, Arc<Service>) {
      let log: Log = Arc::default();
      let registry = Arc::new(DriverRegistry::with_drivers(store.clone(), vec![Box::new(FakeDriver { log })]));
@@ -3133,11 +3133,11 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
 +}
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-api/tests/library.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-api/tests/library.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/library.rs
-+++ b/crates/dblens-api/tests/library.rs
+--- a/crates/datluma-api/tests/library.rs
++++ b/crates/datluma-api/tests/library.rs
 @@ -20,7 +20,7 @@ fn app() -> (Router, Arc<Store>) {
      let history = HistoryLog::inline(store.clone());
      let service =
@@ -3149,11 +3149,11 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
  async fn call(app: &Router, method: &str, uri: &str, body: Option<Value>) -> (StatusCode, Value) {
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-api/tests/live.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-api/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/live.rs
-+++ b/crates/dblens-api/tests/live.rs
+--- a/crates/datluma-api/tests/live.rs
++++ b/crates/datluma-api/tests/live.rs
 @@ -51,7 +51,7 @@ async fn flow(env: &str) {
      secrets.init_vault("主密码").unwrap();
      let registry = Arc::new(DriverRegistry::new(store.clone()));
@@ -3165,11 +3165,11 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
          if let Some(lib) = params.options.get(option) {
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-api/tests/settings.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-api/tests/settings.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/settings.rs
-+++ b/crates/dblens-api/tests/settings.rs
+--- a/crates/datluma-api/tests/settings.rs
++++ b/crates/datluma-api/tests/settings.rs
 @@ -20,7 +20,7 @@ fn app() -> Router {
          vec![Box::new(FakeDriver { log: Arc::default() })],
      ));
@@ -3190,11 +3190,11 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
  
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-api/tests/web.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-api/tests/web.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/web.rs
-+++ b/crates/dblens-api/tests/web.rs
+--- a/crates/datluma-api/tests/web.rs
++++ b/crates/datluma-api/tests/web.rs
 @@ -19,7 +19,7 @@ fn app(dir: &std::path::Path) -> Router {
          vec![Box::new(FakeDriver { log: Arc::default() })],
      ));
@@ -3206,12 +3206,12 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
  
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-api/Cargo.toml`**
+- [ ] **Step 6: 修改 `crates/datluma-api/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-api/Cargo.toml
-+++ b/crates/dblens-api/Cargo.toml
-@@ -14,7 +14,7 @@ dblens-service.workspace = true
+--- a/crates/datluma-api/Cargo.toml
++++ b/crates/datluma-api/Cargo.toml
+@@ -14,7 +14,7 @@ datluma-service.workspace = true
  futures.workspace = true
  serde.workspace = true
  serde_json.workspace = true
@@ -3222,7 +3222,7 @@ git commit -m "feat(service): 导出任务（CSV、xlsx、INSERT、JSON，另开
  
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-api/src/exports.rs`**
+- [ ] **Step 7: 新建 `crates/datluma-api/src/exports.rs`**
 
 ```rust
 //! 导出与运维查询接口（M1c3 设计文档 3.1、5.2 节）。
@@ -3232,9 +3232,9 @@ use axum::body::{Body, Bytes};
 use axum::extract::{Path, State};
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
-use dblens_core::{Lang, current_lang};
-use dblens_dialect::OpsCategory;
-use dblens_service::{ExportRequest, ExportStatus};
+use datluma_core::{Lang, current_lang};
+use datluma_dialect::OpsCategory;
+use datluma_service::{ExportRequest, ExportStatus};
 use serde::Serialize;
 use serde_json::{Value, json};
 use tokio::io::AsyncReadExt;
@@ -3294,7 +3294,7 @@ pub async fn file(State(s): State<AppState>, Path(id): Path<String>) -> ApiResul
     let guard = RemoveOnDrop(path.clone());
     let f = tokio::fs::File::open(&path)
         .await
-        .map_err(|e| dblens_core::Error::internal(dblens_core::msg!("export.write_failed", error = e)))?;
+        .map_err(|e| datluma_core::Error::internal(datluma_core::msg!("export.write_failed", error = e)))?;
     // 文件和删除守卫一起放在流的状态里：流结束或被丢弃时先关闭文件，再删除
     let stream = futures::stream::unfold(Some((f, guard)), |state| async move {
         let (mut f, guard) = state?;
@@ -3354,11 +3354,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -3,6 +3,7 @@
  
  mod auth;
@@ -3372,7 +3372,7 @@ mod tests {
      /// 除同源外还允许的 Origin，如桌面模式的 `tauri://localhost`、前端开发服务器 `http://localhost:5173`。
      pub allowed_origins: Vec<String>,
 +    /// 页面和服务在同一台机器上（桌面程序）：导出可以直接写到页面给出的路径。
-+    /// 浏览器模式（`dblens-server`）页面可能在另一台机器上，为 false，导出一律写临时文件后下载。
++    /// 浏览器模式（`datluma-server`）页面可能在另一台机器上，为 false，导出一律写临时文件后下载。
 +    pub local_files: bool,
  }
  
@@ -3390,11 +3390,11 @@ mod tests {
          .route("/sessions/{id}/autocommit", post(routes::set_autocommit))
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-desktop/build.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-desktop/build.rs`**
 
 ```diff
---- a/crates/dblens-desktop/build.rs
-+++ b/crates/dblens-desktop/build.rs
+--- a/crates/datluma-desktop/build.rs
++++ b/crates/datluma-desktop/build.rs
 @@ -1,6 +1,11 @@
  fn main() {
      // 为页面可调用的命令生成 allow-* 权限，供 capabilities/main.json 引用
@@ -3411,11 +3411,11 @@ mod tests {
  }
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-desktop/capabilities/main.json`**
+- [ ] **Step 10: 修改 `crates/datluma-desktop/capabilities/main.json`**
 
 ```diff
---- a/crates/dblens-desktop/capabilities/main.json
-+++ b/crates/dblens-desktop/capabilities/main.json
+--- a/crates/datluma-desktop/capabilities/main.json
++++ b/crates/datluma-desktop/capabilities/main.json
 @@ -1,7 +1,7 @@
  {
    "$schema": "../gen/schemas/desktop-schema.json",
@@ -3437,11 +3437,11 @@ mod tests {
  }
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-desktop/src/main.rs`**
+- [ ] **Step 11: 修改 `crates/datluma-desktop/src/main.rs`**
 
 ```diff
---- a/crates/dblens-desktop/src/main.rs
-+++ b/crates/dblens-desktop/src/main.rs
+--- a/crates/datluma-desktop/src/main.rs
++++ b/crates/datluma-desktop/src/main.rs
 @@ -53,10 +53,15 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
          .invoke_handler(tauri::generate_handler![
              shell::shell_info,
@@ -3462,11 +3462,11 @@ mod tests {
                      tracing::info!("前端页面目录 {}", dir.display());
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-desktop/src/shell.rs`**
+- [ ] **Step 12: 修改 `crates/datluma-desktop/src/shell.rs`**
 
 ```diff
---- a/crates/dblens-desktop/src/shell.rs
-+++ b/crates/dblens-desktop/src/shell.rs
+--- a/crates/datluma-desktop/src/shell.rs
++++ b/crates/datluma-desktop/src/shell.rs
 @@ -1,14 +1,17 @@
  //! 页面可以调用的原生能力（M1 设计文档 2.2 节）。
  //!
@@ -3480,7 +3480,7 @@ mod tests {
  
 +use std::path::Path;
 +
- use dblens_core::msg;
+ use datluma_core::msg;
  use serde::{Deserialize, Serialize};
  use tauri::{AppHandle, Emitter, Manager};
 +use tauri_plugin_dialog::DialogExt;
@@ -3541,11 +3541,11 @@ mod tests {
      use super::*;
 ```
 
-- [ ] **Step 13: 修改 `crates/dblens-server/src/main.rs`**
+- [ ] **Step 13: 修改 `crates/datluma-server/src/main.rs`**
 
 ```diff
---- a/crates/dblens-server/src/main.rs
-+++ b/crates/dblens-server/src/main.rs
+--- a/crates/datluma-server/src/main.rs
++++ b/crates/datluma-server/src/main.rs
 @@ -132,7 +132,8 @@ async fn run(args: Args) -> Result<(), String> {
              }
          });
@@ -3601,7 +3601,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（接口新增 `export_then_download`、`ops_follow_language` 和文件名编码的单元测试）。
@@ -3609,7 +3609,7 @@ Expected: 全部测试通过（接口新增 `export_then_download`、`ops_follow
 - [ ] **Step 16: 提交**
 
 ```bash
-git add crates/dblens-api/Cargo.toml crates/dblens-api/src/exports.rs crates/dblens-api/src/lib.rs crates/dblens-api/tests/api.rs crates/dblens-api/tests/library.rs crates/dblens-api/tests/live.rs crates/dblens-api/tests/settings.rs crates/dblens-api/tests/web.rs crates/dblens-desktop/build.rs crates/dblens-desktop/capabilities/main.json crates/dblens-desktop/src/main.rs crates/dblens-desktop/src/shell.rs crates/dblens-server/src/main.rs docs/notes/m0-4b-api.md
+git add crates/datluma-api/Cargo.toml crates/datluma-api/src/exports.rs crates/datluma-api/src/lib.rs crates/datluma-api/tests/api.rs crates/datluma-api/tests/library.rs crates/datluma-api/tests/live.rs crates/datluma-api/tests/settings.rs crates/datluma-api/tests/web.rs crates/datluma-desktop/build.rs crates/datluma-desktop/capabilities/main.json crates/datluma-desktop/src/main.rs crates/datluma-desktop/src/shell.rs crates/datluma-server/src/main.rs docs/notes/m0-4b-api.md
 git commit -m "feat(api): 导出任务与运维查询接口；桌面版的另存为对话框和在文件夹中显示" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4301,7 +4301,7 @@ export function baseName(path: string): string {
 -// 桌面外壳的原生能力（M1 设计文档 2.2 节）：自绘标题栏的窗口操作，以及置顶、恢复默认位置、检查更新、关于、退出。
 +// 桌面外壳的原生能力（M1 设计文档 2.2 节）：自绘标题栏的窗口操作，以及置顶、恢复默认位置、检查更新、关于、退出；
 +// 导出（M1c3）用的"另存为"对话框和"在文件夹中显示"。
- // 只有这里调用 Tauri；其他代码通过这里的函数使用。浏览器模式（dblens-server）没有 Tauri，desktop 为 null。
+ // 只有这里调用 Tauri；其他代码通过这里的函数使用。浏览器模式（datluma-server）没有 Tauri，desktop 为 null。
  
  import { invoke } from '@tauri-apps/api/core'
 @@ -32,6 +33,9 @@ export interface DesktopShell {
@@ -4806,18 +4806,18 @@ git commit -m "feat(web): 运维查询侧栏：按方言列出会话、锁、存
 ## 结构
 
 ```text
-crates/dblens-driver/src/{traits.rs, blocking.rs, conformance.rs}
+crates/datluma-driver/src/{traits.rs, blocking.rs, conformance.rs}
                   Connection::set_lob_limit：大字段的读取上限；阻塞适配器转发；一致性测试 lob_limit_reads_full_value
-crates/dblens-driver-{mysql,postgres,oracle,dameng}/src/   各驱动按连接上的上限读取大字段（原来写死 64 KB）
-crates/dblens-dialect/
+crates/datluma-driver-{mysql,postgres,oracle,dameng}/src/   各驱动按连接上的上限读取大字段（原来写死 64 KB）
+crates/datluma-dialect/
   sql/ops/<方言>.sql   运维查询模板：-- [key] 分段，段首注释写中英文名称和分类；mariadb.sql 只覆盖 locks
   src/ops.rs          解析模板（保持顺序）、Dialect::ops_queries、兼容库回退到所属家族
-crates/dblens-service/src/export/
+crates/datluma-service/src/export/
   write.rs            四种格式的写入（RowWriter）：CSV（csv 库）、xlsx（rust_xlsxwriter 低内存模式）、INSERT（方言字面量）、JSON
   job.rs              导出任务：Service::start_export、ExportManager（状态、取消、下载、过期清理）
-crates/dblens-service/src/service.rs   Service::ops（运维查询列表）、exports、history
-crates/dblens-api/src/exports.rs       /exports、/exports/{id}、/exports/{id}/file、/profiles/{id}/ops
-crates/dblens-desktop/src/shell.rs     save_dialog（另存为）、reveal_in_folder（在文件夹中显示）
+crates/datluma-service/src/service.rs   Service::ops（运维查询列表）、exports、history
+crates/datluma-api/src/exports.rs       /exports、/exports/{id}、/exports/{id}/file、/profiles/{id}/ops
+crates/datluma-desktop/src/shell.rs     save_dialog（另存为）、reveal_in_folder（在文件夹中显示）
 web/src/
   features/export/   导出对话框、默认选项和文件名、进度通知
   features/ops/      运维查询侧栏
@@ -4863,11 +4863,11 @@ web/src/
 
 - 新增 `csv` 1.4.0（MIT / Unlicense）。
 - 新增 `rust_xlsxwriter` 0.100.0（MIT / Apache-2.0，特性 `constant_memory`、`chrono`）。写计划时最新的 0.101.0 发布未满 7 天。
-- `dblens-api` 的 tokio 多开 `fs`、`io-util` 特性（下载时流式读文件）。
+- `datluma-api` 的 tokio 多开 `fs`、`io-util` 特性（下载时流式读文件）。
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过。
   - 驱动一致性测试：放宽上限后读出 100000 字节的大字段，改回默认后又是预览（4 个驱动，MySQL 和 MariaDB 各一次）。
   - 导出实库测试（5 个库）：一行含中文和 100000 个字符的大字段，CSV、JSON、INSERT 都写出完整内容（字符数与数据库报告的一致）；xlsx 截断并报一个警告；另导出 2500 行（MySQL 系 990 行）核对行数。
   - 运维查询实库测试（5 个库）：逐个执行全部 6 项，只允许 PG 的慢 SQL 失败。
@@ -4903,10 +4903,10 @@ web/src/
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`（密码不写进任何文件）。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`（密码不写进任何文件）。
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
 
@@ -4914,7 +4914,7 @@ DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rspro
 $env:PATH = "D:\Environments\nvm4w\nodejs;$env:PATH"; Set-Location web; pnpm typecheck; pnpm test; pnpm build
 ```
 
-浏览器模式实测（用新的数据目录启动 `dblens-server --web-dir web/dist`）：
+浏览器模式实测（用新的数据目录启动 `datluma-server --web-dir web/dist`）：
 1. 经接口建 5 个测试连接（密码只经环境变量传给建连接的脚本），经 WebSocket 建测试数据（父子表，子表 1200 行；MySQL 系 990 行）。
 2. 中文界面，运维查询侧栏：按"会话 / 锁 / 存储 / SQL 统计"列出；点"会话列表"新开标签并执行，结果带 `kill_sql` 列。
 3. 结果面板点"导出"，CSV：完成通知显示行数，浏览器下载文件，内容正确。

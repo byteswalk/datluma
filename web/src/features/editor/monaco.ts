@@ -16,20 +16,20 @@ monaco.languages.setLanguageConfiguration('plsql', plsqlConf)
 monaco.languages.setMonarchTokensProvider('plsql', plsqlLanguage)
 
 // 背景色与 app/shell.css 的 --panel 一致
-monaco.editor.defineTheme('dblens-light', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff' } })
-monaco.editor.defineTheme('dblens-dark', {
+monaco.editor.defineTheme('datluma-light', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#ffffff' } })
+monaco.editor.defineTheme('datluma-dark', {
   base: 'vs-dark',
   inherit: true,
   rules: [],
   colors: { 'editor.background': '#1f1f23' },
 })
 
-monaco.editor.defineTheme('dblens-slate', {
+monaco.editor.defineTheme('datluma-slate', {
   base: 'vs-dark',
   inherit: true,
   rules: [],
   colors: { 'editor.background': '#172029' },
 })
-monaco.editor.defineTheme('dblens-rose', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#fdf8fa' } })
+monaco.editor.defineTheme('datluma-rose', { base: 'vs', inherit: true, rules: [], colors: { 'editor.background': '#fdf8fa' } })
 
 export { monaco }

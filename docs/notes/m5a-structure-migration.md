@@ -5,15 +5,15 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/migrate/
+crates/datluma-dialect/src/migrate/
   mod.rs     迁移设置（选项、类型规则、覆盖）、提示、MigrationDraft；migrate()：表、列、主键、唯一约束、索引、外键、检查约束、序列的转换
   names.rs   名字的大小写（按目标库的习惯）、长度上限、重名检查
   types.rs   列类型：覆盖 → 规则 → 同家族原样 → 经逻辑类型；有损判断；Oracle 的 NUMBER(p) 用整数；自增列用整数；外键动作；序列的取值范围
   expr.rs    简单表达式（检查约束、生成列、索引表达式）与默认值的转换：去掉 PG 的类型转换和 MySQL 的字符集前缀，还原 ANY (ARRAY[…])
   script.rs  两步脚本：第一步建序列、（删表）、建表和注释；第二步索引、唯一约束、检查约束，最后外键；同名表的处理；脚本全文
-crates/dblens-service/src/migrate.rs   MigrationPlan、读两端结构、不迁移的对象、预览、开始前检查、任务（TaskKind::Migrate）、逐条执行、迁移报告
-crates/dblens-api/src/migrations.rs    POST /migrations/preview、/migrations
-crates/dblens-service/tests/migrate_live.rs   44 条迁移路线的实库测试
+crates/datluma-service/src/migrate.rs   MigrationPlan、读两端结构、不迁移的对象、预览、开始前检查、任务（TaskKind::Migrate）、逐条执行、迁移报告
+crates/datluma-api/src/migrations.rs    POST /migrations/preview、/migrations
+crates/datluma-service/tests/migrate_live.rs   44 条迁移路线的实库测试
 web/src/features/migrate/
   plan.ts          新方案、逐列/表/检查约束/序列的覆盖、同名表的处理、提示的汇总、执行前的汇总、打开另存的方案
   MigrateView.tsx  迁移标签页
@@ -40,7 +40,7 @@ web/src/features/migrate/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（761 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（761 个）。
   - 方言层：PG 源迁到 MySQL、Oracle、达梦、openGauss 的快照，Oracle 源迁到 PG、MySQL 的快照（含类型规则）；
     默认值、简单表达式、nextval 的转换；覆盖与跳过；重名与超长；同名表的三种处理；外键依赖两张表。
   - 服务层：开始前检查；建表失败后跳过依赖它的语句、其余照常执行。

@@ -28,7 +28,7 @@ export function categoryLabel(kind: CategoryKind): string {
   return t(`tree.category.${CATEGORY_KEY[kind]}`)
 }
 
-/** 各类数据库在对象树中显示的分类，与 dblens-dialect 中各方言的元数据模板对应。 */
+/** 各类数据库在对象树中显示的分类，与 datluma-dialect 中各方言的元数据模板对应。 */
 export function categoriesFor(driver: DriverId): Category[] {
   const kinds: CategoryKind[] =
     driver === 'sqlite'

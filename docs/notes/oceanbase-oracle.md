@@ -49,7 +49,7 @@
 ## 待验证
 
 - 桌面版里新建这种连接。
-- 打包：发版时 `DBLENS_CLIENTS_DIR` 里要放 `oceanbase-client-2.4.14.jar`。
+- 打包：发版时 `DATLUMA_CLIENTS_DIR` 里要放 `oceanbase-client-2.4.14.jar`。
 - 分布式部署、OBProxy 连接（端口一般 2883）：只测过单机直连。
 
 ## 测试环境

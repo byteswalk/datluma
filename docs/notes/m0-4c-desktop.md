@@ -6,9 +6,9 @@
 
 | 场景 | 步骤 |
 |---|---|
-| 浏览器模式 | `cd web && pnpm install && pnpm build`；`cargo run -p dblens-server -- --web-dir web/dist`；打开它打印的"在浏览器中打开"链接 |
-| 前端开发（热更新） | `cargo run -p dblens-server -- --allow-origin http://localhost:5173`；`cd web && pnpm dev`；打开 server 打印的链接，把其中的 `http://127.0.0.1:8742` 换成 `http://localhost:5173` |
-| 桌面 | 先在 `web/` 下 `pnpm build`，再 `cargo run -p dblens-desktop` |
+| 浏览器模式 | `cd web && pnpm install && pnpm build`；`cargo run -p datluma-server -- --web-dir web/dist`；打开它打印的"在浏览器中打开"链接 |
+| 前端开发（热更新） | `cargo run -p datluma-server -- --allow-origin http://localhost:5173`；`cd web && pnpm dev`；打开 server 打印的链接，把其中的 `http://127.0.0.1:8742` 换成 `http://localhost:5173` |
+| 桌面 | 先在 `web/` 下 `pnpm build`，再 `cargo run -p datluma-desktop` |
 
 本机的 cargo 镜像：`CARGO_HOME` 中配置的阿里云镜像索引滞后，缺少 Tauri 依赖的 brotli 9.1.0，会报 `failed to select a version for the requirement brotli = "^9"`。在镜像补上之前，可以改用 rsproxy：
 
@@ -18,17 +18,17 @@
 
 桌面程序可用的环境变量（开发和测试用）：
 
-- `DBLENS_DATA_DIR`：数据目录，默认是用户数据目录下的 `DBLens`（Windows 为 `%APPDATA%\DBLens`）。
-- `DBLENS_WEB_DIR`：前端页面目录。不设时依次找安装包资源目录下的 `web/`、调试构建时源码树中的 `web/dist`。
+- `DATLUMA_DATA_DIR`：数据目录，默认是用户数据目录下的 `DATLUMA`（Windows 为 `%APPDATA%\DATLUMA`）。
+- `DATLUMA_WEB_DIR`：前端页面目录。不设时依次找安装包资源目录下的 `web/`、调试构建时源码树中的 `web/dist`。
 
 ## 架构要点
 
-- 前端页面由接口服务同源提供（`dblens_api::with_web`），前端调用接口不涉及跨域，接口不需要 CORS。
+- 前端页面由接口服务同源提供（`datluma_api::with_web`），前端调用接口不涉及跨域，接口不需要 CORS。
   - 静态文件不需要令牌，`/api` 下的接口仍然需要。
   - 没有扩展名的路径找不到文件时返回 `index.html`（单页应用）。`/api` 下不存在的路径一律 404。
 - 令牌：
-  - 桌面模式：Tauri 的初始化脚本在页面脚本运行前设置 `window.__DBLENS__.token`。窗口只允许停留在接口服务的地址下，防止令牌被注入其他网站的页面。
-  - 浏览器模式：`dblens-server` 打印的链接带 `#token=…`。`#` 后面的内容不会发给服务器，也不会出现在访问日志和 Referer 中。前端取出后存进 sessionStorage，并从地址栏去掉。
+  - 桌面模式：Tauri 的初始化脚本在页面脚本运行前设置 `window.__DATLUMA__.token`。窗口只允许停留在接口服务的地址下，防止令牌被注入其他网站的页面。
+  - 浏览器模式：`datluma-server` 打印的链接带 `#token=…`。`#` 后面的内容不会发给服务器，也不会出现在访问日志和 Referer 中。前端取出后存进 sessionStorage，并从地址栏去掉。
     - server 重启后令牌会变。在已经打开页面的标签页里打开新链接时，只有 `#` 后面变化，浏览器不会重新加载页面。所以前端监听 `hashchange`，地址里带令牌时重新加载（联调中发现）。
 - 桌面程序不用 Tauri IPC，前端里也没有 Tauri 相关代码。窗口置顶、恢复默认位置都走原生菜单和系统热键。
 
@@ -51,9 +51,9 @@
 
 ## 日志
 
-- 位置：数据目录下的 `logs/dblens.YYYY-MM-DD.log`，按天滚动，保留 14 天。
+- 位置：数据目录下的 `logs/datluma.YYYY-MM-DD.log`，按天滚动，保留 14 天。
 - 发布版没有控制台，panic 也写进日志。调试构建同时输出到控制台。
-- `dblens-server` 仍只输出到控制台（标准错误）。
+- `datluma-server` 仍只输出到控制台（标准错误）。
 
 ## 未做 / 后续
 
@@ -61,7 +61,7 @@
   - 把 `web/dist` 作为资源打进安装包的 `web/` 目录（桌面程序已经会在资源目录下找）；
   - NSIS 按当前用户安装、updater 签名密钥与 `latest.json`、CI 发布矩阵；
   - `tauri.conf.json` 的 `bundle.active` 目前是 false；
-  - 占位图标在 M1 设计稿确定后替换（`crates/dblens-desktop/icons/`，源图由 `pnpm dlx @tauri-apps/cli@2.12.4 icon` 生成各尺寸）。
+  - 占位图标在 M1 设计稿确定后替换（`crates/datluma-desktop/icons/`，源图由 `pnpm dlx @tauri-apps/cli@2.12.4 icon` 生成各尺寸）。
 - **M1**：
   - 正式界面要先出设计稿（设计文档 7.1 节）；
   - 设置中"固定亮色/暗色"；

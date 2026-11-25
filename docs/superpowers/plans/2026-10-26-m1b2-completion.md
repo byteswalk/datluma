@@ -94,7 +94,7 @@ function pick(versions) {
 }
 
 async function getJson(url) {
-  const resp = await fetch(url, { headers: { 'User-Agent': 'dblens-check-deps (github.com/byteswalk/dblens)' } })
+  const resp = await fetch(url, { headers: { 'User-Agent': 'datluma-check-deps (github.com/byteswalk/datluma)' } })
   if (!resp.ok) throw new Error(`${url}: HTTP ${resp.status}`)
   return resp.json()
 }
@@ -202,7 +202,7 @@ $env:PATH = "D:\Environments\nvm4w\nodejs;$env:PATH"; Set-Location web; pnpm ins
 $env:PATH = "D:\Environments\nvm4w\nodejs;$env:PATH"; Set-Location web; pnpm typecheck; pnpm test; pnpm build
 ```
 
-有 Cargo 依赖升级时再跑后端全量检查（fmt、clippy、`DBLENS_LANG=en` 下的全部测试）。
+有 Cargo 依赖升级时再跑后端全量检查（fmt、clippy、`DATLUMA_LANG=en` 下的全部测试）。
 
 Expected: tsc 无输出；20 个测试文件、89 个测试通过；打包成功。
 
@@ -399,7 +399,7 @@ describe('PL/SQL 补全分析', () => {
 +# 生成的 PL/SQL 解析器（web/scripts/gen-plsql.mjs）
 +/web/src/features/sql/plsql/gen/
  # tauri-build 生成的权限描述
- /crates/dblens-desktop/gen/
+ /crates/datluma-desktop/gen/
  # tauri-build 按 build.rs 中的命令列表自动生成的权限定义
 ```
 
@@ -442,7 +442,7 @@ describe('PL/SQL 补全分析', () => {
 +    "test": "node scripts/gen-plsql.mjs && vitest run",
 +    "typecheck": "node scripts/gen-plsql.mjs && tsc --noEmit",
      "tauri": "cd .. && tauri",
-     "package": "cd .. && tauri build --config crates/dblens-desktop/tauri.bundle.json"
+     "package": "cd .. && tauri build --config crates/datluma-desktop/tauri.bundle.json"
    },
 @@ -20,6 +21,8 @@
      "@tanstack/react-query": "5.104.5",
@@ -599,7 +599,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 // 加 antlr4-c3 分析光标处可以出现的规则和关键字。做法参照 dt-sql-parser：
 // - 先分句，再逐句解析：一句出错不影响后面的检查；补全只解析光标所在的一句；没改动的句子用缓存；
 // - 先用 SLL 解析，出错再用 LL 重新解析（SLL 快，但个别语句会误报）。
-// 分句规则与后端 dblens-dialect 的 split.rs 一致：`;` 结束语句；PL/SQL 块以单独一行的 `/` 结束。
+// 分句规则与后端 datluma-dialect 的 split.rs 一致：`;` 结束语句；PL/SQL 块以单独一行的 `/` 结束。
 
 import { CodeCompletionCore } from 'antlr4-c3'
 import {
@@ -1742,7 +1742,7 @@ describe('quoteIdent', () => {
     ['Emp', 'postgres', '"Emp"'],
     ['my table', 'mysql', '`my table`'],
     ['Emp', 'mysql', 'Emp'],
-    ['数洞表', 'plsql', '"数洞表"'],
+    ['数览表', 'plsql', '"数览表"'],
   ] as const)('%s（%s）→ %s', (name, d, out) => {
     expect(quoteIdent(name, d)).toBe(out)
   })
@@ -1852,7 +1852,7 @@ describe('findName / defaultSchema', () => {
     expect(defaultSchema('mysql', 'root', 'shop')).toBe('shop')
     expect(defaultSchema('mysql', 'root', null)).toBeNull()
     expect(defaultSchema('postgres', 'admin', 'db')).toBe('public')
-    expect(defaultSchema('oracle', 'dblens_test')).toBe('DBLENS_TEST')
+    expect(defaultSchema('oracle', 'datluma_test')).toBe('DATLUMA_TEST')
   })
 })
 ```
@@ -2725,7 +2725,7 @@ describe('syntaxMarks', () => {
 +    checker.current = attachChecker(editor)
      for (const a of ACTIONS) {
        editor.addAction({
-         id: `dblens.${a.id}`,
+         id: `datluma.${a.id}`,
 ```
 
 - [ ] **Step 6: 修改 `web/src/features/editor/commands.ts`**
@@ -2762,7 +2762,7 @@ import { contextOf, pathOf } from './provider'
 import { sqlClient } from './service'
 import { NO_SYNTAX, SYNTAX_KEY, type SyntaxState, syntaxEnabled, useSyntax } from './syntax'
 
-const OWNER = 'dblens-syntax'
+const OWNER = 'datluma-syntax'
 export const DEBOUNCE_MS = 400
 export const MAX_CHARS = 1_000_000
 const MAX_TIMEOUTS = 3
@@ -3135,7 +3135,7 @@ web/src/features/sql/
 
 验证中的调整（与设计文档不同之处）：
 - 生成工具用 `antlr-ng`（纯 TypeScript，不需要 Java），生成约 5 秒，所以生成的代码不提交，`pnpm dev` / `build` / `test` / `typecheck` 前自动生成，输入不变时跳过。
-- 按 Oracle 的规则先分句再逐句解析（与后端 `dblens-dialect` 的 split.rs 一致）：一句出错不影响后面的检查；补全只解析光标所在的一句；没改动的句子用缓存。
+- 按 Oracle 的规则先分句再逐句解析（与后端 `datluma-dialect` 的 split.rs 一致）：一句出错不影响后面的检查；补全只解析光标所在的一句；没改动的句子用缓存。
 - 表和别名按词扫描（FROM / JOIN / INTO / UPDATE / USING / TABLE 之后），写到一半的语句也能识别。
 
 ### 语法补丁
@@ -3204,7 +3204,7 @@ web/src/features/sql/
 $env:PATH = "D:\Environments\nvm4w\nodejs;$env:PATH"; Set-Location web; pnpm typecheck; pnpm test; pnpm build
 ```
 
-实测（浏览器模式，用新的数据目录启动 `dblens-server --web-dir web/dist`）：
+实测（浏览器模式，用新的数据目录启动 `datluma-server --web-dir web/dist`）：
 1. 建 5 个测试连接（密码只经环境变量传给建连接的脚本），确认 Oracle、达梦的客户端库目录。
 2. MariaDB：`SELECT * FROM ` 后 Ctrl+Space 列出 schema 和关键字；建两张临时表后（执行 DDL 后自动刷新）`SELECT e.| FROM t1 e JOIN t2 d ON …` 补出 t1 的列和类型，按表中顺序。
 3. Oracle：`FROM` 后列出表和注释；别名补出列；执行一条语句识别出 Oracle 后，`SELECT * FORM t` 标红，悬停提示"“FORM”附近有语法错误"。

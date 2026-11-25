@@ -3,18 +3,18 @@ services:
   mysql:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: dblens
-      MYSQL_DATABASE: dblens_test
+      MYSQL_ROOT_PASSWORD: datluma
+      MYSQL_DATABASE: datluma_test
     ports: ["3306:3306"]
   mariadb:
     image: mariadb:11.4
     environment:
-      MARIADB_ROOT_PASSWORD: dblens
-      MARIADB_DATABASE: dblens_test
+      MARIADB_ROOT_PASSWORD: datluma
+      MARIADB_DATABASE: datluma_test
     ports: ["3307:3306"]
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_PASSWORD: dblens
-      POSTGRES_DB: dblens_test
+      POSTGRES_PASSWORD: datluma
+      POSTGRES_DB: datluma_test
     ports: ["5432:5432"]

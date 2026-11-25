@@ -15,6 +15,8 @@ export interface Host {
   hidden?: (key: string) => boolean
   /** 语句要走工单时调用。 */
   onTicket?: (request: TicketRequest) => void
+  /** 品牌组合用哪个版本：单机版（默认）或审计版。 */
+  edition?: 'standalone' | 'audit'
 }
 
 export const HostContext = createContext<Host>({})

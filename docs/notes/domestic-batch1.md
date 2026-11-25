@@ -7,7 +7,7 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/
+crates/datluma-dialect/
   src/variant.rs      Compat（Native / Oracle）
   src/lib.rs          Dialect 带兼容模式；refine 读探测结果（模式、server_version_num）；split / splitter 按模式
   src/split.rs        StreamSplitter::with_oracle_blocks：PG 家族的 Oracle 兼容模式识别 PL/SQL 块和独占一行的 /
@@ -15,9 +15,9 @@ crates/dblens-dialect/
   sql/ops/tidb.sql、oceanbase.sql、opengauss.sql             运维查询的覆盖文件
   src/design/catalog.rs、sql.rs、postgres.rs                  设计器的能力表、TiDB 主键、openGauss 的 serial
   src/import.rs、changes.rs                                   openGauss 的按主键更新；Oracle 模式下空串按 IS NULL 定位
-crates/dblens-driver-postgres/src/types.rs   兼容库类型（域、clob、int1、int16 等）按标准类型读写
-crates/dblens-driver-mysql/src/error.rs      OceanBase、TiDB 报错的出错位置
-crates/dblens-service/src/registry.rs        测试连接返回兼容模式；profile.rs、store.rs 记录产品（迁移版本 4）
+crates/datluma-driver-postgres/src/types.rs   兼容库类型（域、clob、int1、int16 等）按标准类型读写
+crates/datluma-driver-mysql/src/error.rs      OceanBase、TiDB 报错的出错位置
+crates/datluma-service/src/registry.rs        测试连接返回兼容模式；profile.rs、store.rs 记录产品（迁移版本 4）
 vendor/tokio-postgres、vendor/postgres-protocol   openGauss 的 SHA256 认证补丁（vendor/PATCHES.md）
 web/src/features/connections/products.ts      按产品新建连接
 web/src/features/sql/dialects.ts、editor/dialect.ts   Oracle 兼容模式按 PL/SQL 的语法、补全、拆分、高亮
@@ -84,13 +84,13 @@ openGauss（7.0.0-RC1，基于 PG 9.2.4）：
 
 ## 测试库
 
-在测试虚拟机 192.168.139.106 上（密码在虚拟机 root 的 `/root/dblens-test/creds.env`，不进仓库；运行测试时以环境变量传入）：
+在测试虚拟机 192.168.139.106 上（密码在虚拟机 root 的 `/root/datluma-test/creds.env`，不进仓库；运行测试时以环境变量传入）：
 
 | 目标 | 端口 | 部署 |
 |---|---|---|
 | TiDB v8.5.8 | 4000 | tiup 镜像站的官方二进制，单个 tidb-server（`-store unistore -path /data/tidb`），systemd `tidb`，`WorkingDirectory=/data/tidb`（慢日志用相对路径） |
 | OceanBase CE 4.4.2.1 | 2881 | `quay.io/oceanbase/oceanbase-ce:4.4.2-lts`，`MODE=mini`，必须加 `OB_SERVER_IP=127.0.0.1` 和 `--ulimit nofile=65535:65535`，租户 `test` |
-| openGauss 7.0.0-RC1 | 5433 | Docker Hub 的 `opengauss/opengauss:7.0.0-RC1`（经华为云 SWR 同步副本拉取；quay.io 的 7.0.0-RC3 镜像缺动态库）；`password_encryption_type = 1`，远程认证 sha256；库 `dblens_test`（PG）、`dblens_test_a`（A）、`dblens_test_sha`（PG，属于 `admin_sha`：一致性测试用固定的表名，与 `dblens_test` 上的测试同时跑会互相删表）；账号 `admin`（MONADMIN）、`admin_sha`（只存 SHA256）、`admin_m5s`（pg_hba 为 md5，用于确认不支持的报错） |
+| openGauss 7.0.0-RC1 | 5433 | Docker Hub 的 `opengauss/opengauss:7.0.0-RC1`（经华为云 SWR 同步副本拉取；quay.io 的 7.0.0-RC3 镜像缺动态库）；`password_encryption_type = 1`，远程认证 sha256；库 `datluma_test`（PG）、`datluma_test_a`（A）、`datluma_test_sha`（PG，属于 `admin_sha`：一致性测试用固定的表名，与 `datluma_test` 上的测试同时跑会互相删表）；账号 `admin`（MONADMIN）、`admin_sha`（只存 SHA256）、`admin_m5s`（pg_hba 为 md5，用于确认不支持的报错） |
 | 人大金仓 V9R2C16 | 54321 / 54322 | 官方 DEB 包，开发版授权（365 天）；Oracle 模式 systemd `kingbased`，PG 模式第二个实例 `kingbased-pg`（`initdb -m pg`） |
 
 实库测试的环境变量见设计文档 9.1 节。人大金仓的测试要串行运行（`--test-threads=1`，授权限制 10 个连接）；TiDB 的元数据测试会把 `tidb_enable_check_constraint` 设为 ON。

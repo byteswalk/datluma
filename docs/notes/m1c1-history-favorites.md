@@ -5,13 +5,13 @@
 ## 结构
 
 ```text
-crates/dblens-service/src/
+crates/datluma-service/src/
   store.rs        迁移到版本 3：history、favorites 两张表；Store::lock 供多步事务使用
   history.rs      历史的存储（写入并清理、分页查询、删除、清空、设置）；HistoryLog：后台线程批量写入
   favorite.rs     收藏的存储：文件夹和收藏同表，增删改、移动（防止移进自己的下级）、同级重新编号
   session.rs      每条语句执行完写一条历史（执行计划、等待确认没有执行的不记）；统计取回的行数
   service.rs      Service::with_parts 启动历史写入线程；Service::with_history 供测试指定写法
-crates/dblens-api/src/routes.rs   /history、/favorites 接口；tests/library.rs
+crates/datluma-api/src/routes.rs   /history、/favorites 接口；tests/library.rs
 web/src/
   features/history/   历史侧栏（HistoryPanel.tsx）与纯逻辑（history.ts：日期分组、摘要）
   features/favorites/ 收藏侧栏（FavoritesPanel.tsx）、收藏对话框（FavoriteDialog.tsx、dialog.ts）、树的逻辑（tree.ts）
@@ -56,8 +56,8 @@ web/src/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过（361 个）。
-  - 第一次全量运行时，dblens-api 的达梦实库测试偶发连接失败。单独运行和再跑两遍都通过，判断是多个测试程序同时连达梦造成的。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过（361 个）。
+  - 第一次全量运行时，datluma-api 的达梦实库测试偶发连接失败。单独运行和再跑两遍都通过，判断是多个测试程序同时连达梦造成的。
 - 前端：tsc 通过；29 个测试文件、189 个测试通过；打包通过。
 - 浏览器实测（MariaDB，中英文界面）：
   - 执行三条语句（第二条出错）后，历史侧栏按"今天"分组显示两条：出错的显示 MariaDB 的报错原文，成功的显示"2 行"；第三条因出错停止没有执行，不在历史中。

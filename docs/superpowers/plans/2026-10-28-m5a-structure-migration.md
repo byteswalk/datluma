@@ -20,7 +20,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级（有意固定版本的记入 `scripts/check-deps.mjs` 的 `HOLD`）。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误和提示用 `msg!` 词条（`src` 中的中文字面量只能出现在 `#[cfg(test)]` 之后，单独的测试文件中也不能有）；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 实库测试一律串行（`--test-threads=1`），不加 `--include-ignored`（会跑达梦的 spike 测试并卡住）。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
@@ -43,14 +43,14 @@
 ## 文件结构
 
 ```text
-crates/dblens-dialect/src/migrate/{mod.rs, names.rs, types.rs, expr.rs, script.rs, tests.rs, snapshots/}（新增）
-crates/dblens-dialect/src/lib.rs, sql/{mysql.sql, tidb.sql}, tests/snapshots/meta_snapshots__{mysql,oceanbase,tidb}.snap
-crates/dblens-service/src/{migrate.rs（新增）, lib.rs, task.rs, design.rs, compare.rs}, tests/migrate_live.rs（新增）
-crates/dblens-api/src/{migrations.rs（新增）, lib.rs}, tests/models.rs
-crates/dblens-core/locales/app.json
+crates/datluma-dialect/src/migrate/{mod.rs, names.rs, types.rs, expr.rs, script.rs, tests.rs, snapshots/}（新增）
+crates/datluma-dialect/src/lib.rs, sql/{mysql.sql, tidb.sql}, tests/snapshots/meta_snapshots__{mysql,oceanbase,tidb}.snap
+crates/datluma-service/src/{migrate.rs（新增）, lib.rs, task.rs, design.rs, compare.rs}, tests/migrate_live.rs（新增）
+crates/datluma-api/src/{migrations.rs（新增）, lib.rs}, tests/models.rs
+crates/datluma-core/locales/app.json
 web/src/features/migrate/{plan.ts, plan.test.ts, MigrateView.tsx}（新增）
 web/src/{shared/api.ts, app/shell.css, features/editor/{tabs.ts, Workspace.tsx}, features/tree/ObjectTree.tsx, locales/{zh-CN,en}/{migrate.json（新增）, tree.json}, locales/index.ts}
-docs/notes/{m5a-structure-migration.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m5a-structure-migration.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -79,7 +79,7 @@ Expected：输出中没有"查询失败"（写计划时 86 个直接依赖都不
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -101,7 +101,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 ### Task 2: 方言层：结构迁移的转换与两步脚本
 
-- `dblens-dialect/src/migrate/`（新）：
+- `datluma-dialect/src/migrate/`（新）：
   - `mod.rs`：`MigrationOptions { name_case, comments, checks }`、`TypeRule`、`ColumnOverride`、`TableOverride`、`SequenceOverride`、`MigrationSettings`；提示 `MigrationNote { kind, object, column, item, level: NoteLevel::{Info, Lossy, Unsupported}, message }`；结果 `MigrationDraft { tables: Vec<TableMapping>, sequences: Vec<SequenceMapping>, notes }`；`migrate(&MigrationInput, &MigrationSettings)`：序列（PG serial 自带的、Oracle 的 `ISEQ$$_` 不迁；MySQL 系目标没有序列）、表名和列名（覆盖或按大小写选项）、列（类型、生成列、自增、默认值）、主键、唯一约束、索引（MySQL 为外键自动建的同名索引不迁；表达式索引；大字段列；索引方法）、外键（引用范围外且目标中没有的表不建；目标不支持的动作去掉）、检查约束（覆盖或转换）、分区提示；系统生成的约束名不带过去。
   - `names.rs`：`NameCase::{Keep, Lower, Upper}` 和 `for_target`（Oracle、达梦大写，PG 系小写，MySQL 系保持）、`max_ident_len`、重名和超长检查（表、序列、PG/Oracle/达梦的索引在 schema 中唯一）。
   - `types.rs`：列类型（覆盖 → 规则 → 同家族原样 → 经逻辑类型，`Other` 不支持、确认后按文本）；有损判断（等价的容差：TEXT≈无长度 VARCHAR、PG 的 BYTEA、整数≈NUMBER(p)、UUID≈CHAR(36)、Oracle 的 DATE 容纳日期）；Oracle 的 `NUMBER(p≤19)` 迁到其他库用整数；自增列用整数；能否建标识列、外键动作、序列的 bigint 范围。
@@ -115,39 +115,39 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 快照文件（`snapshots/`）随本任务给出；改了生成逻辑时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-dialect/sql/mysql.sql`
-- Modify: `crates/dblens-dialect/sql/tidb.sql`
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Create: `crates/dblens-dialect/src/migrate/expr.rs`
-- Create: `crates/dblens-dialect/src/migrate/mod.rs`
-- Create: `crates/dblens-dialect/src/migrate/names.rs`
-- Create: `crates/dblens-dialect/src/migrate/script.rs`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__oracle_to_mysql.snap`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__oracle_to_pg.snap`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_dameng.snap`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_mysql.snap`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_opengauss.snap`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_oracle.snap`
-- Create: `crates/dblens-dialect/src/migrate/tests.rs`
-- Create: `crates/dblens-dialect/src/migrate/types.rs`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-dialect/sql/mysql.sql`
+- Modify: `crates/datluma-dialect/sql/tidb.sql`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Create: `crates/datluma-dialect/src/migrate/expr.rs`
+- Create: `crates/datluma-dialect/src/migrate/mod.rs`
+- Create: `crates/datluma-dialect/src/migrate/names.rs`
+- Create: `crates/datluma-dialect/src/migrate/script.rs`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__oracle_to_mysql.snap`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__oracle_to_pg.snap`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_dameng.snap`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_mysql.snap`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_opengauss.snap`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_oracle.snap`
+- Create: `crates/datluma-dialect/src/migrate/tests.rs`
+- Create: `crates/datluma-dialect/src/migrate/types.rs`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap`
 
 **Interfaces:**
 - Consumes：M3 的 `Dialect::design_sql`、`Diff`、`TableChange`、`design::diff::{is_expression, text}`；`types::parse_type`、`Dialect::{logical_type, native_type, ident, literal, sequence_ddl}`。
-- Produces（`dblens_dialect::migrate`）：上面的类型；`migrate(input: &MigrationInput, settings: &MigrationSettings) -> MigrationDraft`、`MigrationDraft::blocked()`、`migration_script(tgt: &Dialect, schema, draft, existing: &BTreeMap<String, ExistingAction>, target_tables: &[Table]) -> Result<Vec<MigrationStatement>>`、`script_text(&[MigrationStatement]) -> String`、`convert_expr`、`NameCase`、`max_ident_len`。
+- Produces（`datluma_dialect::migrate`）：上面的类型；`migrate(input: &MigrationInput, settings: &MigrationSettings) -> MigrationDraft`、`MigrationDraft::blocked()`、`migration_script(tgt: &Dialect, schema, draft, existing: &BTreeMap<String, ExistingAction>, target_tables: &[Table]) -> Result<Vec<MigrationStatement>>`、`script_text(&[MigrationStatement]) -> String`、`convert_expr`、`NameCase`、`max_ident_len`。
 
-- [ ] **Step 1: 新建 `crates/dblens-dialect/src/migrate/tests.rs`**
+- [ ] **Step 1: 新建 `crates/datluma-dialect/src/migrate/tests.rs`**
 
 ```rust
 use std::collections::BTreeMap;
 
-use dblens_core::schema::{
+use datluma_core::schema::{
     CheckConstraint, Column, ForeignKey, Index, IndexColumn, PrimaryKey, Sequence, Table, UniqueConstraint,
 };
-use dblens_core::{ColumnType, Lang, LogicalType};
+use datluma_core::{ColumnType, Lang, LogicalType};
 
 use super::*;
 use crate::Variant;
@@ -534,11 +534,11 @@ fn existing_tables_follow_the_chosen_action() {
 }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap
 @@ -53,6 +53,8 @@ SELECT c.TABLE_NAME AS table_name,
           WHEN c.COLUMN_DEFAULT IS NULL THEN NULL
           WHEN c.GENERATION_EXPRESSION <> '' THEN NULL
@@ -550,11 +550,11 @@ fn existing_tables_follow_the_chosen_action() {
         END AS default_value,
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap
 @@ -53,6 +53,8 @@ SELECT c.TABLE_NAME AS table_name,
           WHEN c.COLUMN_DEFAULT IS NULL THEN NULL
           WHEN c.GENERATION_EXPRESSION <> '' THEN NULL
@@ -566,11 +566,11 @@ fn existing_tables_follow_the_chosen_action() {
         END AS default_value,
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap
 @@ -68,6 +68,8 @@ SELECT c.TABLE_NAME AS table_name,
           WHEN c.COLUMN_DEFAULT IS NULL THEN NULL
           WHEN c.GENERATION_EXPRESSION <> '' THEN NULL
@@ -582,11 +582,11 @@ fn existing_tables_follow_the_chosen_action() {
         END AS default_value,
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 5: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -150,6 +150,28 @@
    "metadata.not_source": {"zh-CN": "%{key} 不是源码查询", "en": "%{key} is not a source query"},
    "metadata.pool_closed": {"zh-CN": "连接池已关闭", "en": "The connection pool is closed"},
@@ -618,11 +618,11 @@ fn existing_tables_follow_the_chosen_action() {
    "model.conflict": {"zh-CN": "%{name} 的文件已被修改，请重新加载", "en": "The file for %{name} has changed; reload it"},
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-dialect/sql/mysql.sql`**
+- [ ] **Step 6: 修改 `crates/datluma-dialect/sql/mysql.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/mysql.sql
-+++ b/crates/dblens-dialect/sql/mysql.sql
+--- a/crates/datluma-dialect/sql/mysql.sql
++++ b/crates/datluma-dialect/sql/mysql.sql
 @@ -64,6 +64,8 @@ SELECT c.TABLE_NAME AS table_name,
           WHEN c.COLUMN_DEFAULT IS NULL THEN NULL
           WHEN c.GENERATION_EXPRESSION <> '' THEN NULL
@@ -634,11 +634,11 @@ fn existing_tables_follow_the_chosen_action() {
         END AS default_value,
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-dialect/sql/tidb.sql`**
+- [ ] **Step 7: 修改 `crates/datluma-dialect/sql/tidb.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/tidb.sql
-+++ b/crates/dblens-dialect/sql/tidb.sql
+--- a/crates/datluma-dialect/sql/tidb.sql
++++ b/crates/datluma-dialect/sql/tidb.sql
 @@ -63,6 +63,8 @@ SELECT c.TABLE_NAME AS table_name,
           WHEN c.COLUMN_DEFAULT IS NULL THEN NULL
           WHEN c.GENERATION_EXPRESSION <> '' THEN NULL
@@ -650,11 +650,11 @@ fn existing_tables_follow_the_chosen_action() {
         END AS default_value,
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -10,6 +10,7 @@ pub mod ident;
  mod import;
  pub mod literal;
@@ -665,7 +665,7 @@ fn existing_tables_follow_the_chosen_action() {
  mod split;
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-dialect/src/migrate/expr.rs`**
+- [ ] **Step 9: 新建 `crates/datluma-dialect/src/migrate/expr.rs`**
 
 ```rust
 //! 迁移中的表达式：跨家族时只转换"简单表达式"（列名、字面量、比较、逻辑运算、IN、BETWEEN、IS NULL、LIKE），
@@ -676,7 +676,7 @@ fn existing_tables_follow_the_chosen_action() {
 
 use std::collections::BTreeMap;
 
-use dblens_core::{ColumnType, LogicalType, Value};
+use datluma_core::{ColumnType, LogicalType, Value};
 
 use crate::{Dialect, Family};
 
@@ -1220,7 +1220,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 10: 新建 `crates/dblens-dialect/src/migrate/mod.rs`**
+- [ ] **Step 10: 新建 `crates/datluma-dialect/src/migrate/mod.rs`**
 
 ```rust
 //! 结构迁移（M5a 设计文档第 3、4 节）：把源 schema 的表和序列按目标方言转换成目标结构，
@@ -1235,8 +1235,8 @@ mod types;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use dblens_core::schema::{CheckConstraint, Column, ForeignKey, Index, Sequence, Table, UniqueConstraint};
-use dblens_core::{ColumnType, Msg, msg};
+use datluma_core::schema::{CheckConstraint, Column, ForeignKey, Index, Sequence, Table, UniqueConstraint};
+use datluma_core::{ColumnType, Msg, msg};
 use serde::{Deserialize, Serialize};
 
 use crate::design::diff::{is_expression, text};
@@ -1595,7 +1595,7 @@ impl Context<'_> {
                 }
                 Some(columns) => {
                     target.primary_key =
-                        Some(dblens_core::schema::PrimaryKey { name: self.constraint(&pk.name), columns })
+                        Some(datluma_core::schema::PrimaryKey { name: self.constraint(&pk.name), columns })
                 }
                 None => n.push(
                     None,
@@ -1765,7 +1765,7 @@ impl Context<'_> {
                     }
                 }
             };
-            out.columns.push(dblens_core::schema::IndexColumn { name, descending: c.descending });
+            out.columns.push(datluma_core::schema::IndexColumn { name, descending: c.descending });
         }
         if let Some(m) = text(&x.method) {
             if self.same_family() {
@@ -1889,14 +1889,14 @@ fn item_name(name: &Option<String>, columns: &[String]) -> String {
 }
 ```
 
-- [ ] **Step 11: 新建 `crates/dblens-dialect/src/migrate/names.rs`**
+- [ ] **Step 11: 新建 `crates/datluma-dialect/src/migrate/names.rs`**
 
 ```rust
 //! 迁移中的名字：大小写转换、长度上限、重名检查。
 
 use std::collections::BTreeMap;
 
-use dblens_core::msg;
+use datluma_core::msg;
 use serde::{Deserialize, Serialize};
 
 use super::{MigrationNote, NoteLevel, ObjectKind, SequenceMapping, TableMapping};
@@ -2074,7 +2074,7 @@ pub(super) fn check(
 }
 ```
 
-- [ ] **Step 12: 新建 `crates/dblens-dialect/src/migrate/script.rs`**
+- [ ] **Step 12: 新建 `crates/datluma-dialect/src/migrate/script.rs`**
 
 ```rust
 //! 迁移脚本（M5a 设计文档第 6 节）：第一步建序列、建表（列、主键、注释），删除重建的表先删；
@@ -2082,8 +2082,8 @@ pub(super) fn check(
 
 use std::collections::BTreeMap;
 
-use dblens_core::Result;
-use dblens_core::schema::{Index, Sequence, Table};
+use datluma_core::Result;
+use datluma_core::schema::{Index, Sequence, Table};
 use serde::{Deserialize, Serialize};
 
 use super::MigrationDraft;
@@ -2314,11 +2314,11 @@ fn sequence_sql(tgt: &Dialect, schema: &str, s: &Sequence) -> String {
 }
 ```
 
-- [ ] **Step 13: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__oracle_to_mysql.snap`**
+- [ ] **Step 13: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__oracle_to_mysql.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, Variant::MySql)"
 ---
 Lossy DOC_SEQ: The target database has no sequences; not migrated
@@ -2341,11 +2341,11 @@ ALTER TABLE app.DOCS ADD INDEX IX_DOCS_TITLE (TITLE);
 ALTER TABLE app.DOCS ADD CONSTRAINT CK_FLAG CHECK (FLAG IN (0, 1));
 ```
 
-- [ ] **Step 14: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__oracle_to_pg.snap`**
+- [ ] **Step 14: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__oracle_to_pg.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, Variant::Postgres)"
 ---
 Info DOC_SEQ: MAXVALUE is outside the bigint range
@@ -2372,11 +2372,11 @@ CREATE INDEX ix_docs_title ON app.docs (title);
 ALTER TABLE app.docs ADD CONSTRAINT ck_flag CHECK (flag IN (0, 1));
 ```
 
-- [ ] **Step 15: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_dameng.snap`**
+- [ ] **Step 15: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_dameng.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, tgt)"
 ---
 Info customers_id_seq: Sequence owned by a serial column; migrated with the identity column
@@ -2428,11 +2428,11 @@ ALTER TABLE "app".ORDERS ADD CONSTRAINT CK_STATUS CHECK ((STATUS) IN ('new', 'pa
 ALTER TABLE "app".ORDERS ADD CONSTRAINT FK_ORDERS_CUSTOMER FOREIGN KEY (CUSTOMER_ID) REFERENCES "app".CUSTOMERS (ID) ON DELETE CASCADE;
 ```
 
-- [ ] **Step 16: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_mysql.snap`**
+- [ ] **Step 16: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_mysql.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, tgt)"
 ---
 Info customers_id_seq: Sequence owned by a serial column; migrated with the identity column
@@ -2475,11 +2475,11 @@ ALTER TABLE app.orders ADD CONSTRAINT ck_status CHECK ((status) IN ('new', 'paid
 ALTER TABLE app.orders ADD CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES app.customers (id) ON DELETE CASCADE ON UPDATE CASCADE;
 ```
 
-- [ ] **Step 17: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_opengauss.snap`**
+- [ ] **Step 17: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_opengauss.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, tgt)"
 ---
 Info customers_id_seq: Sequence owned by a serial column; migrated with the identity column
@@ -2527,11 +2527,11 @@ ALTER TABLE app.orders ADD CONSTRAINT ck_status CHECK ((status)::text = ANY ((AR
 ALTER TABLE app.orders ADD CONSTRAINT fk_orders_customer FOREIGN KEY (customer_id) REFERENCES app.customers (id) ON DELETE CASCADE ON UPDATE CASCADE;
 ```
 
-- [ ] **Step 18: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_oracle.snap`**
+- [ ] **Step 18: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_oracle.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, tgt)"
 ---
 Info customers_id_seq: Sequence owned by a serial column; migrated with the identity column
@@ -2583,13 +2583,13 @@ ALTER TABLE "app".ORDERS ADD CONSTRAINT CK_STATUS CHECK ((STATUS) IN ('new', 'pa
 ALTER TABLE "app".ORDERS ADD CONSTRAINT FK_ORDERS_CUSTOMER FOREIGN KEY (CUSTOMER_ID) REFERENCES "app".CUSTOMERS (ID) ON DELETE CASCADE;
 ```
 
-- [ ] **Step 19: 新建 `crates/dblens-dialect/src/migrate/types.rs`**
+- [ ] **Step 19: 新建 `crates/datluma-dialect/src/migrate/types.rs`**
 
 ```rust
 //! 迁移中的类型：列类型的映射（覆盖 → 规则 → 同家族原样 → 经逻辑类型）、有损判断、序列、目标库的能力。
 
-use dblens_core::schema::{Column, Sequence};
-use dblens_core::{LogicalType, Msg, msg};
+use datluma_core::schema::{Column, Sequence};
+use datluma_core::{LogicalType, Msg, msg};
 
 use super::{ColumnOverride, NoteLevel, Notes, TypeRule};
 use crate::types::parse_type;
@@ -2757,7 +2757,7 @@ pub(super) fn sequence(tgt: &Dialect, s: &Sequence, name: &str, n: &mut Notes) -
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 10 个，快照 6 个，元数据快照 3 个更新）。
@@ -2765,7 +2765,7 @@ Expected: 全部测试通过（dialect 新增 10 个，快照 6 个，元数据�
 - [ ] **Step 21: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/sql/mysql.sql crates/dblens-dialect/sql/tidb.sql crates/dblens-dialect/src/lib.rs crates/dblens-dialect/src/migrate/expr.rs crates/dblens-dialect/src/migrate/mod.rs crates/dblens-dialect/src/migrate/names.rs crates/dblens-dialect/src/migrate/script.rs crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__oracle_to_mysql.snap crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__oracle_to_pg.snap crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_dameng.snap crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_mysql.snap crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_opengauss.snap crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_oracle.snap crates/dblens-dialect/src/migrate/tests.rs crates/dblens-dialect/src/migrate/types.rs crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__oceanbase.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__tidb.snap
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/sql/mysql.sql crates/datluma-dialect/sql/tidb.sql crates/datluma-dialect/src/lib.rs crates/datluma-dialect/src/migrate/expr.rs crates/datluma-dialect/src/migrate/mod.rs crates/datluma-dialect/src/migrate/names.rs crates/datluma-dialect/src/migrate/script.rs crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__oracle_to_mysql.snap crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__oracle_to_pg.snap crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_dameng.snap crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_mysql.snap crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_opengauss.snap crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_oracle.snap crates/datluma-dialect/src/migrate/tests.rs crates/datluma-dialect/src/migrate/types.rs crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__oceanbase.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__tidb.snap
 git commit -m "feat(migrate): 结构迁移的转换与两步脚本" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2773,33 +2773,33 @@ git commit -m "feat(migrate): 结构迁移的转换与两步脚本" -m "Co-Autho
 
 ### Task 3: 服务层：预览、任务、报告与接口；实库测试
 
-- `dblens-service/src/migrate.rs`（新）：`MigrationEnd`、`MigrationPlan { source, tables, sequences, target, settings, existing }`、`OtherObject`、`MigrationPreview`；读两端结构（目标 schema 必须存在；开始前跳过元数据缓存）、不迁移的对象（视图、物化视图、例程、同义词、迁移的表上的触发器）；`problems`（源和目标相同、没有要迁移的对象、有不支持的项、同名表没有选择）；`Service::preview_migration`、`Service::start_migration`（`TaskKind::Migrate`：逐条执行，失败记下后继续，建表失败的表跳过依赖它的语句；结束后刷新目标的元数据缓存，写迁移报告 `migration-<schema>.md`：结果、汇总、失败的语句、提示、不迁移的对象及其源库 DDL、脚本）。
+- `datluma-service/src/migrate.rs`（新）：`MigrationEnd`、`MigrationPlan { source, tables, sequences, target, settings, existing }`、`OtherObject`、`MigrationPreview`；读两端结构（目标 schema 必须存在；开始前跳过元数据缓存）、不迁移的对象（视图、物化视图、例程、同义词、迁移的表上的触发器）；`problems`（源和目标相同、没有要迁移的对象、有不支持的项、同名表没有选择）；`Service::preview_migration`、`Service::start_migration`（`TaskKind::Migrate`：逐条执行，失败记下后继续，建表失败的表跳过依赖它的语句；结束后刷新目标的元数据缓存，写迁移报告 `migration-<schema>.md`：结果、汇总、失败的语句、提示、不迁移的对象及其源库 DDL、脚本）。
 - `task.rs`：`TaskKind::Migrate`、`TaskHandle::status()`；`design.rs` 的 `Run::sql` 改为 `pub(crate)`；`compare.rs` 的测试辅助 `service` 改为 `pub(crate)`；`lib.rs` 导出 `MigrationEnd`、`MigrationPlan`、`MigrationPreview`、`OtherObject`。
-- `dblens-api/src/migrations.rs`（新）：`POST /migrations/preview`、`POST /migrations`（201 `{id}`）。
+- `datluma-api/src/migrations.rs`（新）：`POST /migrations/preview`、`POST /migrations`（201 `{id}`）。
 - `tests/migrate_live.rs`（新）：一个服务中建源和目标两个连接；源库建测试结构（自增主键、默认值、注释、唯一约束、检查约束、索引、外键），迁移，读回目标结构与草稿按要点比对；44 条路线，表名带源库代号。
 - 后端词条加 `migrate.same_target`、`nothing`、`unsupported_left`、`existing_unchosen` 和报告的 `migrate.report.*`。
 
 **Files:**
-- Modify: `crates/dblens-api/src/lib.rs`
-- Create: `crates/dblens-api/src/migrations.rs`
-- Modify: `crates/dblens-api/tests/models.rs`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/src/compare.rs`
-- Modify: `crates/dblens-service/src/design.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Create: `crates/dblens-service/src/migrate.rs`
-- Modify: `crates/dblens-service/src/task.rs`
-- Create: `crates/dblens-service/tests/migrate_live.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Create: `crates/datluma-api/src/migrations.rs`
+- Modify: `crates/datluma-api/tests/models.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/src/compare.rs`
+- Modify: `crates/datluma-service/src/design.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Create: `crates/datluma-service/src/migrate.rs`
+- Modify: `crates/datluma-service/src/task.rs`
+- Create: `crates/datluma-service/tests/migrate_live.rs`
 
 **Interfaces:**
 - Consumes：任务 2；M4a 的 `Run`、`check_policy`；元数据服务；任务。
-- Produces（`dblens_service`）：`MigrationPlan`、`MigrationEnd`、`MigrationPreview`、`OtherObject`；`Service::{preview_migration(&plan) -> Result<MigrationPreview>, start_migration(plan) -> Result<String>}`；接口见上。
+- Produces（`datluma_service`）：`MigrationPlan`、`MigrationEnd`、`MigrationPreview`、`OtherObject`；`Service::{preview_migration(&plan) -> Result<MigrationPreview>, start_migration(plan) -> Result<String>}`；接口见上。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/models.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/models.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/models.rs
-+++ b/crates/dblens-api/tests/models.rs
+--- a/crates/datluma-api/tests/models.rs
++++ b/crates/datluma-api/tests/models.rs
 @@ -309,3 +309,16 @@ async fn documents() {
          "{md}"
      );
@@ -2819,7 +2819,7 @@ git commit -m "feat(migrate): 结构迁移的转换与两步脚本" -m "Co-Autho
 +}
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-service/tests/migrate_live.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-service/tests/migrate_live.rs`**
 
 ````rust
 //! 结构迁移（M5a）的实库测试：源库和目标库的环境变量都设置时运行，否则直接通过（变量见 `live.rs`）。
@@ -2833,11 +2833,11 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use dblens_core::LogicalType;
-use dblens_core::schema::Table;
-use dblens_dialect::{Dialect, Variant};
-use dblens_driver::{ConnectParams, DriverId};
-use dblens_service::{
+use datluma_core::LogicalType;
+use datluma_core::schema::Table;
+use datluma_dialect::{Dialect, Variant};
+use datluma_driver::{ConnectParams, DriverId};
+use datluma_service::{
     DefaultPolicy, DriverRegistry, Environment, ExecRequest, MigrationEnd, MigrationPlan, ProfileInput,
     SecretBackend, Secrets, Service, SessionEvent, Store, TaskState, TaskStatus,
 };
@@ -3140,58 +3140,58 @@ macro_rules! routes {
 }
 
 routes! {
-    mysql_to_pg: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_PG_URL", "m5my";
-    mysql_to_oracle: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_ORACLE_URL", "m5my";
-    mysql_to_dameng: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_DM_URL", "m5my";
-    mysql_to_tidb: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_TIDB_URL", "m5my";
-    mysql_to_oceanbase: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_OCEANBASE_URL", "m5my";
-    mariadb_to_mysql: "DBLENS_TEST_MARIADB_URL" => "DBLENS_TEST_MYSQL_URL", "m5ma";
-    mariadb_to_pg: "DBLENS_TEST_MARIADB_URL" => "DBLENS_TEST_PG_URL", "m5ma";
-    mariadb_to_oracle: "DBLENS_TEST_MARIADB_URL" => "DBLENS_TEST_ORACLE_URL", "m5ma";
-    mariadb_to_dameng: "DBLENS_TEST_MARIADB_URL" => "DBLENS_TEST_DM_URL", "m5ma";
-    pg_to_mysql: "DBLENS_TEST_PG_URL" => "DBLENS_TEST_MYSQL_URL", "m5pg";
-    pg_to_oracle: "DBLENS_TEST_PG_URL" => "DBLENS_TEST_ORACLE_URL", "m5pg";
-    pg_to_dameng: "DBLENS_TEST_PG_URL" => "DBLENS_TEST_DM_URL", "m5pg";
-    oracle_to_mysql: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_MYSQL_URL", "m5or";
-    oracle_to_pg: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_PG_URL", "m5or";
-    oracle_to_dameng: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_DM_URL", "m5or";
-    oracle_to_kingbase: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_KINGBASE_URL", "m5or";
-    oracle_to_opengauss: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_OPENGAUSS_A_URL", "m5or";
-    dameng_to_mysql: "DBLENS_TEST_DM_URL" => "DBLENS_TEST_MYSQL_URL", "m5dm";
-    dameng_to_pg: "DBLENS_TEST_DM_URL" => "DBLENS_TEST_PG_URL", "m5dm";
-    dameng_to_oracle: "DBLENS_TEST_DM_URL" => "DBLENS_TEST_ORACLE_URL", "m5dm";
-    tidb_to_mysql: "DBLENS_TEST_TIDB_URL" => "DBLENS_TEST_MYSQL_URL", "m5ti";
-    tidb_to_pg: "DBLENS_TEST_TIDB_URL" => "DBLENS_TEST_PG_URL", "m5ti";
-    tidb_to_oracle: "DBLENS_TEST_TIDB_URL" => "DBLENS_TEST_ORACLE_URL", "m5ti";
-    tidb_to_dameng: "DBLENS_TEST_TIDB_URL" => "DBLENS_TEST_DM_URL", "m5ti";
-    oceanbase_to_mysql: "DBLENS_TEST_OCEANBASE_URL" => "DBLENS_TEST_MYSQL_URL", "m5ob";
-    oceanbase_to_pg: "DBLENS_TEST_OCEANBASE_URL" => "DBLENS_TEST_PG_URL", "m5ob";
-    oceanbase_to_oracle: "DBLENS_TEST_OCEANBASE_URL" => "DBLENS_TEST_ORACLE_URL", "m5ob";
-    oceanbase_to_dameng: "DBLENS_TEST_OCEANBASE_URL" => "DBLENS_TEST_DM_URL", "m5ob";
-    opengauss_to_mysql: "DBLENS_TEST_OPENGAUSS_URL" => "DBLENS_TEST_MYSQL_URL", "m5og";
-    opengauss_to_pg: "DBLENS_TEST_OPENGAUSS_URL" => "DBLENS_TEST_PG_URL", "m5og";
-    opengauss_to_oracle: "DBLENS_TEST_OPENGAUSS_URL" => "DBLENS_TEST_ORACLE_URL", "m5og";
-    opengauss_to_dameng: "DBLENS_TEST_OPENGAUSS_URL" => "DBLENS_TEST_DM_URL", "m5og";
-    opengauss_a_to_mysql: "DBLENS_TEST_OPENGAUSS_A_URL" => "DBLENS_TEST_MYSQL_URL", "m5oa";
-    opengauss_a_to_pg: "DBLENS_TEST_OPENGAUSS_A_URL" => "DBLENS_TEST_PG_URL", "m5oa";
-    opengauss_a_to_oracle: "DBLENS_TEST_OPENGAUSS_A_URL" => "DBLENS_TEST_ORACLE_URL", "m5oa";
-    opengauss_a_to_dameng: "DBLENS_TEST_OPENGAUSS_A_URL" => "DBLENS_TEST_DM_URL", "m5oa";
-    kingbase_to_mysql: "DBLENS_TEST_KINGBASE_URL" => "DBLENS_TEST_MYSQL_URL", "m5kb";
-    kingbase_to_pg: "DBLENS_TEST_KINGBASE_URL" => "DBLENS_TEST_PG_URL", "m5kb";
-    kingbase_to_oracle: "DBLENS_TEST_KINGBASE_URL" => "DBLENS_TEST_ORACLE_URL", "m5kb";
-    kingbase_to_dameng: "DBLENS_TEST_KINGBASE_URL" => "DBLENS_TEST_DM_URL", "m5kb";
-    kingbase_pg_to_mysql: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_MYSQL_URL", "m5kp";
-    kingbase_pg_to_pg: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_PG_URL", "m5kp";
-    kingbase_pg_to_oracle: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_ORACLE_URL", "m5kp";
-    kingbase_pg_to_dameng: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_DM_URL", "m5kp";
+    mysql_to_pg: "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_PG_URL", "m5my";
+    mysql_to_oracle: "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_ORACLE_URL", "m5my";
+    mysql_to_dameng: "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_DM_URL", "m5my";
+    mysql_to_tidb: "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_TIDB_URL", "m5my";
+    mysql_to_oceanbase: "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_OCEANBASE_URL", "m5my";
+    mariadb_to_mysql: "DATLUMA_TEST_MARIADB_URL" => "DATLUMA_TEST_MYSQL_URL", "m5ma";
+    mariadb_to_pg: "DATLUMA_TEST_MARIADB_URL" => "DATLUMA_TEST_PG_URL", "m5ma";
+    mariadb_to_oracle: "DATLUMA_TEST_MARIADB_URL" => "DATLUMA_TEST_ORACLE_URL", "m5ma";
+    mariadb_to_dameng: "DATLUMA_TEST_MARIADB_URL" => "DATLUMA_TEST_DM_URL", "m5ma";
+    pg_to_mysql: "DATLUMA_TEST_PG_URL" => "DATLUMA_TEST_MYSQL_URL", "m5pg";
+    pg_to_oracle: "DATLUMA_TEST_PG_URL" => "DATLUMA_TEST_ORACLE_URL", "m5pg";
+    pg_to_dameng: "DATLUMA_TEST_PG_URL" => "DATLUMA_TEST_DM_URL", "m5pg";
+    oracle_to_mysql: "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_MYSQL_URL", "m5or";
+    oracle_to_pg: "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_PG_URL", "m5or";
+    oracle_to_dameng: "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_DM_URL", "m5or";
+    oracle_to_kingbase: "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_KINGBASE_URL", "m5or";
+    oracle_to_opengauss: "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_OPENGAUSS_A_URL", "m5or";
+    dameng_to_mysql: "DATLUMA_TEST_DM_URL" => "DATLUMA_TEST_MYSQL_URL", "m5dm";
+    dameng_to_pg: "DATLUMA_TEST_DM_URL" => "DATLUMA_TEST_PG_URL", "m5dm";
+    dameng_to_oracle: "DATLUMA_TEST_DM_URL" => "DATLUMA_TEST_ORACLE_URL", "m5dm";
+    tidb_to_mysql: "DATLUMA_TEST_TIDB_URL" => "DATLUMA_TEST_MYSQL_URL", "m5ti";
+    tidb_to_pg: "DATLUMA_TEST_TIDB_URL" => "DATLUMA_TEST_PG_URL", "m5ti";
+    tidb_to_oracle: "DATLUMA_TEST_TIDB_URL" => "DATLUMA_TEST_ORACLE_URL", "m5ti";
+    tidb_to_dameng: "DATLUMA_TEST_TIDB_URL" => "DATLUMA_TEST_DM_URL", "m5ti";
+    oceanbase_to_mysql: "DATLUMA_TEST_OCEANBASE_URL" => "DATLUMA_TEST_MYSQL_URL", "m5ob";
+    oceanbase_to_pg: "DATLUMA_TEST_OCEANBASE_URL" => "DATLUMA_TEST_PG_URL", "m5ob";
+    oceanbase_to_oracle: "DATLUMA_TEST_OCEANBASE_URL" => "DATLUMA_TEST_ORACLE_URL", "m5ob";
+    oceanbase_to_dameng: "DATLUMA_TEST_OCEANBASE_URL" => "DATLUMA_TEST_DM_URL", "m5ob";
+    opengauss_to_mysql: "DATLUMA_TEST_OPENGAUSS_URL" => "DATLUMA_TEST_MYSQL_URL", "m5og";
+    opengauss_to_pg: "DATLUMA_TEST_OPENGAUSS_URL" => "DATLUMA_TEST_PG_URL", "m5og";
+    opengauss_to_oracle: "DATLUMA_TEST_OPENGAUSS_URL" => "DATLUMA_TEST_ORACLE_URL", "m5og";
+    opengauss_to_dameng: "DATLUMA_TEST_OPENGAUSS_URL" => "DATLUMA_TEST_DM_URL", "m5og";
+    opengauss_a_to_mysql: "DATLUMA_TEST_OPENGAUSS_A_URL" => "DATLUMA_TEST_MYSQL_URL", "m5oa";
+    opengauss_a_to_pg: "DATLUMA_TEST_OPENGAUSS_A_URL" => "DATLUMA_TEST_PG_URL", "m5oa";
+    opengauss_a_to_oracle: "DATLUMA_TEST_OPENGAUSS_A_URL" => "DATLUMA_TEST_ORACLE_URL", "m5oa";
+    opengauss_a_to_dameng: "DATLUMA_TEST_OPENGAUSS_A_URL" => "DATLUMA_TEST_DM_URL", "m5oa";
+    kingbase_to_mysql: "DATLUMA_TEST_KINGBASE_URL" => "DATLUMA_TEST_MYSQL_URL", "m5kb";
+    kingbase_to_pg: "DATLUMA_TEST_KINGBASE_URL" => "DATLUMA_TEST_PG_URL", "m5kb";
+    kingbase_to_oracle: "DATLUMA_TEST_KINGBASE_URL" => "DATLUMA_TEST_ORACLE_URL", "m5kb";
+    kingbase_to_dameng: "DATLUMA_TEST_KINGBASE_URL" => "DATLUMA_TEST_DM_URL", "m5kb";
+    kingbase_pg_to_mysql: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_MYSQL_URL", "m5kp";
+    kingbase_pg_to_pg: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_PG_URL", "m5kp";
+    kingbase_pg_to_oracle: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_ORACLE_URL", "m5kp";
+    kingbase_pg_to_dameng: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_DM_URL", "m5kp";
 }
 ````
 
-- [ ] **Step 3: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -8,6 +8,7 @@ mod documents;
  mod error;
  mod exports;
@@ -3211,7 +3211,7 @@ routes! {
          .route("/exports/{id}/file", get(exports::file))
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-api/src/migrations.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-api/src/migrations.rs`**
 
 ```rust
 //! 结构迁移的接口（M5a 设计文档 3.2 节）：预览（转换结果、脚本、开始前检查），开始迁移。
@@ -3219,7 +3219,7 @@ routes! {
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use dblens_service::{MigrationPlan, MigrationPreview};
+use datluma_service::{MigrationPlan, MigrationPreview};
 use serde_json::{Value, json};
 
 use crate::AppState;
@@ -3243,11 +3243,11 @@ pub async fn start(
 }
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 5: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -152,6 +152,7 @@
    "metadata.table_detail_count": {"zh-CN": "表明细查询数量不对", "en": "Wrong number of table detail queries"},
    "migrate.check_dropped": {"zh-CN": "检查约束 %{expression} 不能转换，不迁移", "en": "Check constraint %{expression} cannot be converted; not migrated"},
@@ -3285,11 +3285,11 @@ pub async fn start(
    "model.conflict": {"zh-CN": "%{name} 的文件已被修改，请重新加载", "en": "The file for %{name} has changed; reload it"},
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/compare.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/compare.rs`**
 
 ```diff
---- a/crates/dblens-service/src/compare.rs
-+++ b/crates/dblens-service/src/compare.rs
+--- a/crates/datluma-service/src/compare.rs
++++ b/crates/datluma-service/src/compare.rs
 @@ -439,7 +439,7 @@ impl Service {
  }
  
@@ -3298,7 +3298,7 @@ pub async fn start(
 +pub(crate) mod tests {
      use std::time::Duration;
  
-     use dblens_core::schema::{Column, PrimaryKey};
+     use datluma_core::schema::{Column, PrimaryKey};
 @@ -459,7 +459,7 @@ mod tests {
      use crate::store::Store;
      use crate::task::{TaskState, TaskStatus};
@@ -3310,11 +3310,11 @@ pub async fn start(
          secrets.init_vault("master").unwrap();
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-service/src/design.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-service/src/design.rs`**
 
 ```diff
---- a/crates/dblens-service/src/design.rs
-+++ b/crates/dblens-service/src/design.rs
+--- a/crates/datluma-service/src/design.rs
++++ b/crates/datluma-service/src/design.rs
 @@ -408,7 +408,7 @@ impl Run<'_> {
      }
  
@@ -3326,11 +3326,11 @@ pub async fn start(
          self.record(sql, at, started, result.as_ref().ok().copied(), result.as_ref().err());
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -13,6 +13,7 @@ mod favorite;
  mod history;
  mod import;
@@ -3349,25 +3349,25 @@ pub async fn start(
      DiagramWarning, FileError, LogicalKey, ModelDatabase, ModelDesignPreview, ModelDesignRequest, ModelInfo,
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-service/src/migrate.rs`**
+- [ ] **Step 9: 新建 `crates/datluma-service/src/migrate.rs`**
 
 ````rust
 //! 结构迁移（M5a 设计文档第 3.2、6 节）：读源和目标的结构，按迁移方案转换、检查、生成脚本；
-//! 作为任务逐条执行（某张表建表失败时跳过依赖它的语句），最后写迁移报告（markdown）。转换本身在 `dblens_dialect::migrate`。
+//! 作为任务逐条执行（某张表建表失败时跳过依赖它的语句），最后写迁移报告（markdown）。转换本身在 `datluma_dialect::migrate`。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::sync::Arc;
 use std::time::Instant;
 
-use dblens_core::schema::{RoutineKind, Sequence, Table};
-use dblens_core::{Error, Lang, Msg, Result, current_lang, msg};
-use dblens_dialect::meta::{MetaArgs, MetaKey};
-use dblens_dialect::migrate::{
+use datluma_core::schema::{RoutineKind, Sequence, Table};
+use datluma_core::{Error, Lang, Msg, Result, current_lang, msg};
+use datluma_dialect::meta::{MetaArgs, MetaKey};
+use datluma_dialect::migrate::{
     ExistingAction, MigrationDraft, MigrationInput, MigrationSettings, MigrationStatement, NoteLevel,
     StatementKind, migrate, migration_script, script_text,
 };
-use dblens_dialect::{DdlKind, Dialect, Variant};
+use datluma_dialect::{DdlKind, Dialect, Variant};
 use serde::{Deserialize, Serialize};
 
 use crate::design::Run;
@@ -3798,7 +3798,7 @@ pub(crate) async fn run_statements(
 
 #[cfg(test)]
 mod tests {
-    use dblens_dialect::migrate::{MigrationNote, ObjectKind, TableMapping};
+    use datluma_dialect::migrate::{MigrationNote, ObjectKind, TableMapping};
 
     use super::*;
     use crate::compare::tests::service;
@@ -3899,11 +3899,11 @@ mod tests {
 }
 ````
 
-- [ ] **Step 10: 修改 `crates/dblens-service/src/task.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-service/src/task.rs`**
 
 ```diff
---- a/crates/dblens-service/src/task.rs
-+++ b/crates/dblens-service/src/task.rs
+--- a/crates/datluma-service/src/task.rs
++++ b/crates/datluma-service/src/task.rs
 @@ -32,6 +32,8 @@ pub enum TaskKind {
      Sync,
      /// 导出文档（M4c）。
@@ -3933,10 +3933,10 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及国产库第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑迁移的测试：`cargo test … -p dblens-service --test migrate_live -- --test-threads=1`（源和目标的环境变量都设置时才运行该路线）。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及国产库第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑迁移的测试：`cargo test … -p datluma-service --test migrate_live -- --test-threads=1`（源和目标的环境变量都设置时才运行该路线）。
 - 人大金仓的开发版授权最多 10 个连接：它的测试要串行运行（`--test-threads=1`）。
 - 达梦偶发"网络通讯失败"，失败时单独重跑该路线（如 `dameng_to_mysql`）。
 
@@ -3945,7 +3945,7 @@ Expected: 全部测试通过（service 新增 2 个，api 新增 1 个）；迁�
 - [ ] **Step 12: 提交**
 
 ```bash
-git add crates/dblens-api/src/lib.rs crates/dblens-api/src/migrations.rs crates/dblens-api/tests/models.rs crates/dblens-core/locales/app.json crates/dblens-service/src/compare.rs crates/dblens-service/src/design.rs crates/dblens-service/src/lib.rs crates/dblens-service/src/migrate.rs crates/dblens-service/src/task.rs crates/dblens-service/tests/migrate_live.rs
+git add crates/datluma-api/src/lib.rs crates/datluma-api/src/migrations.rs crates/datluma-api/tests/models.rs crates/datluma-core/locales/app.json crates/datluma-service/src/compare.rs crates/datluma-service/src/design.rs crates/datluma-service/src/lib.rs crates/datluma-service/src/migrate.rs crates/datluma-service/src/task.rs crates/datluma-service/tests/migrate_live.rs
 git commit -m "feat(migrate): 结构迁移的预览、任务、报告与接口" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5400,7 +5400,7 @@ export function parsePlan(text: string): MigrationPlan | null {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -5413,7 +5413,7 @@ Expected: 全部通过（前端新增 5 个测试）。
 
 - [ ] **Step 15: 浏览器实测**
 
-浏览器实测（设计文档第 5 节）：用 `dblens-server --listen 127.0.0.1:<端口>` 启动浏览器模式。先在一个 MySQL 系的测试库建两张表（含 ENUM 列、自增主键、注释、唯一键、索引、外键）。
+浏览器实测（设计文档第 5 节）：用 `datluma-server --listen 127.0.0.1:<端口>` 启动浏览器模式。先在一个 MySQL 系的测试库建两张表（含 ENUM 列、自增主键、注释、唯一键、索引、外键）。
 1. 对象树中该 schema 右键"迁移到…"：打开迁移标签，源已填好；选目标连接和 schema，"读取结构"。
 2. 对象列表中有 ENUM 列的表标"不支持"，底部提示还有不支持的映射，"开始迁移"不可用；点该列的"按文本迁移"后变为"有损"，可以开始。
 3. 改一列的目标名或类型：右侧 DDL 预览随之更新。
@@ -5439,7 +5439,7 @@ git commit -m "feat(web): 迁移标签页" -m "Co-Authored-By: Claude Opus 5.5 <
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m5a-structure-migration.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
 
@@ -5481,15 +5481,15 @@ git commit -m "feat(web): 迁移标签页" -m "Co-Authored-By: Claude Opus 5.5 <
 ## 结构
 
 ```text
-crates/dblens-dialect/src/migrate/
+crates/datluma-dialect/src/migrate/
   mod.rs     迁移设置（选项、类型规则、覆盖）、提示、MigrationDraft；migrate()：表、列、主键、唯一约束、索引、外键、检查约束、序列的转换
   names.rs   名字的大小写（按目标库的习惯）、长度上限、重名检查
   types.rs   列类型：覆盖 → 规则 → 同家族原样 → 经逻辑类型；有损判断；Oracle 的 NUMBER(p) 用整数；自增列用整数；外键动作；序列的取值范围
   expr.rs    简单表达式（检查约束、生成列、索引表达式）与默认值的转换：去掉 PG 的类型转换和 MySQL 的字符集前缀，还原 ANY (ARRAY[…])
   script.rs  两步脚本：第一步建序列、（删表）、建表和注释；第二步索引、唯一约束、检查约束，最后外键；同名表的处理；脚本全文
-crates/dblens-service/src/migrate.rs   MigrationPlan、读两端结构、不迁移的对象、预览、开始前检查、任务（TaskKind::Migrate）、逐条执行、迁移报告
-crates/dblens-api/src/migrations.rs    POST /migrations/preview、/migrations
-crates/dblens-service/tests/migrate_live.rs   44 条迁移路线的实库测试
+crates/datluma-service/src/migrate.rs   MigrationPlan、读两端结构、不迁移的对象、预览、开始前检查、任务（TaskKind::Migrate）、逐条执行、迁移报告
+crates/datluma-api/src/migrations.rs    POST /migrations/preview、/migrations
+crates/datluma-service/tests/migrate_live.rs   44 条迁移路线的实库测试
 web/src/features/migrate/
   plan.ts          新方案、逐列/表/检查约束/序列的覆盖、同名表的处理、提示的汇总、执行前的汇总、打开另存的方案
   MigrateView.tsx  迁移标签页
@@ -5516,7 +5516,7 @@ web/src/features/migrate/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（761 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（761 个）。
   - 方言层：PG 源迁到 MySQL、Oracle、达梦、openGauss 的快照，Oracle 源迁到 PG、MySQL 的快照（含类型规则）；
     默认值、简单表达式、nextval 的转换；覆盖与跳过；重名与超长；同名表的三种处理；外键依赖两张表。
   - 服务层：开始前检查；建表失败后跳过依赖它的语句、其余照常执行。
@@ -5530,11 +5530,11 @@ web/src/features/migrate/
 - 未验证：桌面程序的"另存脚本""迁移报告"保存对话框。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -334,6 +334,8 @@ trait Policy: Send + Sync {
  - M4a 已完成（设计 `docs/superpowers/specs/2026-10-27-m4a-model-compare-design.md`，详细计划 `docs/superpowers/plans/2026-10-27-m4a-model-compare.md`，说明 `docs/notes/m4a-model-compare.md`）。M4b、M4c 尚未开始。
  - M4b 已完成（设计 `docs/superpowers/specs/2026-10-28-m4b-er-diagram-design.md`，详细计划 `docs/superpowers/plans/2026-10-28-m4b-er-diagram.md`，说明 `docs/notes/m4b-er-diagram.md`）。
@@ -5555,6 +5555,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m5a-structure-migration.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m0-4b-api.md docs/notes/m5a-structure-migration.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M5a 结构迁移的说明、接口和进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

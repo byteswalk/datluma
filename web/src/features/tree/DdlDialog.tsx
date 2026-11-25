@@ -80,7 +80,7 @@ export default function DdlDialog({ target, onClose }: { target: DdlTarget; onCl
           <Editor
             language={editorLanguage(target.driver)}
             value={data ?? ''}
-            theme={`dblens-${theme}`}
+            theme={`datluma-${theme}`}
             options={{
               useShadowDOM: false,
               readOnly: true,

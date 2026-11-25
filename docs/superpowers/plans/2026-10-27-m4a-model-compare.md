@@ -4,7 +4,7 @@
 
 **Goal:** 模型目录（`model.yaml` + 每表一个 YAML 文件，可放进 git）、从库反向生成模型、在模型中用设计器编辑表、模型与库或库与库的三层比对、同步到库（脚本预览后执行）或写回模型。
 
-**Architecture:** 比对、写回和同步脚本在 `dblens-dialect::compare`（不做 IO，复用 M3 的 `diff_table`、`design_sql` 和重建）；模型目录的读写和打开的模型在 `dblens-service::model`；比对与同步的编排在 `dblens-service::compare`，执行复用 M3 的执行器（改为按段执行）；接口 `/models`、`/compare` 只在页面和服务在同一台机器上时可用；前端新增模型面板、比对标签，设计器增加模型模式。
+**Architecture:** 比对、写回和同步脚本在 `datluma-dialect::compare`（不做 IO，复用 M3 的 `diff_table`、`design_sql` 和重建）；模型目录的读写和打开的模型在 `datluma-service::model`；比对与同步的编排在 `datluma-service::compare`，执行复用 M3 的执行器（改为按段执行）；接口 `/models`、`/compare` 只在页面和服务在同一台机器上时可用；前端新增模型面板、比对标签，设计器增加模型模式。
 
 **Tech Stack:** Rust（axum、tokio、serde、serde-saphyr、insta）；React 19 + TypeScript、antd 6、Monaco、zustand、TanStack Query、Vitest。
 
@@ -19,13 +19,13 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条（`src` 中的中文字面量只能出现在 `#[cfg(test)]` 之后）；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
 ## 与设计文档的差异（写计划时实测后调整）
 
-- `dblens-server` 只监听本机地址时 `local_files` 为真：导出也可以直接写到页面给出的路径。
+- `datluma-server` 只监听本机地址时 `local_files` 为真：导出也可以直接写到页面给出的路径。
 - MySQL 家族不查询 `lower_case_table_names`，由比对选项"名字不区分大小写"决定。
 - 新建模型时不选版本（按最新版本）；反向生成的模型带库的版本。
 - 外键的默认动作（`NO ACTION`、MySQL 家族的 `RESTRICT`）与不写视为相同。
@@ -41,15 +41,15 @@
 ## 文件结构
 
 ```text
-crates/dblens-dialect/src/compare/{mod.rs, normalize.rs, apply.rs, sync.rs, tests.rs, snapshots/}（新增）; src/{lib.rs, design/mod.rs}
-crates/dblens-service/src/model/{mod.rs, file.rs, store.rs, ops.rs, snapshots/}（新增）; src/compare.rs（新增）; src/{lib.rs, service.rs, task.rs, design.rs}; tests/live.rs
-crates/dblens-api/src/models.rs（新增）, src/lib.rs, tests/models.rs（新增）; crates/dblens-server/src/main.rs
-crates/dblens-desktop/src/{main.rs, shell.rs}
-crates/dblens-core/locales/app.json; Cargo.toml; crates/dblens-service/Cargo.toml
+crates/datluma-dialect/src/compare/{mod.rs, normalize.rs, apply.rs, sync.rs, tests.rs, snapshots/}（新增）; src/{lib.rs, design/mod.rs}
+crates/datluma-service/src/model/{mod.rs, file.rs, store.rs, ops.rs, snapshots/}（新增）; src/compare.rs（新增）; src/{lib.rs, service.rs, task.rs, design.rs}; tests/live.rs
+crates/datluma-api/src/models.rs（新增）, src/lib.rs, tests/models.rs（新增）; crates/datluma-server/src/main.rs
+crates/datluma-desktop/src/{main.rs, shell.rs}
+crates/datluma-core/locales/app.json; Cargo.toml; crates/datluma-service/Cargo.toml
 web/src/features/model/（新增）; features/compare/（新增）; features/design/{source.ts（新增）, DesignView.tsx, ForeignKeysPane.tsx, OptionsPane.tsx}
 web/src/features/editor/{tabs.ts, tabs.test.ts, Workspace.tsx, actions.tsx}; features/tree/ObjectTree.tsx; app/{Shell.tsx, StatusBar.tsx, TitleBar.tsx, menus.ts, menus.test.ts, ui.ts, shell.css}
 web/src/shared/{api.ts, shell.ts}; locales/{zh-CN,en}/{model.json（新增）, app.json, tree.json}; locales/index.ts
-docs/notes/{m4a-model-compare.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m4a-model-compare.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -78,7 +78,7 @@ Expected：输出中没有"查询失败"。以执行当天的结果为准；`ser
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -100,7 +100,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 ### Task 2: 方言：结构比对、写回与同步脚本
 
-新模块 `crates/dblens-dialect/src/compare/`（不做 IO）：
+新模块 `crates/datluma-dialect/src/compare/`（不做 IO）：
 - `mod.rs`：`CompareRenames`（源 → 目标；列按源的表名分组）、`CompareOptions`（忽略注释、忽略列顺序、忽略系统生成的名字（默认是）、不区分大小写）、`CompareSide`、`TableStatus`、`SchemaItem`（编号）、`SchemaChange`、`TableDiff`、`RenameSuggestion`、`SchemaDiff`；`compare_schemas`：按名字和给出的改名配对，其余按列名的 Jaccard 系数 ≥ 0.7 且列数差不超过 2 推测表的改名（只作为建议），配对的表整理后用 M3 的 `diff_table` 比对；删一列加一列、类型相同、位置相差不超过 1 的推测为列的改名。
 - `normalize.rs`：外键引用本 schema 时去掉 schema；目标中改了名的表按源的名字引用；按选项去掉注释、按目标的顺序排列共有的列、对齐系统生成的约束名和索引名（Oracle / 达梦的 `SYS_C…`，MySQL 的 `PRIMARY`、`<表>_ibfk_N`，PG 家族的 `<表>_pkey` 等）；PG 默认值去掉类型转换和外层括号；同义的类型名（`int4` 与 `integer` 等）视为相同。外键的默认动作（`NO ACTION`、MySQL 家族的 `RESTRICT`）与不写视为相同在任务 7 加入。
 - `apply.rs`：`apply_changes`：把变更应用到表结构（列改名时同步约束、索引、自引用外键；重新编号）。
@@ -112,31 +112,31 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 快照文件（`snapshots/`）随本任务给出；改了生成逻辑时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-dialect/src/compare/apply.rs`
-- Create: `crates/dblens-dialect/src/compare/mod.rs`
-- Create: `crates/dblens-dialect/src/compare/normalize.rs`
-- Create: `crates/dblens-dialect/src/compare/snapshots/dblens_dialect__compare__tests__sync_mysql.snap`
-- Create: `crates/dblens-dialect/src/compare/snapshots/dblens_dialect__compare__tests__sync_pg.snap`
-- Create: `crates/dblens-dialect/src/compare/sync.rs`
-- Create: `crates/dblens-dialect/src/compare/tests.rs`
-- Modify: `crates/dblens-dialect/src/design/mod.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-dialect/src/compare/apply.rs`
+- Create: `crates/datluma-dialect/src/compare/mod.rs`
+- Create: `crates/datluma-dialect/src/compare/normalize.rs`
+- Create: `crates/datluma-dialect/src/compare/snapshots/datluma_dialect__compare__tests__sync_mysql.snap`
+- Create: `crates/datluma-dialect/src/compare/snapshots/datluma_dialect__compare__tests__sync_pg.snap`
+- Create: `crates/datluma-dialect/src/compare/sync.rs`
+- Create: `crates/datluma-dialect/src/compare/tests.rs`
+- Modify: `crates/datluma-dialect/src/design/mod.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
 
 **Interfaces:**
 - Consumes：M3 的 `diff_table`、`design_sql`、`design_unsupported`、`rebuild`、`RebuildContext`。
-- Produces（`dblens_dialect::compare`）：
+- Produces（`datluma_dialect::compare`）：
   - `compare_schemas(d: &Dialect, source: &CompareSide, target: &CompareSide, renames: &CompareRenames, opts: &CompareOptions) -> Result<SchemaDiff>`；
   - `apply_changes(table: &Table, changes: &[TableChange]) -> Result<Table>`；
   - `sync_rebuild_tables(d, diff, selected: &BTreeSet<u32>) -> Vec<String>`、`sync_script(d, schema, diff, selected, targets: &[Table], contexts: &BTreeMap<String, RebuildContext>) -> Result<SyncScript>`；
   - `SyncScript { steps: Vec<SyncStep>, refused: Vec<(String, Msg)>, warnings: Vec<Msg>, transactional: bool }`，`SyncStep::{Sql { sql, items }, Rebuild { table, rebuild, items }}`。
 
-- [ ] **Step 1: 新建 `crates/dblens-dialect/src/compare/tests.rs`**
+- [ ] **Step 1: 新建 `crates/datluma-dialect/src/compare/tests.rs`**
 
 ```rust
 use std::collections::{BTreeMap, BTreeSet};
 
-use dblens_core::schema::{ForeignKey, Index, IndexColumn, PrimaryKey, Table};
+use datluma_core::schema::{ForeignKey, Index, IndexColumn, PrimaryKey, Table};
 
 use super::*;
 use crate::Variant;
@@ -429,11 +429,11 @@ fn sync_script_mysql_keeps_one_alter_per_table_rules() {
 }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 2: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -17,6 +17,7 @@
    "changes.not_unique": {"zh-CN": "第 %{n} 个改动影响了 %{count} 行：行标识不唯一", "en": "Change %{n} affected %{count} rows: the row identity is not unique"},
    "changes.rolled_back": {"zh-CN": "已回滚（同一次提交中的其他改动失败）", "en": "Rolled back (another change in the same commit failed)"},
@@ -444,14 +444,14 @@ fn sync_script_mysql_keeps_one_alter_per_table_rules() {
    "design.bad_rename": {"zh-CN": "列 %{name} 的原名不对", "en": "Column %{name} has an invalid original name"},
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-dialect/src/compare/apply.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-dialect/src/compare/apply.rs`**
 
 ```rust
 //! 把变更应用到表结构上（M4a 设计文档 6.2 节）：同步的目标是模型时，按勾选的变更改写模型中的表。
 //! 与 `diff_table` 互逆：`apply_changes(原表, diff_table(原表, 草稿))` 与草稿再比对没有差异。
 
-use dblens_core::schema::{Column, Table};
-use dblens_core::{Error, Result, msg};
+use datluma_core::schema::{Column, Table};
+use datluma_core::{Error, Result, msg};
 
 use crate::design::TableChange as C;
 
@@ -573,7 +573,7 @@ fn apply_one(t: &mut Table, ch: &C) -> Result<()> {
 }
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/src/compare/mod.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/src/compare/mod.rs`**
 
 ```rust
 //! 结构比对（M4a 设计文档第 5 节）：两组表（模型或数据库的一个 schema）配对后逐表比对，
@@ -588,8 +588,8 @@ mod sync;
 
 use std::collections::BTreeMap;
 
-use dblens_core::Result;
-use dblens_core::schema::Table;
+use datluma_core::Result;
+use datluma_core::schema::Table;
 use serde::{Deserialize, Serialize};
 
 use crate::Dialect;
@@ -907,7 +907,7 @@ fn suggest_columns(source: &Table, target: &Table, changes: &[TableChange]) -> V
 mod tests;
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/src/compare/normalize.rs`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/src/compare/normalize.rs`**
 
 ```rust
 //! 比对前把两边的表整理成可以直接比较的形式（M4a 设计文档 5.3 节）：
@@ -917,7 +917,7 @@ mod tests;
 
 use std::collections::BTreeMap;
 
-use dblens_core::schema::{Column, ForeignKey, Table};
+use datluma_core::schema::{Column, ForeignKey, Table};
 
 use super::CompareOptions;
 use crate::design::diff::same_type;
@@ -1179,11 +1179,11 @@ pub(super) fn is_generated(d: &Dialect, table: &str, name: &str) -> bool {
 }
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-dialect/src/compare/snapshots/dblens_dialect__compare__tests__sync_mysql.snap`**
+- [ ] **Step 6: 新建 `crates/datluma-dialect/src/compare/snapshots/datluma_dialect__compare__tests__sync_mysql.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/compare/tests.rs
+source: crates/datluma-dialect/src/compare/tests.rs
 expression: "text.join(\"\\n\")"
 ---
 [1] ALTER TABLE shop.orders DROP FOREIGN KEY fk_parent
@@ -1200,11 +1200,11 @@ expression: "text.join(\"\\n\")"
 [12] ALTER TABLE shop.orders ADD CONSTRAINT fk_parent FOREIGN KEY (order_code) REFERENCES shop.parent (code)
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-dialect/src/compare/snapshots/dblens_dialect__compare__tests__sync_pg.snap`**
+- [ ] **Step 7: 新建 `crates/datluma-dialect/src/compare/snapshots/datluma_dialect__compare__tests__sync_pg.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/compare/tests.rs
+source: crates/datluma-dialect/src/compare/tests.rs
 expression: "text.join(\"\\n\")"
 ---
 [1] ALTER TABLE app.orders DROP CONSTRAINT fk_old
@@ -1222,7 +1222,7 @@ expression: "text.join(\"\\n\")"
 [4] ALTER TABLE app.items ADD CONSTRAINT fk_items_orders FOREIGN KEY (id) REFERENCES app.orders (id)
 ```
 
-- [ ] **Step 8: 新建 `crates/dblens-dialect/src/compare/sync.rs`**
+- [ ] **Step 8: 新建 `crates/datluma-dialect/src/compare/sync.rs`**
 
 ```rust
 //! 同步脚本（M4a 设计文档 6.1 节）：按勾选的变更修改目标 schema。
@@ -1232,8 +1232,8 @@ expression: "text.join(\"\\n\")"
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use dblens_core::schema::Table;
-use dblens_core::{Msg, Result};
+use datluma_core::schema::Table;
+use datluma_core::{Msg, Result};
 use serde::Serialize;
 
 use super::{SchemaChange, SchemaDiff, TableDiff, apply_changes};
@@ -1409,11 +1409,11 @@ pub fn sync_script(
 }
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-dialect/src/design/mod.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-dialect/src/design/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/mod.rs
-+++ b/crates/dblens-dialect/src/design/mod.rs
+--- a/crates/datluma-dialect/src/design/mod.rs
++++ b/crates/datluma-dialect/src/design/mod.rs
 @@ -2,7 +2,7 @@
  //! 再按方言生成 DDL；库不支持的改动改用重建表的脚本。不做任何 IO。
  
@@ -1434,11 +1434,11 @@ pub fn sync_script(
  /// 约束改名一律先删后建，不需要映射。
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -2,6 +2,7 @@
  
  mod browse;
@@ -1455,7 +1455,7 @@ pub fn sync_script(
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 6 个，快照 2 个）。
@@ -1463,7 +1463,7 @@ Expected: 全部测试通过（dialect 新增 6 个，快照 2 个）。
 - [ ] **Step 12: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/src/compare/apply.rs crates/dblens-dialect/src/compare/mod.rs crates/dblens-dialect/src/compare/normalize.rs crates/dblens-dialect/src/compare/snapshots/dblens_dialect__compare__tests__sync_mysql.snap crates/dblens-dialect/src/compare/snapshots/dblens_dialect__compare__tests__sync_pg.snap crates/dblens-dialect/src/compare/sync.rs crates/dblens-dialect/src/compare/tests.rs crates/dblens-dialect/src/design/mod.rs crates/dblens-dialect/src/lib.rs
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/src/compare/apply.rs crates/datluma-dialect/src/compare/mod.rs crates/datluma-dialect/src/compare/normalize.rs crates/datluma-dialect/src/compare/snapshots/datluma_dialect__compare__tests__sync_mysql.snap crates/datluma-dialect/src/compare/snapshots/datluma_dialect__compare__tests__sync_pg.snap crates/datluma-dialect/src/compare/sync.rs crates/datluma-dialect/src/compare/tests.rs crates/datluma-dialect/src/design/mod.rs crates/datluma-dialect/src/lib.rs
 git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1471,7 +1471,7 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
 
 ### Task 3: 服务层：模型目录的读写
 
-- 依赖：工作区加 `serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }`，`dblens-service` 使用它，开发依赖加 `insta`。
+- 依赖：工作区加 `serde-saphyr = { version = "2.0.0", default-features = false, features = ["serialize", "deserialize"] }`，`datluma-service` 使用它，开发依赖加 `insta`。
 - `model/file.rs`：`ModelInfo`（`model.yaml`）、`ModelDatabase`（`dialect()` 由它构造方言）、`SchemaRenames`；表文件的写法（字段顺序固定，空的不写，逻辑类型和列序号不写，`nullable` 只写 false，升序的索引列只写名字，多行文本用块写法）；表和每列不认识的字段保留；`escape_name` / `unescape_name`；`fingerprint`（文件内容的哈希）；`write_atomic`。
 - `model/store.rs`：`ModelStore`：打开、新建、由表列表新建（反向生成用）、关闭、列表；表文件缓存（按修改时间和长度重读，解析失败的标为"文件有错"）；读表、读一个 schema 的全部表（带指纹）；保存（核对指纹，列改名时更新其他表外键的引用、记入改名记录，删掉的列去掉记录和扩展字段）、表改名（改文件名、更新引用、记录；再改沿用最初的原名，改回原名删去记录）、删除、写回（先核对全部涉及的表的指纹再写）、删去已应用的改名；格式比程序新时只读。
 - 后端词条加 `noun.model`、`model.*`（读写失败、目录不为空、不是模型目录、文件有错、只读、冲突、表已存在）。
@@ -1480,18 +1480,18 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
 
 **Files:**
 - Modify: `Cargo.toml`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/Cargo.toml`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Create: `crates/dblens-service/src/model/file.rs`
-- Create: `crates/dblens-service/src/model/mod.rs`
-- Create: `crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__info_yaml.snap`
-- Create: `crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap`
-- Create: `crates/dblens-service/src/model/store.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/Cargo.toml`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Create: `crates/datluma-service/src/model/file.rs`
+- Create: `crates/datluma-service/src/model/mod.rs`
+- Create: `crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__info_yaml.snap`
+- Create: `crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap`
+- Create: `crates/datluma-service/src/model/store.rs`
 
 **Interfaces:**
 - Consumes：任务 2 无；方言的 `logical_type`。
-- Produces（`dblens_service`）：`ModelStore`（`open`、`create`、`create_from`、`close`、`list`、`summary_of`、`dialect`、`set_info`、`tables`、`read_table`、`schema_tables`、`renames`、`save_table`、`rename_table`、`delete_table`、`write_back`、`clear_renames`、`root`）、`ModelSummary { id, path, info, read_only }`、`ModelInfo`、`ModelDatabase { variant, compat, version }`、`SchemaRenames { tables, columns }`、`TableEntry`、`FileError`、`ModelTableView { table, fingerprint }`、`SchemaTables { tables: Vec<(Table, String)>, errors }`、`ModelWrite::{Put { table: Box<Table>, path_of }, Delete { name }}`。
+- Produces（`datluma_service`）：`ModelStore`（`open`、`create`、`create_from`、`close`、`list`、`summary_of`、`dialect`、`set_info`、`tables`、`read_table`、`schema_tables`、`renames`、`save_table`、`rename_table`、`delete_table`、`write_back`、`clear_renames`、`root`）、`ModelSummary { id, path, info, read_only }`、`ModelInfo`、`ModelDatabase { variant, compat, version }`、`SchemaRenames { tables, columns }`、`TableEntry`、`FileError`、`ModelTableView { table, fingerprint }`、`SchemaTables { tables: Vec<(Table, String)>, errors }`、`ModelWrite::{Put { table: Box<Table>, path_of }, Delete { name }}`。
 
 - [ ] **Step 1: 修改 `Cargo.toml`**
 
@@ -1508,11 +1508,11 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
  tauri = "2.12.5"
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 2: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -140,6 +140,15 @@
    "metadata.not_source": {"zh-CN": "%{key} 不是源码查询", "en": "%{key} is not a source query"},
    "metadata.pool_closed": {"zh-CN": "连接池已关闭", "en": "The connection pool is closed"},
@@ -1523,7 +1523,7 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
 +  "model.dir_not_empty": {"zh-CN": "目录 %{path} 不为空", "en": "Directory %{path} is not empty"},
 +  "model.io_failed": {"zh-CN": "读写 %{path} 失败：%{error}", "en": "Failed to access %{path}: %{error}"},
 +  "model.not_a_model": {"zh-CN": "%{path} 不是模型目录（没有 model.yaml）", "en": "%{path} is not a model directory (model.yaml not found)"},
-+  "model.read_only": {"zh-CN": "模型文件格式 %{format} 比本程序新，只能查看；请升级数洞", "en": "Model format %{format} is newer than this version supports; it is read-only. Please upgrade DBLens"},
++  "model.read_only": {"zh-CN": "模型文件格式 %{format} 比本程序新，只能查看；请升级数览", "en": "Model format %{format} is newer than this version supports; it is read-only. Please upgrade DATLUMA"},
 +  "model.table_exists": {"zh-CN": "表 %{name} 已存在", "en": "Table %{name} already exists"},
 +  "model.yaml_write_failed": {"zh-CN": "生成 YAML 失败：%{error}", "en": "Failed to write YAML: %{error}"},
    "native.dameng_dpi": {"zh-CN": "达梦 DPI 库", "en": "DM DPI library"},
@@ -1539,11 +1539,11 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
    "noun.session": {"zh-CN": "会话 %{id}", "en": "session %{id}"},
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/Cargo.toml`**
+- [ ] **Step 3: 修改 `crates/datluma-service/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-service/Cargo.toml
-+++ b/crates/dblens-service/Cargo.toml
+--- a/crates/datluma-service/Cargo.toml
++++ b/crates/datluma-service/Cargo.toml
 @@ -37,6 +37,7 @@ rusqlite.workspace = true
  rust_xlsxwriter.workspace = true
  serde.workspace = true
@@ -1560,11 +1560,11 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
  tempfile.workspace = true
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -10,6 +10,7 @@ mod favorite;
  mod history;
  mod import;
@@ -1586,7 +1586,7 @@ git commit -m "feat(dialect): 结构比对、写回与同步脚本" -m "Co-Autho
      Decision, DefaultPolicy, ExecContext, ObjectRef, Outcome, Policy, StatementInfo, StatementKind, classify,
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-service/src/model/file.rs`**
+- [ ] **Step 5: 新建 `crates/datluma-service/src/model/file.rs`**
 
 ```rust
 //! 模型目录中的文件（M4a 设计文档第 3 节）：`model.yaml` 与 `tables/<schema>/<表>.yaml`。
@@ -1598,11 +1598,11 @@ use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
-use dblens_core::schema::{
+use datluma_core::schema::{
     CheckConstraint, Column, ForeignKey, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint,
 };
-use dblens_core::{ColumnType, Error, Result, msg};
-use dblens_dialect::{Compat, Dialect, Variant};
+use datluma_core::{ColumnType, Error, Result, msg};
+use datluma_dialect::{Compat, Dialect, Variant};
 use serde::{Deserialize, Serialize};
 
 /// 当前的文件格式版本。
@@ -2017,7 +2017,7 @@ pub fn info_path(root: &Path) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use dblens_core::LogicalType;
+    use datluma_core::LogicalType;
 
     use super::*;
 
@@ -2146,7 +2146,7 @@ mod tests {
             ("CON", "%43ON"),
             ("con.x", "%63on.x"),
             ("trail. ", "trail%2E%20"),
-            ("数洞 表", "数洞 表"),
+            ("数览 表", "数览 表"),
         ] {
             assert_eq!(escape_name(name), file, "{name}");
             assert_eq!(unescape_name(file), name, "{file}");
@@ -2155,7 +2155,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-service/src/model/mod.rs`**
+- [ ] **Step 6: 新建 `crates/datluma-service/src/model/mod.rs`**
 
 ```rust
 //! 模型（M4a）：模型目录的读写、打开的模型。
@@ -2167,11 +2167,11 @@ pub use file::{ModelDatabase, ModelInfo, SchemaRenames};
 pub use store::{FileError, ModelStore, ModelSummary, ModelTableView, ModelWrite, SchemaTables, TableEntry};
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__info_yaml.snap`**
+- [ ] **Step 7: 新建 `crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__info_yaml.snap`**
 
 ```text
 ---
-source: crates/dblens-service/src/model/file.rs
+source: crates/datluma-service/src/model/file.rs
 expression: text
 ---
 format: 1
@@ -2192,11 +2192,11 @@ renames:
         amount: total
 ```
 
-- [ ] **Step 8: 新建 `crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap`**
+- [ ] **Step 8: 新建 `crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap`**
 
 ```text
 ---
-source: crates/dblens-service/src/model/file.rs
+source: crates/datluma-service/src/model/file.rs
 expression: text
 ---
 name: orders
@@ -2241,7 +2241,7 @@ indexes:
   - code
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-service/src/model/store.rs`**
+- [ ] **Step 9: 新建 `crates/datluma-service/src/model/store.rs`**
 
 ```rust
 //! 打开的模型（M4a 设计文档 4.1 节）：编号 → 目录、模型信息；表文件按需读取，按修改时间和长度判断是否重读。
@@ -2252,9 +2252,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::SystemTime;
 
-use dblens_core::schema::Table;
-use dblens_core::{Error, Result, msg};
-use dblens_dialect::Dialect;
+use datluma_core::schema::Table;
+use datluma_core::{Error, Result, msg};
+use datluma_dialect::Dialect;
 use serde::Serialize;
 
 use super::file::{
@@ -2516,7 +2516,7 @@ impl OpenModel {
         &mut self,
         schema: &str,
         skip: Option<&Path>,
-        mut fix: impl FnMut(&mut dblens_core::schema::ForeignKey) -> bool,
+        mut fix: impl FnMut(&mut datluma_core::schema::ForeignKey) -> bool,
     ) -> Result<()> {
         let mut changed = Vec::new();
         for (p, c) in &self.files {
@@ -2962,9 +2962,9 @@ fn clear_renames(m: &mut OpenModel, schema: &str, cleared: &[(String, Option<Str
 
 #[cfg(test)]
 mod tests {
-    use dblens_core::schema::{Column, ForeignKey, PrimaryKey};
-    use dblens_core::{ColumnType, LogicalType};
-    use dblens_dialect::{Compat, Variant};
+    use datluma_core::schema::{Column, ForeignKey, PrimaryKey};
+    use datluma_core::{ColumnType, LogicalType};
+    use datluma_dialect::{Compat, Variant};
 
     use super::*;
 
@@ -3171,7 +3171,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 10 个，快照 2 个）。
@@ -3179,7 +3179,7 @@ Expected: 全部测试通过（service 新增 10 个，快照 2 个）。
 - [ ] **Step 11: 提交**
 
 ```bash
-git add Cargo.lock Cargo.toml crates/dblens-core/locales/app.json crates/dblens-service/Cargo.toml crates/dblens-service/src/lib.rs crates/dblens-service/src/model/file.rs crates/dblens-service/src/model/mod.rs crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__info_yaml.snap crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap crates/dblens-service/src/model/store.rs
+git add Cargo.lock Cargo.toml crates/datluma-core/locales/app.json crates/datluma-service/Cargo.toml crates/datluma-service/src/lib.rs crates/datluma-service/src/model/file.rs crates/datluma-service/src/model/mod.rs crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__info_yaml.snap crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap crates/datluma-service/src/model/store.rs
 git commit -m "feat(service): 模型目录的读写" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3193,37 +3193,37 @@ git commit -m "feat(service): 模型目录的读写" -m "Co-Authored-By: Claude 
 - 后端词条加 `model.no_schemas`。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/model/mod.rs`
-- Create: `crates/dblens-service/src/model/ops.rs`
-- Modify: `crates/dblens-service/src/service.rs`
-- Modify: `crates/dblens-service/src/task.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/model/mod.rs`
+- Create: `crates/datluma-service/src/model/ops.rs`
+- Modify: `crates/datluma-service/src/service.rs`
+- Modify: `crates/datluma-service/src/task.rs`
 
 **Interfaces:**
 - Consumes：任务 3 的 `ModelStore`；M3 的 `validate`、`diff_table`、`prepare_draft`。
 - Produces：`Service::{recent_models, open_model, create_model, start_reverse, preview_model_design, save_model_design}`；`NewModel { path, name, database, schemas }`、`ReverseRequest { profile_id, schemas, path, name }`、`ModelDesignRequest { schema, name, draft, renames, fingerprint }`、`ModelDesignPreview { errors, warnings, changes, conflict }`、`RECENT_MODELS_SETTING`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -145,6 +145,7 @@
    "model.conflict": {"zh-CN": "%{name} 的文件已被修改，请重新加载", "en": "The file for %{name} has changed; reload it"},
    "model.dir_not_empty": {"zh-CN": "目录 %{path} 不为空", "en": "Directory %{path} is not empty"},
    "model.io_failed": {"zh-CN": "读写 %{path} 失败：%{error}", "en": "Failed to access %{path}: %{error}"},
 +  "model.no_schemas": {"zh-CN": "没有选择 schema", "en": "No schema selected"},
    "model.not_a_model": {"zh-CN": "%{path} 不是模型目录（没有 model.yaml）", "en": "%{path} is not a model directory (model.yaml not found)"},
-   "model.read_only": {"zh-CN": "模型文件格式 %{format} 比本程序新，只能查看；请升级数洞", "en": "Model format %{format} is newer than this version supports; it is read-only. Please upgrade DBLens"},
+   "model.read_only": {"zh-CN": "模型文件格式 %{format} 比本程序新，只能查看；请升级数览", "en": "Model format %{format} is newer than this version supports; it is read-only. Please upgrade DATLUMA"},
    "model.table_exists": {"zh-CN": "表 %{name} 已存在", "en": "Table %{name} already exists"},
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -40,8 +40,9 @@ pub use import::{
  };
  pub use metadata::{METADATA_POOL_SIZE, MetadataCache, MetadataService};
@@ -3238,11 +3238,11 @@ git commit -m "feat(service): 模型目录的读写" -m "Co-Authored-By: Claude 
  pub use policy::{
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/model/mod.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/model/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/mod.rs
-+++ b/crates/dblens-service/src/model/mod.rs
+--- a/crates/datluma-service/src/model/mod.rs
++++ b/crates/datluma-service/src/model/mod.rs
 @@ -1,7 +1,9 @@
  //! 模型（M4a）：模型目录的读写、打开的模型。
  
@@ -3255,7 +3255,7 @@ git commit -m "feat(service): 模型目录的读写" -m "Co-Authored-By: Claude 
  pub use store::{FileError, ModelStore, ModelSummary, ModelTableView, ModelWrite, SchemaTables, TableEntry};
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-service/src/model/ops.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-service/src/model/ops.rs`**
 
 ```rust
 //! 模型的服务层操作（M4a 设计文档第 4 节）：最近打开的模型、新建、反向生成、设计器保存。
@@ -3264,10 +3264,10 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use dblens_core::schema::Table;
-use dblens_core::{Error, Msg, Result, msg};
-use dblens_dialect::design::{DesignIssue, Renames, TableChange, diff_table, validate};
-use dblens_dialect::meta::{MetaArgs, MetaKey};
+use datluma_core::schema::Table;
+use datluma_core::{Error, Msg, Result, msg};
+use datluma_dialect::design::{DesignIssue, Renames, TableChange, diff_table, validate};
+use datluma_dialect::meta::{MetaArgs, MetaKey};
 use serde::{Deserialize, Serialize};
 
 use super::file::ModelDatabase;
@@ -3471,9 +3471,9 @@ impl Service {
 mod tests {
     use std::time::Duration;
 
-    use dblens_core::schema::{Column, PrimaryKey};
-    use dblens_core::{ColumnType, LogicalType};
-    use dblens_dialect::{Compat, Variant};
+    use datluma_core::schema::{Column, PrimaryKey};
+    use datluma_core::{ColumnType, LogicalType};
+    use datluma_dialect::{Compat, Variant};
 
     use super::*;
     use crate::fake::{FakeDriver, Log};
@@ -3604,12 +3604,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/service.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/service.rs`**
 
 ```diff
---- a/crates/dblens-service/src/service.rs
-+++ b/crates/dblens-service/src/service.rs
-@@ -9,6 +9,7 @@ use dblens_dialect::{Dialect, OpsQuery, Variant};
+--- a/crates/datluma-service/src/service.rs
++++ b/crates/datluma-service/src/service.rs
+@@ -9,6 +9,7 @@ use datluma_dialect::{Dialect, OpsQuery, Variant};
  use crate::export::ExportManager;
  use crate::history::HistoryLog;
  use crate::metadata::{MetadataCache, MetadataService};
@@ -3636,11 +3636,11 @@ mod tests {
              secrets,
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/task.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/task.rs`**
 
 ```diff
---- a/crates/dblens-service/src/task.rs
-+++ b/crates/dblens-service/src/task.rs
+--- a/crates/datluma-service/src/task.rs
++++ b/crates/datluma-service/src/task.rs
 @@ -26,6 +26,8 @@ pub enum TaskKind {
      SqlFile,
      /// 表设计器执行改动（M3）。
@@ -3675,7 +3675,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 2 个）。
@@ -3683,7 +3683,7 @@ Expected: 全部测试通过（service 新增 2 个）。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/lib.rs crates/dblens-service/src/model/mod.rs crates/dblens-service/src/model/ops.rs crates/dblens-service/src/service.rs crates/dblens-service/src/task.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/lib.rs crates/datluma-service/src/model/mod.rs crates/datluma-service/src/model/ops.rs crates/datluma-service/src/service.rs crates/datluma-service/src/task.rs
 git commit -m "feat(service): 模型的新建、反向生成与设计器保存" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3696,21 +3696,21 @@ git commit -m "feat(service): 模型的新建、反向生成与设计器保存" 
 - 后端词条加 `compare.family_mismatch`、`compare.changed`、`compare.rebuild_refused`。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-service/src/compare.rs`
-- Modify: `crates/dblens-service/src/design.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/task.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-service/src/compare.rs`
+- Modify: `crates/datluma-service/src/design.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/task.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的比对和同步脚本、任务 3 的 `ModelStore`。
 - Produces：`Service::{compare, preview_sync, start_sync}`；`CompareSideRef::{Model { model, schema }, Database { profile, schema }}`、`CompareRequest { source, target, options, renames }`、`CompareResult { diff, renames, source_errors, target_errors, source_tables, target_tables, fingerprint }`、`SyncRequest { compare, selected, fingerprint }`、`SyncPreview { script, text, writes, denied, confirm, fingerprint }`、`ModelWriteInfo { name, from, delete }`、`SyncStarted { task }`；crate 内 `design::{Part, Run}`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -18,6 +18,9 @@
    "changes.rolled_back": {"zh-CN": "已回滚（同一次提交中的其他改动失败）", "en": "Rolled back (another change in the same commit failed)"},
    "changes.unknown_column": {"zh-CN": "列 %{column} 不存在", "en": "Column %{column} does not exist"},
@@ -3723,25 +3723,25 @@ git commit -m "feat(service): 模型的新建、反向生成与设计器保存" 
    "design.bad_rename": {"zh-CN": "列 %{name} 的原名不对", "en": "Column %{name} has an invalid original name"},
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-service/src/compare.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-service/src/compare.rs`**
 
 ```rust
 //! 结构比对与同步（M4a 设计文档第 5、6 节）：读取两边（模型或库的一个 schema）、比对、
-//! 生成同步脚本并作为任务执行，或把变更写回模型。比对本身在 `dblens_dialect::compare`。
+//! 生成同步脚本并作为任务执行，或把变更写回模型。比对本身在 `datluma_dialect::compare`。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use dblens_core::schema::Table;
-use dblens_core::{Error, Msg, Result, msg};
-use dblens_dialect::Dialect;
-use dblens_dialect::compare::{
+use datluma_core::schema::Table;
+use datluma_core::{Error, Msg, Result, msg};
+use datluma_dialect::Dialect;
+use datluma_dialect::compare::{
     CompareOptions, CompareRenames, CompareSide, SchemaChange, SchemaDiff, SyncScript, SyncStep,
     apply_changes, compare_schemas, sync_rebuild_tables, sync_script,
 };
-use dblens_dialect::design::{RebuildContext, TableChange};
-use dblens_dialect::meta::{MetaArgs, MetaKey};
+use datluma_dialect::design::{RebuildContext, TableChange};
+use datluma_dialect::meta::{MetaArgs, MetaKey};
 use serde::{Deserialize, Serialize};
 
 use crate::design::{Part, Run};
@@ -4170,11 +4170,11 @@ impl Service {
 mod tests {
     use std::time::Duration;
 
-    use dblens_core::schema::{Column, PrimaryKey};
-    use dblens_core::{ColumnType, LogicalType};
-    use dblens_dialect::compare::TableStatus;
-    use dblens_dialect::design::{Rebuild, RebuildStep};
-    use dblens_dialect::{Compat, Variant};
+    use datluma_core::schema::{Column, PrimaryKey};
+    use datluma_core::{ColumnType, LogicalType};
+    use datluma_dialect::compare::TableStatus;
+    use datluma_dialect::design::{Rebuild, RebuildStep};
+    use datluma_dialect::{Compat, Variant};
 
     use super::*;
     use crate::fake::{FakeDriver, Log};
@@ -4355,11 +4355,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/design.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/design.rs`**
 
 ```diff
---- a/crates/dblens-service/src/design.rs
-+++ b/crates/dblens-service/src/design.rs
+--- a/crates/datluma-service/src/design.rs
++++ b/crates/datluma-service/src/design.rs
 @@ -92,6 +92,44 @@ enum Plan {
      Rebuild(Rebuild),
  }
@@ -4625,19 +4625,19 @@ mod tests {
              }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -1,6 +1,7 @@
- //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `dblens-api` 使用，自身不处理 HTTP。
+ //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `datluma-api` 使用，自身不处理 HTTP。
  
  mod changes;
 +mod compare;
  mod design;
  mod export;
- /// 测试用的假驱动，供本 crate 和 `dblens-api` 的测试使用（feature `testing`）。
+ /// 测试用的假驱动，供本 crate 和 `datluma-api` 的测试使用（feature `testing`）。
 @@ -23,6 +24,9 @@ mod store;
  mod task;
  
@@ -4650,11 +4650,11 @@ mod tests {
      EXPORT_LOB_LIMIT, ExportFormat, ExportManager, ExportOptions, ExportRequest, ExportSource, ExportState,
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/task.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/task.rs`**
 
 ```diff
---- a/crates/dblens-service/src/task.rs
-+++ b/crates/dblens-service/src/task.rs
+--- a/crates/datluma-service/src/task.rs
++++ b/crates/datluma-service/src/task.rs
 @@ -28,6 +28,8 @@ pub enum TaskKind {
      Design,
      /// 从库反向生成模型（M4a）。
@@ -4672,7 +4672,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 3 个；M3 设计器的测试不变）。
@@ -4680,7 +4680,7 @@ Expected: 全部测试通过（service 新增 3 个；M3 设计器的测试不�
 - [ ] **Step 7: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/compare.rs crates/dblens-service/src/design.rs crates/dblens-service/src/lib.rs crates/dblens-service/src/task.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/compare.rs crates/datluma-service/src/design.rs crates/datluma-service/src/lib.rs crates/datluma-service/src/task.rs
 git commit -m "feat(service): 结构比对与同步（执行器按段执行、写回模型）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4688,21 +4688,21 @@ git commit -m "feat(service): 结构比对与同步（执行器按段执行、�
 
 ### Task 6: 接口：模型与比对；只监听本机地址的浏览器模式可用本机路径
 
-- `dblens-api/src/models.rs`：`/models`（列表与最近、新建）、`/models/open`、`/models/reverse`、`/models/{id}`（读、改、关闭）、`/models/{id}/caps`、`/models/{id}/tables`（列表、保存）、`/models/{id}/tables/preview`、`/models/{id}/tables/{schema}/{name}`（读、删除）、`.../rename`；`/compare`、`/compare/preview`、`/compare/sync`、`/compare/script`（把同步脚本写到 `.sql` 文件）。`/models` 下和 `/compare/script` 要求 `local_files`，否则 403。
-- `ApiConfig.local_files` 的说明改为"页面和服务在同一台机器上"；`dblens-server` 只监听本机地址时为真。
+- `datluma-api/src/models.rs`：`/models`（列表与最近、新建）、`/models/open`、`/models/reverse`、`/models/{id}`（读、改、关闭）、`/models/{id}/caps`、`/models/{id}/tables`（列表、保存）、`/models/{id}/tables/preview`、`/models/{id}/tables/{schema}/{name}`（读、删除）、`.../rename`；`/compare`、`/compare/preview`、`/compare/sync`、`/compare/script`（把同步脚本写到 `.sql` 文件）。`/models` 下和 `/compare/script` 要求 `local_files`，否则 403。
+- `ApiConfig.local_files` 的说明改为"页面和服务在同一台机器上"；`datluma-server` 只监听本机地址时为真。
 - 后端词条加 `model.local_only`、`model.script_ext`。
 
 **Files:**
-- Modify: `crates/dblens-api/src/lib.rs`
-- Create: `crates/dblens-api/src/models.rs`
-- Create: `crates/dblens-api/tests/models.rs`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-server/src/main.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Create: `crates/datluma-api/src/models.rs`
+- Create: `crates/datluma-api/tests/models.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-server/src/main.rs`
 
 **Interfaces:**
 - Consumes：任务 3–5 的服务层接口。
 
-- [ ] **Step 1: 新建 `crates/dblens-api/tests/models.rs`**
+- [ ] **Step 1: 新建 `crates/datluma-api/tests/models.rs`**
 
 ```rust
 //! 模型与比对接口（M4a）。
@@ -4712,8 +4712,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use dblens_api::{ApiConfig, router};
-use dblens_service::{DefaultPolicy, DriverRegistry, HistoryLog, SecretBackend, Secrets, Service, Store};
+use datluma_api::{ApiConfig, router};
+use datluma_service::{DefaultPolicy, DriverRegistry, HistoryLog, SecretBackend, Secrets, Service, Store};
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
 use tower::ServiceExt;
@@ -4855,11 +4855,11 @@ async fn edit_compare_and_write_back() {
 }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -6,6 +6,7 @@ mod design;
  mod error;
  mod exports;
@@ -4873,7 +4873,7 @@ async fn edit_compare_and_write_back() {
      /// 除同源外还允许的 Origin，如桌面模式的 `tauri://localhost`、前端开发服务器 `http://localhost:5173`。
      pub allowed_origins: Vec<String>,
 -    /// 页面和服务在同一台机器上（桌面程序）：导出可以直接写到页面给出的路径。
--    /// 浏览器模式（`dblens-server`）页面可能在另一台机器上，为 false，导出一律写临时文件后下载。
+-    /// 浏览器模式（`datluma-server`）页面可能在另一台机器上，为 false，导出一律写临时文件后下载。
 +    /// 页面和服务在同一台机器上（桌面程序、只监听本机地址的浏览器模式）：导出可以直接写到页面给出的路径，
 +    /// 可以打开模型目录。监听其他地址的浏览器模式页面可能在另一台机器上，为 false，导出一律写临时文件后下载。
      pub local_files: bool,
@@ -4901,7 +4901,7 @@ async fn edit_compare_and_write_back() {
          .route("/exports/{id}/file", get(exports::file))
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-api/src/models.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-api/src/models.rs`**
 
 ```rust
 //! 模型与比对的接口（M4a 设计文档 4.4 节）。模型目录是服务所在机器上的路径：
@@ -4912,9 +4912,9 @@ use std::path::PathBuf;
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use dblens_core::{Error, msg};
-use dblens_dialect::design::DesignCaps;
-use dblens_service::{
+use datluma_core::{Error, msg};
+use datluma_dialect::design::DesignCaps;
+use datluma_service::{
     CompareRequest, CompareResult, ModelDesignPreview, ModelDesignRequest, ModelSummary, ModelTableView,
     NewModel, ReverseRequest, SyncPreview, SyncRequest, SyncStarted, TableEntry,
 };
@@ -5107,11 +5107,11 @@ pub async fn sync(
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 4: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -148,9 +148,11 @@
    "model.conflict": {"zh-CN": "%{name} 的文件已被修改，请重新加载", "en": "The file for %{name} has changed; reload it"},
    "model.dir_not_empty": {"zh-CN": "目录 %{path} 不为空", "en": "Directory %{path} is not empty"},
@@ -5119,18 +5119,18 @@ pub async fn sync(
 +  "model.local_only": {"zh-CN": "只有桌面程序和只监听本机地址的浏览器模式可以使用模型", "en": "Models are available only in the desktop app and in browser mode listening on a local address"},
    "model.no_schemas": {"zh-CN": "没有选择 schema", "en": "No schema selected"},
    "model.not_a_model": {"zh-CN": "%{path} 不是模型目录（没有 model.yaml）", "en": "%{path} is not a model directory (model.yaml not found)"},
-   "model.read_only": {"zh-CN": "模型文件格式 %{format} 比本程序新，只能查看；请升级数洞", "en": "Model format %{format} is newer than this version supports; it is read-only. Please upgrade DBLens"},
+   "model.read_only": {"zh-CN": "模型文件格式 %{format} 比本程序新，只能查看；请升级数览", "en": "Model format %{format} is newer than this version supports; it is read-only. Please upgrade DATLUMA"},
 +  "model.script_ext": {"zh-CN": "脚本只能保存为 .sql 文件", "en": "Scripts can only be saved as .sql files"},
    "model.table_exists": {"zh-CN": "表 %{name} 已存在", "en": "Table %{name} already exists"},
    "model.yaml_write_failed": {"zh-CN": "生成 YAML 失败：%{error}", "en": "Failed to write YAML: %{error}"},
    "native.dameng_dpi": {"zh-CN": "达梦 DPI 库", "en": "DM DPI library"},
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-server/src/main.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-server/src/main.rs`**
 
 ```diff
---- a/crates/dblens-server/src/main.rs
-+++ b/crates/dblens-server/src/main.rs
+--- a/crates/datluma-server/src/main.rs
++++ b/crates/datluma-server/src/main.rs
 @@ -132,8 +132,9 @@ async fn run(args: Args) -> Result<(), String> {
              }
          });
@@ -5151,7 +5151,7 @@ pub async fn sync(
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（api 新增 `tests/models.rs` 3 个）。
@@ -5159,7 +5159,7 @@ Expected: 全部测试通过（api 新增 `tests/models.rs` 3 个）。
 - [ ] **Step 7: 提交**
 
 ```bash
-git add crates/dblens-api/src/lib.rs crates/dblens-api/src/models.rs crates/dblens-api/tests/models.rs crates/dblens-core/locales/app.json crates/dblens-server/src/main.rs
+git add crates/datluma-api/src/lib.rs crates/datluma-api/src/models.rs crates/datluma-api/tests/models.rs crates/datluma-core/locales/app.json crates/datluma-server/src/main.rs
 git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览器模式可用本机路径" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5167,22 +5167,22 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
 
 ### Task 7: 实库测试；比对时外键的默认动作视为相同
 
-- `dblens-service/tests/live.rs` 的 `model_flow`（原有 5 个库和国产库第一批的 6 个目标）：建 `m4_cust`、`m4_ord` → 反向生成 → 在模型中列改名（`note` → `remark`）、加列、换索引、加外键、表改名（`m4_cust` → `m4_customer`，外键引用跟着改）→ 模型对库比对（按记下的改名配对）→ 同步到库 → 再比对无差异、改名记录已删去 → 库中加列 → 库对模型比对并写回 → 两边一致 → 同一个库中第二个 schema（PG 家族 `CREATE SCHEMA m4_b`，MySQL 家族 `CREATE DATABASE dblens_test_m4b`；Oracle、达梦跳过）的库对库比对与同步。同一 schema 中其他测试的表会并发变化：只看 `m4_` 开头的表，库对库同步不传指纹。
+- `datluma-service/tests/live.rs` 的 `model_flow`（原有 5 个库和国产库第一批的 6 个目标）：建 `m4_cust`、`m4_ord` → 反向生成 → 在模型中列改名（`note` → `remark`）、加列、换索引、加外键、表改名（`m4_cust` → `m4_customer`，外键引用跟着改）→ 模型对库比对（按记下的改名配对）→ 同步到库 → 再比对无差异、改名记录已删去 → 库中加列 → 库对模型比对并写回 → 两边一致 → 同一个库中第二个 schema（PG 家族 `CREATE SCHEMA m4_b`，MySQL 家族 `CREATE DATABASE datluma_test_m4b`；Oracle、达梦跳过）的库对库比对与同步。同一 schema 中其他测试的表会并发变化：只看 `m4_` 开头的表，库对库同步不传指纹。
 - 实测发现 MariaDB、OceanBase 读回的外键动作是 `RESTRICT`：`normalize.rs` 加 `default_actions`，比对单元测试加一处断言。
 
 **Files:**
-- Modify: `crates/dblens-dialect/src/compare/normalize.rs`
-- Modify: `crates/dblens-dialect/src/compare/tests.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-dialect/src/compare/normalize.rs`
+- Modify: `crates/datluma-dialect/src/compare/tests.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 2–5。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/src/compare/tests.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/src/compare/tests.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/compare/tests.rs
-+++ b/crates/dblens-dialect/src/compare/tests.rs
+--- a/crates/datluma-dialect/src/compare/tests.rs
++++ b/crates/datluma-dialect/src/compare/tests.rs
 @@ -101,6 +101,7 @@ fn options_and_equivalent_spellings() {
      target.primary_key.as_mut().unwrap().name = Some("orders_pkey".into());
      target.uniques[0].name = Some("orders_code_key".into());
@@ -5193,11 +5193,11 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
      source.columns[1].default = Some("'x'".into());
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -6,22 +6,27 @@
  //! 走一遍完整流程：保存连接配置（密码放本地密码库）→ 测试连接 → 打开会话执行 → 浏览元数据 →
  //! 会话中执行 DDL 后元数据缓存失效 → 取消长查询；查询工作台用到的执行计划、出错位置、切换 schema。
@@ -5207,17 +5207,17 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
  use std::sync::Arc;
  use std::time::Duration;
  
--use dblens_core::schema::{CheckConstraint, Column, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint};
-+use dblens_core::schema::{
+-use datluma_core::schema::{CheckConstraint, Column, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint};
++use datluma_core::schema::{
 +    CheckConstraint, Column, ForeignKey, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint,
 +};
- use dblens_core::{ColumnType, Error, LogicalType, Value};
-+use dblens_dialect::compare::{CompareOptions, CompareRenames, SchemaChange, TableStatus};
- use dblens_dialect::design::{Renames, TableChange, diff_table};
- use dblens_dialect::meta::{MetaArgs, MetaKey};
- use dblens_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
- use dblens_driver::{ConnectParams, DriverId};
- use dblens_service::{
+ use datluma_core::{ColumnType, Error, LogicalType, Value};
++use datluma_dialect::compare::{CompareOptions, CompareRenames, SchemaChange, TableStatus};
+ use datluma_dialect::design::{Renames, TableChange, diff_table};
+ use datluma_dialect::meta::{MetaArgs, MetaKey};
+ use datluma_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
+ use datluma_driver::{ConnectParams, DriverId};
+ use datluma_service::{
 -    ChangeSet, ColumnMapping, DEFAULT_BATCH, DataOrder, DefaultPolicy, DesignRequest, DriverRegistry,
 -    Environment, ExecRequest, ExportFormat, ExportOptions, ExportRequest, ExportSource, ExportState,
 -    ExportStatus, FileOptions, FileSource, GenerateKind, ImportRequest, NewColumn, NewTable, ObjectKind,
@@ -5413,7 +5413,7 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
 +    // 5. 库对库：同一个库中的第二个 schema
 +    let other: Option<&'static str> = match live.driver {
 +        DriverId::Postgres => Some("m4_b"),
-+        DriverId::Mysql => Some("dblens_test_m4b"),
++        DriverId::Mysql => Some("datluma_test_m4b"),
 +        DriverId::Oracle | DriverId::Dameng => None,
 +    };
 +    let created = match other {
@@ -5448,27 +5448,27 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
 +
 +#[tokio::test]
 +async fn mysql_model() {
-+    model_flow("DBLENS_TEST_MYSQL_URL").await;
++    model_flow("DATLUMA_TEST_MYSQL_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn mariadb_model() {
-+    model_flow("DBLENS_TEST_MARIADB_URL").await;
++    model_flow("DATLUMA_TEST_MARIADB_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn postgres_model() {
-+    model_flow("DBLENS_TEST_PG_URL").await;
++    model_flow("DATLUMA_TEST_PG_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn oracle_model() {
-+    model_flow("DBLENS_TEST_ORACLE_URL").await;
++    model_flow("DATLUMA_TEST_ORACLE_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn dameng_model() {
-+    model_flow("DBLENS_TEST_DM_URL").await;
++    model_flow("DATLUMA_TEST_DM_URL").await;
 +}
 +
  const MYSQL_SLOW: &str = "SELECT COUNT(*) FROM information_schema.columns a, information_schema.columns b, information_schema.columns c";
@@ -5487,11 +5487,11 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
  }
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/src/compare/normalize.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/src/compare/normalize.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/compare/normalize.rs
-+++ b/crates/dblens-dialect/src/compare/normalize.rs
+--- a/crates/datluma-dialect/src/compare/normalize.rs
++++ b/crates/datluma-dialect/src/compare/normalize.rs
 @@ -44,6 +44,8 @@ pub(super) fn align(
      let mut t = target.clone();
      own_schema_refs(&mut s, source_schema);
@@ -5534,10 +5534,10 @@ git commit -m "feat(api): 模型与比对接口；只监听本机地址的浏览
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及国产库第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑模型的测试：`cargo test … -p dblens-service --test live model -- --test-threads=1`。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及国产库第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑模型的测试：`cargo test … -p datluma-service --test live model -- --test-threads=1`。
 - 人大金仓的开发版授权最多 10 个连接：它的测试要串行运行（`--test-threads=1`）。
 - 达梦的测试与其他测试同时运行时偶发"网络通讯失败"，失败时用 `dameng_model` 单独重跑。
 
@@ -5546,7 +5546,7 @@ Expected: 全部测试通过：模型的实库测试 11 个。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-dialect/src/compare/normalize.rs crates/dblens-dialect/src/compare/tests.rs crates/dblens-service/tests/live.rs
+git add crates/datluma-dialect/src/compare/normalize.rs crates/datluma-dialect/src/compare/tests.rs crates/datluma-service/tests/live.rs
 git commit -m "test(service): 模型的实库测试；比对时外键的默认动作视为相同" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5566,8 +5566,8 @@ git commit -m "test(service): 模型的实库测试；比对时外键的默认�
 - 样式：`shell.css` 末尾的模型与比对部分。
 
 **Files:**
-- Modify: `crates/dblens-desktop/src/main.rs`
-- Modify: `crates/dblens-desktop/src/shell.rs`
+- Modify: `crates/datluma-desktop/src/main.rs`
+- Modify: `crates/datluma-desktop/src/shell.rs`
 - Modify: `web/src/app/Shell.tsx`
 - Modify: `web/src/app/StatusBar.tsx`
 - Modify: `web/src/app/TitleBar.tsx`
@@ -5755,11 +5755,11 @@ describe('两边定义对照', () => {
      markRun(id)
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-desktop/src/main.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-desktop/src/main.rs`**
 
 ```diff
---- a/crates/dblens-desktop/src/main.rs
-+++ b/crates/dblens-desktop/src/main.rs
+--- a/crates/datluma-desktop/src/main.rs
++++ b/crates/datluma-desktop/src/main.rs
 @@ -56,6 +56,7 @@ fn run(data_dir: PathBuf) -> Result<(), String> {
              shell::set_auto_check_update,
              shell::save_dialog,
@@ -5770,11 +5770,11 @@ describe('两边定义对照', () => {
          .setup(move |app| {
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-desktop/src/shell.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-desktop/src/shell.rs`**
 
 ```diff
---- a/crates/dblens-desktop/src/shell.rs
-+++ b/crates/dblens-desktop/src/shell.rs
+--- a/crates/datluma-desktop/src/shell.rs
++++ b/crates/datluma-desktop/src/shell.rs
 @@ -137,6 +137,16 @@ pub async fn open_dialog(app: AppHandle, filters: Vec<FileFilter>) -> Option<Str
      dialog.blocking_pick_file().and_then(|p| p.into_path().ok()).map(|p| p.display().to_string())
  }
@@ -8502,7 +8502,7 @@ export function baseName(path: string): string {
  // 桌面外壳的原生能力（M1 设计文档 2.2 节）：自绘标题栏的窗口操作，以及置顶、恢复默认位置、检查更新、关于、退出；
 -// 导出（M1c3）用的"另存为"对话框和"在文件夹中显示"，导入（M2b）用的"打开"对话框。
 +// 导出（M1c3）用的"另存为"对话框和"在文件夹中显示"，导入（M2b）用的"打开"对话框，模型（M4a）用的"选择文件夹"对话框。
- // 只有这里调用 Tauri；其他代码通过这里的函数使用。浏览器模式（dblens-server）没有 Tauri，desktop 为 null。
+ // 只有这里调用 Tauri；其他代码通过这里的函数使用。浏览器模式（datluma-server）没有 Tauri，desktop 为 null。
  
  import { invoke } from '@tauri-apps/api/core'
 @@ -38,6 +38,8 @@ export interface DesktopShell {
@@ -8530,7 +8530,7 @@ export function baseName(path: string): string {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -8543,7 +8543,7 @@ Expected: 全部通过（前端新增 5 个测试）。
 
 - [ ] **Step 36: 浏览器实测**
 
-浏览器实测（设计文档第 8 节）：用 `dblens-server --listen 127.0.0.1:<端口>` 启动浏览器模式，在 openGauss PG（或任一库）上：
+浏览器实测（设计文档第 8 节）：用 `datluma-server --listen 127.0.0.1:<端口>` 启动浏览器模式，在 openGauss PG（或任一库）上：
 1. 对象树 schema 右键"另存为模型…"：对话框带上连接和 schema，填目录生成；模型面板出现模型 → schema → 表。
 2. 双击表打开设计器：标题"模型名 / schema.表"；列改名后"变更"子标签列出改名；保存提示"已保存到模型文件"。
 3. 工具栏"与库比对"：比对标签的源已选好；选目标连接和 schema，比对：按改名配对，选中表时两边定义对照、不同的行标色。
@@ -8554,7 +8554,7 @@ Expected: 全部通过（前端新增 5 个测试）。
 - [ ] **Step 37: 提交**
 
 ```bash
-git add crates/dblens-desktop/src/main.rs crates/dblens-desktop/src/shell.rs web/src/app/Shell.tsx web/src/app/StatusBar.tsx web/src/app/TitleBar.tsx web/src/app/menus.test.ts web/src/app/menus.ts web/src/app/shell.css web/src/app/ui.ts web/src/features/compare/CompareView.tsx web/src/features/compare/SyncDialog.tsx web/src/features/compare/logic.test.ts web/src/features/compare/logic.ts web/src/features/design/DesignView.tsx web/src/features/design/ForeignKeysPane.tsx web/src/features/design/OptionsPane.tsx web/src/features/design/source.ts web/src/features/editor/Workspace.tsx web/src/features/editor/actions.tsx web/src/features/editor/tabs.test.ts web/src/features/editor/tabs.ts web/src/features/model/ModelDialogs.tsx web/src/features/model/ModelsPanel.tsx web/src/features/model/dialogs.ts web/src/features/tree/ObjectTree.tsx web/src/locales/en/app.json web/src/locales/en/model.json web/src/locales/en/tree.json web/src/locales/index.ts web/src/locales/zh-CN/app.json web/src/locales/zh-CN/model.json web/src/locales/zh-CN/tree.json web/src/shared/api.ts web/src/shared/shell.ts
+git add crates/datluma-desktop/src/main.rs crates/datluma-desktop/src/shell.rs web/src/app/Shell.tsx web/src/app/StatusBar.tsx web/src/app/TitleBar.tsx web/src/app/menus.test.ts web/src/app/menus.ts web/src/app/shell.css web/src/app/ui.ts web/src/features/compare/CompareView.tsx web/src/features/compare/SyncDialog.tsx web/src/features/compare/logic.test.ts web/src/features/compare/logic.ts web/src/features/design/DesignView.tsx web/src/features/design/ForeignKeysPane.tsx web/src/features/design/OptionsPane.tsx web/src/features/design/source.ts web/src/features/editor/Workspace.tsx web/src/features/editor/actions.tsx web/src/features/editor/tabs.test.ts web/src/features/editor/tabs.ts web/src/features/model/ModelDialogs.tsx web/src/features/model/ModelsPanel.tsx web/src/features/model/dialogs.ts web/src/features/tree/ObjectTree.tsx web/src/locales/en/app.json web/src/locales/en/model.json web/src/locales/en/tree.json web/src/locales/index.ts web/src/locales/zh-CN/app.json web/src/locales/zh-CN/model.json web/src/locales/zh-CN/tree.json web/src/shared/api.ts web/src/shared/shell.ts
 git commit -m "feat(web): 模型面板、比对标签与设计器的模型模式" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -8569,7 +8569,7 @@ git commit -m "feat(web): 模型面板、比对标签与设计器的模型模式
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m4a-model-compare.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
 
@@ -8582,7 +8582,7 @@ git commit -m "feat(web): 模型面板、比对标签与设计器的模型模式
  
 +### 模型与比对（M4a 加入）
 +
-+模型目录是服务所在机器上的路径：`/models` 下的接口和 `/compare/script` 只在页面和服务在同一台机器上（桌面程序、只监听本机地址的 `dblens-server`）时可用，否则 403。
++模型目录是服务所在机器上的路径：`/models` 下的接口和 `/compare/script` 只在页面和服务在同一台机器上（桌面程序、只监听本机地址的 `datluma-server`）时可用，否则 403。
 +
 +| 方法 | 路径 | 说明 |
 +|---|---|---|
@@ -8627,18 +8627,18 @@ git commit -m "feat(web): 模型面板、比对标签与设计器的模型模式
 ## 结构
 
 ```text
-crates/dblens-dialect/src/compare/
+crates/datluma-dialect/src/compare/
   mod.rs        CompareRenames、CompareOptions、SchemaDiff；compare_schemas（表的配对、推测改名、逐表 diff_table）
   normalize.rs  比对前整理两边：本 schema 的外键引用、改名后的表名、注释、列顺序、系统生成的名字、同义的类型和默认值、外键的默认动作
   apply.rs      apply_changes：把变更应用到表结构（写回模型）
   sync.rs       sync_rebuild_tables、sync_script：同步脚本（删外键 → 删表 → 改名 → 逐表修改或重建 → 建表 → 加外键）
-crates/dblens-service/src/model/
+crates/datluma-service/src/model/
   file.rs       model.yaml、表文件的读写（serde-saphyr）、文件名转义、指纹、先写临时文件再改名
   store.rs      ModelStore：打开的模型、表文件缓存（按修改时间和长度重读）、表的保存/改名/删除、改名记录、写回
   ops.rs        最近打开的模型、新建、反向生成任务（TaskKind::Reverse）、设计器的预览和保存
-crates/dblens-service/src/compare.rs  读取两边、比对、同步预览、同步执行（TaskKind::Sync）或写回模型
-crates/dblens-service/src/design.rs   执行器改为按段执行（Part：一条语句或一张表的重建），M3 与同步共用
-crates/dblens-api/src/models.rs       /models、/compare
+crates/datluma-service/src/compare.rs  读取两边、比对、同步预览、同步执行（TaskKind::Sync）或写回模型
+crates/datluma-service/src/design.rs   执行器改为按段执行（Part：一条语句或一张表的重建），M3 与同步共用
+crates/datluma-api/src/models.rs       /models、/compare
 web/src/features/model/    模型面板、打开/新建/反向生成对话框
 web/src/features/compare/  比对标签、同步对话框、勾选与依赖提示等纯逻辑
 web/src/features/design/source.ts  设计器选外键引用的数据来源（连接或模型）
@@ -8659,7 +8659,7 @@ web/src/features/design/source.ts  设计器选外键引用的数据来源（连
 
 ## 与设计文档不一致的地方
 
-- `dblens-server` 只监听本机地址时 `local_files` 为真：除了能使用模型，导出也可以直接写到页面给出的路径（与桌面程序相同）。
+- `datluma-server` 只监听本机地址时 `local_files` 为真：除了能使用模型，导出也可以直接写到页面给出的路径（与桌面程序相同）。
 - MySQL 家族不查询 `lower_case_table_names`：名字是否区分大小写由比对选项"名字不区分大小写"决定（默认区分）。
 - 新建模型时不选版本（按最新版本）；从库反向生成的模型带库的版本。
 - 模型的改名记录在两种情况下删去已应用的项：同步到库（源是模型）的任务成功后；写回模型时（按写回的改名）。
@@ -8672,7 +8672,7 @@ web/src/features/design/source.ts  设计器选外键引用的数据来源（连
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（682 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（682 个）。
   - dialect：表的配对与推测改名、各选项与等价写法、各家族系统生成的名字、`apply_changes` 与 `diff_table` 互逆、同步脚本的顺序和重建（PG、MySQL 快照）。
   - service：模型目录读写（文件名转义、未知字段保留、坏文件、格式较新时只读、指纹冲突、改名记录与外键引用的更新、写回前核对指纹）；
     设计器保存；反向生成失败时不留下目录；模型对模型比对并写回；预览后目标被改时拒绝同步；执行器多段执行时失败后列出没有执行的语句。
@@ -8687,11 +8687,11 @@ web/src/features/design/source.ts  设计器选外键引用的数据来源（连
 - 未验证：桌面程序中的"选择文件夹"对话框和"在文件管理器中显示"；监听其他地址的浏览器模式下模型面板的提示只有接口测试覆盖。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -330,6 +330,8 @@ trait Policy: Send + Sync {
  - M3 已完成（设计 `docs/superpowers/specs/2026-10-27-m3-table-designer-design.md`，详细计划 `docs/superpowers/plans/2026-10-27-m3-table-designer.md`，说明 `docs/notes/m3-table-designer.md`）。
  - 2026-10-27 用户决定：国产库适配（OceanBase、人大金仓、PolarDB、TiDB、TDSQL、GaussDB、GoldenDB、GBase）作为 M3 之后的单独里程碑，分三批：有 Docker 或免费版的；只有云服务的；需要新驱动或新架构的（GBase 8s、OceanBase 的 Oracle 模式）。
@@ -8712,6 +8712,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m4a-model-compare.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m0-4b-api.md docs/notes/m4a-model-compare.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M4a 模型与比对的说明、接口和进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

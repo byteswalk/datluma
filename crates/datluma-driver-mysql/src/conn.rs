@@ -1,0 +1,89 @@
+use async_trait::async_trait;
+use datluma_core::{Error, Result, Value, msg};
+use datluma_driver::{CancelHandle, Connection, ExecStream, ServerInfo};
+use mysql_async::prelude::Queryable;
+use mysql_async::{Conn, Opts};
+
+use crate::error::{map_err, with_position};
+use crate::exec::MyExec;
+use crate::value::to_mysql_param;
+
+pub struct MySqlConnection {
+    pub(crate) conn: Conn,
+    pub(crate) opts: Opts,
+    pub(crate) lob_limit: usize,
+}
+
+#[async_trait]
+impl Connection for MySqlConnection {
+    async fn execute<'a>(
+        &'a mut self,
+        sql: &'a str,
+        params: &'a [Value],
+    ) -> Result<Box<dyn ExecStream + 'a>> {
+        if params.is_empty() {
+            // 文本协议，支持一次返回多个结果集（如 CALL）
+            let result = self.conn.query_iter(sql).await.map_err(|e| with_position(map_err(e), sql))?;
+            Ok(Box::new(MyExec::new(result, self.lob_limit)))
+        } else {
+            let values = params.iter().map(to_mysql_param).collect::<Result<Vec<_>>>()?;
+            let result =
+                self.conn.exec_iter(sql, values).await.map_err(|e| with_position(map_err(e), sql))?;
+            Ok(Box::new(MyExec::new(result, self.lob_limit)))
+        }
+    }
+
+    fn set_lob_limit(&mut self, bytes: usize) {
+        self.lob_limit = bytes;
+    }
+
+    /// 另开一个连接执行 `KILL QUERY <线程号>`。
+    fn cancel_handle(&self) -> CancelHandle {
+        let opts = self.opts.clone();
+        let id = self.conn.id();
+        CancelHandle::new(move || {
+            let opts = opts.clone();
+            async move {
+                let mut killer = Conn::new(opts).await.map_err(map_err)?;
+                killer.query_drop(format!("KILL QUERY {id}")).await.map_err(map_err)?;
+                killer.disconnect().await.map_err(map_err)?;
+                Ok(())
+            }
+        })
+    }
+
+    async fn set_autocommit(&mut self, on: bool) -> Result<()> {
+        let sql = if on { "SET autocommit = 1" } else { "SET autocommit = 0" };
+        self.conn.query_drop(sql).await.map_err(map_err)
+    }
+
+    async fn commit(&mut self) -> Result<()> {
+        self.conn.query_drop("COMMIT").await.map_err(map_err)
+    }
+
+    async fn rollback(&mut self) -> Result<()> {
+        self.conn.query_drop("ROLLBACK").await.map_err(map_err)
+    }
+
+    async fn ping(&mut self) -> Result<()> {
+        self.conn.ping().await.map_err(map_err)
+    }
+
+    async fn server_info(&mut self) -> Result<ServerInfo> {
+        let version: Option<String> = self.conn.query_first("SELECT VERSION()").await.map_err(map_err)?;
+        let version =
+            version.ok_or_else(|| Error::internal(msg!("driver.no_result", sql = "SELECT VERSION()")))?;
+        // GBase 8a 的 VERSION() 只有版本号（如 9.5.3.28.12509af275af），产品名在 @@version_comment 里。
+        // 和 GoldenDB 的 JDBC 一样把产品名补在版本号前，Variant::detect 才认得出。查询失败不影响连接。
+        let comment: Option<String> = self.conn.query_first("SELECT @@version_comment").await.unwrap_or(None);
+        let version = match comment {
+            Some(c) if c.starts_with("GBase") => format!("GBase 8a {version}"),
+            _ => version,
+        };
+        Ok(ServerInfo { product: "MySQL".into(), version })
+    }
+
+    async fn close(self: Box<Self>) -> Result<()> {
+        self.conn.disconnect().await.map_err(map_err)
+    }
+}

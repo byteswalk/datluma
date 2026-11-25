@@ -1,6 +1,6 @@
 # M1 查询工作台：界面与技术设计
 
-**上位文档**：`docs/superpowers/specs/2026-10-22-dblens-design.md`，第 7 节。本文档细化其中的界面，并记录 2026-10-25 与用户逐项确认的决定。
+**上位文档**：`docs/superpowers/specs/2026-10-22-datluma-design.md`，第 7 节。本文档细化其中的界面，并记录 2026-10-25 与用户逐项确认的决定。
 
 **设计稿**：`docs/design/m1-workbench.html`。用浏览器打开即可，可切换亮色和暗色，画面按真实尺寸 1440×900 绘制。本文档的界面描述以设计稿为准。
 
@@ -29,7 +29,7 @@
 
 从上到下依次是：
 
-1. **标题栏**（32px）：图标、菜单（文件 / 编辑 / 查看 / SQL / 窗口 / 帮助）、居中标题（"当前标签 · 连接 — DBLens 数洞"）、置顶按钮、窗口按钮。
+1. **标题栏**（32px）：图标、菜单（文件 / 编辑 / 查看 / SQL / 窗口 / 帮助）、居中标题（"当前标签 · 连接 — DATLUMA 数览"）、置顶按钮、窗口按钮。
 2. **主体**：
    - 活动栏（44px）；
    - 侧栏（默认 270px，可拖动，可折叠）；
@@ -47,7 +47,7 @@
 
 - **Windows / Linux**：完全自绘标题栏。
 - **macOS**：保留系统的红黄绿按钮（左上），菜单在屏幕顶部的系统菜单栏；标题栏只放标题和置顶按钮。
-- **浏览器模式**（`dblens-server`）：标题栏变为页面顶栏，只有菜单和标题，没有置顶和窗口按钮。
+- **浏览器模式**（`datluma-server`）：标题栏变为页面顶栏，只有菜单和标题，没有置顶和窗口按钮。
 
 ### 1.3 快捷键
 
@@ -97,7 +97,7 @@
 
 | 难点 | 选用 | 说明 |
 |---|---|---|
-| SQL 格式化 | `sql-formatter` 15.9（MIT） | 支持 mysql、mariadb、tidb、postgresql、plsql 等方言。DBLens 方言对应：MySQL 系用 mysql / mariadb / tidb，PG 系用 postgresql，Oracle 和达梦用 plsql |
+| SQL 格式化 | `sql-formatter` 15.9（MIT） | 支持 mysql、mariadb、tidb、postgresql、plsql 等方言。DATLUMA 方言对应：MySQL 系用 mysql / mariadb / tidb，PG 系用 postgresql，Oracle 和达梦用 plsql |
 | 编辑器 | `monaco-editor` 0.57 + `@monaco-editor/react` 4.7（MIT） | 设计文档指定 |
 | 语法高亮、语法校验、上下文补全（MySQL 系、PG 系） | `monaco-sql-languages` 1.2 + `dt-sql-parser` 4.5（DTStack，MIT） | 基于 ANTLR4：词法高亮；语法错误标记；按光标位置给出该出现关键字还是库、表、列；收集语句中的表和别名（用于 `a.` 补全）。对象名称由我们按元数据缓存提供 |
 | 同上（Oracle、达梦） | ANTLR 官方语法库 grammars-v4 的 PL/SQL 语法 + `antlr4ng` + `antlr4-c3` | dt-sql-parser 没有 Oracle。按 dt-sql-parser 的做法（它本身就基于 antlr4ng 和 antlr4-c3）生成 Oracle 解析器，达梦语法与 Oracle 兼容，共用一套。达梦特有语法遇到不兼容时再在语法上补。在 M1b 中先做技术验证，确认解析速度和补全效果 |
@@ -106,7 +106,7 @@
 | 可拖动面板 | `react-resizable-panels` 4.15（MIT） | |
 | 状态管理、服务端数据 | `zustand` 5、`@tanstack/react-query` 5（MIT） | |
 | 图标 | `@tabler/icons-react` 3.49（MIT） | 设计稿用的就是 Tabler，直接沿用 |
-| 语句拆分、语句分析（后端） | 沿用 M0：`dblens-dialect` 的拆分；`sqlparser` 0.63 做语句分析 | 已有，已测试 |
+| 语句拆分、语句分析（后端） | 沿用 M0：`datluma-dialect` 的拆分；`sqlparser` 0.63 做语句分析 | 已有，已测试 |
 | xlsx 导出（后端） | `rust_xlsxwriter`（MIT / Apache-2.0） | 设计文档指定 |
 
 依赖版本原则（用户 2026-10-25 要求，见 `docs/superpowers/specs/2026-10-25-m1b2-completion-design.md` 3.1 节）：只用正式发布版，跟随最新，新版发布满 7 天再升级，严重安全修复不等；每个里程碑的计划先做依赖复查。
@@ -134,7 +134,7 @@ M0 的原则是"前端只通过 HTTP 和 WebSocket 调用业务，不用 Tauri I
 |---|---|
 | M1a | 设置存储：本地 SQLite 中的键值表，加 `GET/PUT /api/settings`；桌面程序的 Tauri 权限配置（2.2 节） |
 | M1b | `exec` 消息增加 `continue_on_error`；`explain` 接口，按方言生成执行计划语句，结果以表格或文本返回；SQL 错误位置换算成 UTF-16 偏移，供编辑器标红 |
-| M1c | 历史：表和搜索接口，每条语句执行后由后端写入；收藏：带文件夹的表和增删改接口；运维查询模板：放在 `dblens-dialect`，与元数据模板相同的写法；查看 DDL：MySQL 系用 `SHOW CREATE`，Oracle / 达梦用 `DBMS_METADATA`，PostgreSQL 系由结构模型拼出；导出接口：后端重新执行查询，边取边写文件（CSV、xlsx、INSERT、JSON） |
+| M1c | 历史：表和搜索接口，每条语句执行后由后端写入；收藏：带文件夹的表和增删改接口；运维查询模板：放在 `datluma-dialect`，与元数据模板相同的写法；查看 DDL：MySQL 系用 `SHOW CREATE`，Oracle / 达梦用 `DBMS_METADATA`，PostgreSQL 系由结构模型拼出；导出接口：后端重新执行查询，边取边写文件（CSV、xlsx、INSERT、JSON） |
 
 ## 4. 拆分
 
@@ -180,7 +180,7 @@ M1b 在写计划时（2026-10-25，用户确认）再拆成两份：
   - 连接对话框的校验；
   - 确认框的流程；
   - 结果分批加载。
-- **后端新增接口**：沿用 `dblens-api` 的接口测试写法；涉及数据库的部分对 5 个测试库做实库测试。
+- **后端新增接口**：沿用 `datluma-api` 的接口测试写法；涉及数据库的部分对 5 个测试库做实库测试。
 - **端到端**：每份子计划结束时，对照设计稿逐项实测：
   - 桌面版：Windows 上实际操作窗口；
   - 浏览器模式：在内置浏览器里操作。

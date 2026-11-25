@@ -5,12 +5,12 @@
 ## 结构
 
 ```text
-crates/dblens-service/src/model/
+crates/datluma-service/src/model/
   file.rs      LogicalKey；表文件的 logical_keys；ModelTable::new
   diagram.rs   图文件（Diagram、DiagramTables、DiagramDisplay、Position）；图的列表、读（表、逻辑外键、提示）、保存、新建、改名、删除；
                表改名、删除时更新各图（on_table_changed）
   store.rs     逻辑外键的增删；表、列改名时更新逻辑外键的引用；表改名、删除时调用 diagram::on_table_changed
-crates/dblens-api/src/diagrams.rs   /models/{id}/diagrams…、…/logical-keys…、/files/image
+crates/datluma-api/src/diagrams.rs   /models/{id}/diagrams…、…/logical-keys…、/files/image
 web/src/features/er/
   graph.ts       节点和连线、节点尺寸、dagre 自动布局、搜索
   TableNode.tsx  表节点（每列左右各一个连接点）
@@ -46,7 +46,7 @@ web/src/features/er/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（688 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（688 个）。
   - service：逻辑外键的校验、设计器保存后保留、表和列改名时引用跟着改、删除；图文件的写法（快照）、默认图没有文件、指纹冲突、手写字段保留；
     主题图的新建、改名、删除，表改名、删除时图跟着改；缺表和引用失效的逻辑外键进提示；文件有错的表只有名字。
   - api：没有 `local_files` 时禁止；图和逻辑外键的完整流程；导出图片只写 `.svg`、`.png`。

@@ -460,7 +460,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin + Send> Connection<S> {
         self.drain_to_attention_ack().await
     }
 
-    /// DBLens 补丁：取消时按包丢弃剩下的响应，直到某条响应以带 DONE_ATTN 的 DONE 令牌结束。
+    /// DATLUMA 补丁：取消时按包丢弃剩下的响应，直到某条响应以带 DONE_ATTN 的 DONE 令牌结束。
     ///
     /// 原来的做法按令牌读到当前响应的末尾为止：结果集读到一半被丢弃时，缓冲区停在令牌中间，而且服务器的
     /// 取消确认常在单独的一条响应中，留在连接上被下一个请求读到（那次请求就得到空结果）。确认是响应的最后

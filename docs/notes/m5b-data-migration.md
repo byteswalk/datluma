@@ -5,11 +5,11 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/migrate/data.rs   TableRead（增量读取、计数、抽样、按主键取一行；PG 的精确小数参数写成 $n::text::numeric）、
+crates/datluma-dialect/src/migrate/data.rs   TableRead（增量读取、计数、抽样、按主键取一行；PG 的精确小数参数写成 $n::text::numeric）、
                                             keyset_params、达梦的 IDENTITY_INSERT、自增的调整、序列的下一个值和推进
-crates/dblens-dialect/src/migrate/script.rs ExistingAction 加 Append、Replace（不动结构）、copies_data
-crates/dblens-dialect/src/migrate/mod.rs    TableOverride 加 filter、structure_only
-crates/dblens-service/src/migrate/
+crates/datluma-dialect/src/migrate/script.rs ExistingAction 加 Append、Replace（不动结构）、copies_data
+crates/datluma-dialect/src/migrate/mod.rs    TableOverride 加 filter、structure_only
+crates/datluma-service/src/migrate/
   mod.rs     MigrationPlan 加 mode、data；开始前检查（只迁数据时表必须已有、数据选项的范围）；建迁移记录、开始、继续、未完成的列表、放弃；
              作为任务执行（错误和报告用开始时的界面语言）
   record.rs  迁移记录（方案快照、脚本、每张表的搬运参数和进度、跳过的行、调整、提示、不迁移的对象），存在 数据目录/migrations/<id>.json
@@ -17,7 +17,7 @@ crates/dblens-service/src/migrate/
   copy.rs    一张表的搬运：流式读、转换、分批写，停止或跳过（逐行重试），续传
   values.rs  值转换成目标列的类型；校验时的规整
   report.rs  迁移报告
-crates/dblens-api/src/migrations.rs  GET /migrations、POST /migrations/{id}/resume、DELETE /migrations/{id}
+crates/datluma-api/src/migrations.rs  GET /migrations、POST /migrations/{id}/resume、DELETE /migrations/{id}
 web/src/features/migrate/progress.tsx  按表的进度、未完成的迁移
 ```
 
@@ -30,13 +30,13 @@ web/src/features/migrate/progress.tsx  按表的进度、未完成的迁移
 - 达梦序列的不缓存是 `CACHE 0`，迁到 PG 时去掉（PG 至少为 1），属于 M5a 的转换，一并修正。
 - 校验按目标的规则把空串、空二进制视为 NULL（Oracle 及兼容 Oracle 的模式会这样存），否则逐值比对误报。
 - 续传位置的主键值、抽样时按主键取目标行的参数，在 PG 上是精确小数时写成 `$n::text::numeric`（驱动不能直接绑定 NUMERIC 参数，与导入相同）。
-- 迁移记录先放在系统临时目录的 `dblens-migrations`，`Service::open` 时改到数据目录的 `migrations`（测试各自指定目录）。
+- 迁移记录先放在系统临时目录的 `datluma-migrations`，`Service::open` 时改到数据目录的 `migrations`（测试各自指定目录）。
 - 映射提示在开始时按界面语言写成文字存进记录，报告用记录中的文字。
 - 迁移标签保存的方案在恢复时补上后来加的项（模式、数据选项），旧方案打开不会出错。
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（775 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（775 个）。
   - 方言层：增量读取（单列、复合主键、过滤条件、PG 的精确小数参数）、计数、抽样、按主键取行、自增和序列的语句；追加、清空不动结构。
   - 服务层：迁移记录的读写和未完成的列表、值转换、校验的规整（含 Oracle 的空串）、语句执行（建表失败跳过依赖、成功的记下、保存记录）、开始前检查。
   - 接口：未完成的列表、继续和放弃不存在的记录。

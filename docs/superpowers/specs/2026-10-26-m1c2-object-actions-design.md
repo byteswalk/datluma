@@ -48,7 +48,7 @@ PG 系的拼法：
 - **序列**：`CREATE SEQUENCE … START / INCREMENT / MINVALUE / MAXVALUE / CACHE / [NO] CYCLE`。
 - **函数、过程**：已有的程序源码（`pg_get_functiondef`）。
 
-DDL 的拼装和取 DDL 的查询放在 `dblens-dialect`（无 IO，单元测试），取数放在服务层，按 `MetaKey::Ddl` 缓存。
+DDL 的拼装和取 DDL 的查询放在 `datluma-dialect`（无 IO，单元测试），取数放在服务层，按 `MetaKey::Ddl` 缓存。
 
 界面：右键"查看 DDL"。
 - 弹出只读的 Monaco 预览（按连接的语言高亮），标题为对象名；
@@ -68,7 +68,7 @@ DDL 的拼装和取 DDL 的查询放在 `dblens-dialect`（无 IO，单元测试
   - 别名依次为 `t1`、`t2`…，`SELECT t1.*, t2.* … FROM 本表 t1 JOIN 被连接表 t2 ON t1.x = t2.y [AND …]`；
   - 同一个表被多个外键引用时，每个外键各连一次。
 
-关联查询的生成放在 `dblens-dialect`（单元测试）。"引用本表的表"需要读取整个 schema 的外键（已有的 schema 级表明细，有缓存）。
+关联查询的生成放在 `datluma-dialect`（单元测试）。"引用本表的表"需要读取整个 schema 的外键（已有的 schema 级表明细，有缓存）。
 外键关系另有接口 `GET …/relations?table=`，返回 `[{direction: out|in, name, schema, table, local_columns, other_columns}]`，前端用它组装"关联查询"子菜单。
 
 界面：表和视图的右键菜单增加"生成 SQL"子菜单：

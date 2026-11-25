@@ -4,7 +4,7 @@
 import type { CellValue } from '../../shared/exec'
 import { t } from '../../shared/i18n'
 
-/** 列的逻辑类型（dblens_core::LogicalType 的 JSON，按 kind 区分）。 */
+/** 列的逻辑类型（datluma_core::LogicalType 的 JSON，按 kind 区分）。 */
 export interface Logical {
   kind: string
   bits?: number

@@ -5,18 +5,18 @@
 ## 结构
 
 ```text
-crates/dblens-driver/src/{traits.rs, blocking.rs, conformance.rs}
+crates/datluma-driver/src/{traits.rs, blocking.rs, conformance.rs}
                   Connection::set_lob_limit：大字段的读取上限；阻塞适配器转发；一致性测试 lob_limit_reads_full_value
-crates/dblens-driver-{mysql,postgres,oracle,dameng}/src/   各驱动按连接上的上限读取大字段（原来写死 64 KB）
-crates/dblens-dialect/
+crates/datluma-driver-{mysql,postgres,oracle,dameng}/src/   各驱动按连接上的上限读取大字段（原来写死 64 KB）
+crates/datluma-dialect/
   sql/ops/<方言>.sql   运维查询模板：-- [key] 分段，段首注释写中英文名称和分类；mariadb.sql 只覆盖 locks
   src/ops.rs          解析模板（保持顺序）、Dialect::ops_queries、兼容库回退到所属家族
-crates/dblens-service/src/export/
+crates/datluma-service/src/export/
   write.rs            四种格式的写入（RowWriter）：CSV（csv 库）、xlsx（rust_xlsxwriter 低内存模式）、INSERT（方言字面量）、JSON
   job.rs              导出任务：Service::start_export、ExportManager（状态、取消、下载、过期清理）
-crates/dblens-service/src/service.rs   Service::ops（运维查询列表）、exports、history
-crates/dblens-api/src/exports.rs       /exports、/exports/{id}、/exports/{id}/file、/profiles/{id}/ops
-crates/dblens-desktop/src/shell.rs     save_dialog（另存为）、reveal_in_folder（在文件夹中显示）
+crates/datluma-service/src/service.rs   Service::ops（运维查询列表）、exports、history
+crates/datluma-api/src/exports.rs       /exports、/exports/{id}、/exports/{id}/file、/profiles/{id}/ops
+crates/datluma-desktop/src/shell.rs     save_dialog（另存为）、reveal_in_folder（在文件夹中显示）
 web/src/
   features/export/   导出对话框、默认选项和文件名、进度通知
   features/ops/      运维查询侧栏
@@ -62,13 +62,13 @@ web/src/
 
 - 新增 `csv` 1.4.0（MIT / Unlicense）。
 - 新增 `rust_xlsxwriter` 0.100.0（MIT / Apache-2.0，特性 `constant_memory`、`chrono`）。写计划时最新的 0.101.0 发布未满 7 天。
-- `dblens-api` 的 tokio 多开 `fs`、`io-util` 特性（下载时流式读文件）。
+- `datluma-api` 的 tokio 多开 `fs`、`io-util` 特性（下载时流式读文件）。
 - 2026-10-26 执行时复查（`node scripts/check-deps.mjs`）：共 77 个直接依赖，0 个可升级；未满 7 天的有 @tanstack/react-query 5.105.0、antd 6.6.8、i18next 26.5.11、react-i18next 17.1.9、react-resizable-panels 4.15.0、simple-icons 16.36.0、minijinja 3.0.4、rust_xlsxwriter 0.101.0、uuid 1.29.0。
   - 本机经代理上网时，Node 的 `fetch` 默认不读 `HTTPS_PROXY`，查询会全部失败（输出"查询失败：fetch failed"，最后仍显示"0 个可升级"）。需要先设 `NODE_USE_ENV_PROXY=1`。
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过。
   - 驱动一致性测试：放宽上限后读出 100000 字节的大字段，改回默认后又是预览（4 个驱动，MySQL 和 MariaDB 各一次）。
   - 导出实库测试（5 个库）：一行含中文和 100000 个字符的大字段，CSV、JSON、INSERT 都写出完整内容（字符数与数据库报告的一致）；xlsx 截断并报一个警告；另导出 2500 行（MySQL 系 990 行）核对行数。
   - 运维查询实库测试（5 个库）：逐个执行全部 6 项，只允许 PG 的慢 SQL 失败。

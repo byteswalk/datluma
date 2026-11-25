@@ -21,7 +21,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级（有意固定版本的记入 `scripts/check-deps.mjs` 的 `HOLD`）。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条（`src` 中的中文字面量只能出现在 `#[cfg(test)]` 之后）；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -43,13 +43,13 @@
 ## 文件结构
 
 ```text
-crates/dblens-service/src/model/{file.rs, store.rs, mod.rs, diagram.rs（新增）, snapshots/}; src/lib.rs; tests/live.rs
-crates/dblens-api/src/{diagrams.rs（新增）, models.rs, lib.rs}, Cargo.toml, tests/models.rs
-crates/dblens-core/locales/app.json
+crates/datluma-service/src/model/{file.rs, store.rs, mod.rs, diagram.rs（新增）, snapshots/}; src/lib.rs; tests/live.rs
+crates/datluma-api/src/{diagrams.rs（新增）, models.rs, lib.rs}, Cargo.toml, tests/models.rs
+crates/datluma-core/locales/app.json
 web/src/features/er/{graph.ts, graph.test.ts, TableNode.tsx, ErView.tsx, export.ts, events.ts}（新增）
 web/src/features/{editor/{tabs.ts, tabs.test.ts, Workspace.tsx, actions.tsx}, model/ModelsPanel.tsx, tree/ObjectTree.tsx, design/DesignView.tsx}
 web/src/{shared/api.ts, app/{StatusBar.tsx, shell.css}, locales/{zh-CN,en}/{er.json（新增）, tree.json}, locales/index.ts}; web/package.json, web/pnpm-lock.yaml; scripts/check-deps.mjs
-docs/notes/{m4b-er-diagram.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m4b-er-diagram.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -78,7 +78,7 @@ Expected：输出中没有"查询失败"。以执行当天的结果为准；`@da
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -107,22 +107,22 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 快照文件（`snapshots/`）随本任务给出；改了生成逻辑时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/model/file.rs`
-- Modify: `crates/dblens-service/src/model/mod.rs`
-- Modify: `crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap`
-- Modify: `crates/dblens-service/src/model/store.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/model/file.rs`
+- Modify: `crates/datluma-service/src/model/mod.rs`
+- Modify: `crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap`
+- Modify: `crates/datluma-service/src/model/store.rs`
 
 **Interfaces:**
 - Consumes：M4a 的 `ModelStore`、表文件。
-- Produces（`dblens_service`）：`LogicalKey`；`ModelStore::add_logical_key(id, schema, table, key: LogicalKey, expected: Option<&str>) -> Result<String>`、`ModelStore::delete_logical_key(id, schema, table, index: usize, expected: Option<&str>) -> Result<String>`；crate 内 `ModelTable { table, logical_keys, extra, column_extra }`、`ModelTable::new`。
+- Produces（`datluma_service`）：`LogicalKey`；`ModelStore::add_logical_key(id, schema, table, key: LogicalKey, expected: Option<&str>) -> Result<String>`、`ModelStore::delete_logical_key(id, schema, table, index: usize, expected: Option<&str>) -> Result<String>`；crate 内 `ModelTable { table, logical_keys, extra, column_extra }`、`ModelTable::new`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -148,6 +148,10 @@
    "model.conflict": {"zh-CN": "%{name} 的文件已被修改，请重新加载", "en": "The file for %{name} has changed; reload it"},
    "model.dir_not_empty": {"zh-CN": "目录 %{path} 不为空", "en": "Directory %{path} is not empty"},
@@ -136,11 +136,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
    "model.not_a_model": {"zh-CN": "%{path} 不是模型目录（没有 model.yaml）", "en": "%{path} is not a model directory (model.yaml not found)"},
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -44,7 +44,7 @@ pub use import::{
  };
  pub use metadata::{METADATA_POOL_SIZE, MetadataCache, MetadataService};
@@ -152,11 +152,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
  };
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/model/file.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/model/file.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/file.rs
-+++ b/crates/dblens-service/src/model/file.rs
+--- a/crates/datluma-service/src/model/file.rs
++++ b/crates/datluma-service/src/model/file.rs
 @@ -163,6 +163,8 @@ struct TableFile {
      #[serde(default, skip_serializing_if = "Vec::is_empty")]
      foreign_keys: Vec<ForeignKeyFile>,
@@ -242,11 +242,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
      #[test]
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/model/mod.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/model/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/mod.rs
-+++ b/crates/dblens-service/src/model/mod.rs
+--- a/crates/datluma-service/src/model/mod.rs
++++ b/crates/datluma-service/src/model/mod.rs
 @@ -4,6 +4,6 @@ mod file;
  mod ops;
  mod store;
@@ -257,11 +257,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
  pub use store::{FileError, ModelStore, ModelSummary, ModelTableView, ModelWrite, SchemaTables, TableEntry};
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap`**
 
 ```diff
---- a/crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap
-+++ b/crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap
+--- a/crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap
++++ b/crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap
 @@ -33,6 +33,14 @@ foreign_keys:
    ref_columns:
    - code
@@ -279,12 +279,12 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
    expression: amount >= 0
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/model/store.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/model/store.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/store.rs
-+++ b/crates/dblens-service/src/model/store.rs
-@@ -12,7 +12,7 @@ use dblens_dialect::Dialect;
+--- a/crates/datluma-service/src/model/store.rs
++++ b/crates/datluma-service/src/model/store.rs
+@@ -12,7 +12,7 @@ use datluma_dialect::Dialect;
  use serde::Serialize;
  
  use super::file::{
@@ -304,7 +304,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
          &mut self,
          schema: &str,
          skip: Option<&Path>,
--        mut fix: impl FnMut(&mut dblens_core::schema::ForeignKey) -> bool,
+-        mut fix: impl FnMut(&mut datluma_core::schema::ForeignKey) -> bool,
 +        mut fix: impl FnMut(&mut String, &mut Vec<String>) -> bool,
      ) -> Result<()> {
          let mut changed = Vec::new();
@@ -563,7 +563,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 1 个，表文件的快照多一段 `logical_keys`）。
@@ -571,7 +571,7 @@ Expected: 全部测试通过（service 新增 1 个，表文件的快照多一�
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/lib.rs crates/dblens-service/src/model/file.rs crates/dblens-service/src/model/mod.rs crates/dblens-service/src/model/snapshots/dblens_service__model__file__tests__table_yaml.snap crates/dblens-service/src/model/store.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/lib.rs crates/datluma-service/src/model/file.rs crates/datluma-service/src/model/mod.rs crates/datluma-service/src/model/snapshots/datluma_service__model__file__tests__table_yaml.snap crates/datluma-service/src/model/store.rs
 git commit -m "feat(service): 模型中的逻辑外键" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -587,22 +587,22 @@ git commit -m "feat(service): 模型中的逻辑外键" -m "Co-Authored-By: Clau
 快照文件（`snapshots/`）随本任务给出；改了生成逻辑时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Create: `crates/dblens-service/src/model/diagram.rs`
-- Modify: `crates/dblens-service/src/model/mod.rs`
-- Create: `crates/dblens-service/src/model/snapshots/dblens_service__model__diagram__tests__diagram_yaml.snap`
-- Modify: `crates/dblens-service/src/model/store.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Create: `crates/datluma-service/src/model/diagram.rs`
+- Modify: `crates/datluma-service/src/model/mod.rs`
+- Create: `crates/datluma-service/src/model/snapshots/datluma_service__model__diagram__tests__diagram_yaml.snap`
+- Modify: `crates/datluma-service/src/model/store.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `LogicalKey`、`ModelTable`。
-- Produces（`dblens_service`）：上面的类型；`ModelStore::{diagrams(id, schema) -> Result<Vec<DiagramSummary>>, read_diagram(id, schema, name) -> Result<DiagramView>, save_diagram(id, schema, name, diagram, expected) -> Result<String>, create_diagram(id, schema, name, tables) -> Result<String>, rename_diagram(id, schema, from, to) -> Result<()>, delete_diagram(id, schema, name) -> Result<()>}`。
+- Produces（`datluma_service`）：上面的类型；`ModelStore::{diagrams(id, schema) -> Result<Vec<DiagramSummary>>, read_diagram(id, schema, name) -> Result<DiagramView>, save_diagram(id, schema, name, diagram, expected) -> Result<String>, create_diagram(id, schema, name, tables) -> Result<String>, rename_diagram(id, schema, from, to) -> Result<()>, delete_diagram(id, schema, name) -> Result<()>}`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -146,6 +146,8 @@
    "model.bad_file": {"zh-CN": "文件 %{path} 有错：%{error}", "en": "File %{path} is invalid: %{error}"},
    "model.bad_path": {"zh-CN": "路径无效：%{path}", "en": "Invalid path: %{path}"},
@@ -614,11 +614,11 @@ git commit -m "feat(service): 模型中的逻辑外键" -m "Co-Authored-By: Clau
    "model.lk_column_missing": {"zh-CN": "列 %{name} 不存在", "en": "Column %{name} does not exist"},
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -44,9 +44,10 @@ pub use import::{
  };
  pub use metadata::{METADATA_POOL_SIZE, MetadataCache, MetadataService};
@@ -635,7 +635,7 @@ git commit -m "feat(service): 模型中的逻辑外键" -m "Co-Authored-By: Clau
  pub use policy::{
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-service/src/model/diagram.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-service/src/model/diagram.rs`**
 
 ```rust
 //! ER 图（M4b 设计文档第 3、5 节）：`diagrams/<schema>/<图名>.yaml`。每个 schema 都有默认图 `_all`（全部表），
@@ -644,8 +644,8 @@ git commit -m "feat(service): 模型中的逻辑外键" -m "Co-Authored-By: Clau
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use dblens_core::schema::Table;
-use dblens_core::{Error, Result, msg};
+use datluma_core::schema::Table;
+use datluma_core::{Error, Result, msg};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::file::{LogicalKey, escape_name, fingerprint, io_err, unescape_name, write_atomic};
@@ -1037,9 +1037,9 @@ impl ModelStore {
 
 #[cfg(test)]
 mod tests {
-    use dblens_core::schema::{Column, ForeignKey, PrimaryKey};
-    use dblens_core::{ColumnType, LogicalType};
-    use dblens_dialect::{Compat, Variant};
+    use datluma_core::schema::{Column, ForeignKey, PrimaryKey};
+    use datluma_core::{ColumnType, LogicalType};
+    use datluma_dialect::{Compat, Variant};
 
     use super::super::file::ModelDatabase;
     use super::*;
@@ -1186,11 +1186,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/model/mod.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/model/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/mod.rs
-+++ b/crates/dblens-service/src/model/mod.rs
+--- a/crates/datluma-service/src/model/mod.rs
++++ b/crates/datluma-service/src/model/mod.rs
 @@ -1,9 +1,14 @@
  //! 模型（M4a）：模型目录的读写、打开的模型。
  
@@ -1208,11 +1208,11 @@ mod tests {
  pub use store::{FileError, ModelStore, ModelSummary, ModelTableView, ModelWrite, SchemaTables, TableEntry};
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-service/src/model/snapshots/dblens_service__model__diagram__tests__diagram_yaml.snap`**
+- [ ] **Step 5: 新建 `crates/datluma-service/src/model/snapshots/datluma_service__model__diagram__tests__diagram_yaml.snap`**
 
 ```text
 ---
-source: crates/dblens-service/src/model/diagram.rs
+source: crates/datluma-service/src/model/diagram.rs
 expression: text
 ---
 name: _all
@@ -1224,13 +1224,13 @@ positions:
     "y": 40
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/model/store.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/model/store.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/store.rs
-+++ b/crates/dblens-service/src/model/store.rs
-@@ -11,9 +11,10 @@ use dblens_core::{Error, Result, msg};
- use dblens_dialect::Dialect;
+--- a/crates/datluma-service/src/model/store.rs
++++ b/crates/datluma-service/src/model/store.rs
+@@ -11,9 +11,10 @@ use datluma_core::{Error, Result, msg};
+ use datluma_dialect::Dialect;
  use serde::Serialize;
  
 +use super::diagram;
@@ -1405,7 +1405,7 @@ positions:
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 3 个，快照 1 个）。
@@ -1413,7 +1413,7 @@ Expected: 全部测试通过（service 新增 3 个，快照 1 个）。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/lib.rs crates/dblens-service/src/model/diagram.rs crates/dblens-service/src/model/mod.rs crates/dblens-service/src/model/snapshots/dblens_service__model__diagram__tests__diagram_yaml.snap crates/dblens-service/src/model/store.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/lib.rs crates/datluma-service/src/model/diagram.rs crates/datluma-service/src/model/mod.rs crates/datluma-service/src/model/snapshots/datluma_service__model__diagram__tests__diagram_yaml.snap crates/datluma-service/src/model/store.rs
 git commit -m "feat(service): 模型中的 ER 图文件" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1421,26 +1421,26 @@ git commit -m "feat(service): 模型中的 ER 图文件" -m "Co-Authored-By: Cla
 
 ### Task 4: 接口：ER 图与逻辑外键，桌面程序导出图片
 
-- `dblens-api/src/diagrams.rs`（新）：`/models/{id}/diagrams`（列表、新建）、`/models/{id}/diagrams/{schema}/{name}`（读、保存、删除）、`…/rename`、`/models/{id}/tables/{schema}/{name}/logical-keys`（加）、`…/logical-keys/{index}`（删）、`/files/image`（`{path, data}`，base64，只接受 `.svg`、`.png`）。都要求 `local_files`（`models::local_only` 改为 `pub(crate)`）。
-- `dblens-api` 依赖 `base64`（工作区已有）。
+- `datluma-api/src/diagrams.rs`（新）：`/models/{id}/diagrams`（列表、新建）、`/models/{id}/diagrams/{schema}/{name}`（读、保存、删除）、`…/rename`、`/models/{id}/tables/{schema}/{name}/logical-keys`（加）、`…/logical-keys/{index}`（删）、`/files/image`（`{path, data}`，base64，只接受 `.svg`、`.png`）。都要求 `local_files`（`models::local_only` 改为 `pub(crate)`）。
+- `datluma-api` 依赖 `base64`（工作区已有）。
 - 后端词条加 `model.image_ext`、`model.image_data`。
 
 **Files:**
-- Modify: `crates/dblens-api/Cargo.toml`
-- Create: `crates/dblens-api/src/diagrams.rs`
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/src/models.rs`
-- Modify: `crates/dblens-api/tests/models.rs`
-- Modify: `crates/dblens-core/locales/app.json`
+- Modify: `crates/datluma-api/Cargo.toml`
+- Create: `crates/datluma-api/src/diagrams.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/src/models.rs`
+- Modify: `crates/datluma-api/tests/models.rs`
+- Modify: `crates/datluma-core/locales/app.json`
 
 **Interfaces:**
 - Consumes：任务 2、3 的服务层接口。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/models.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/models.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/models.rs
-+++ b/crates/dblens-api/tests/models.rs
+--- a/crates/datluma-api/tests/models.rs
++++ b/crates/datluma-api/tests/models.rs
 @@ -60,6 +60,102 @@ async fn models_need_local_files() {
      let (st, _) =
          call(&app, "POST", "/api/compare/script", Some(json!({ "path": "/tmp/x.sql", "text": "" }))).await;
@@ -1546,22 +1546,22 @@ git commit -m "feat(service): 模型中的 ER 图文件" -m "Co-Authored-By: Cla
  #[tokio::test]
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-api/Cargo.toml`**
+- [ ] **Step 2: 修改 `crates/datluma-api/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-api/Cargo.toml
-+++ b/crates/dblens-api/Cargo.toml
+--- a/crates/datluma-api/Cargo.toml
++++ b/crates/datluma-api/Cargo.toml
 @@ -7,6 +7,7 @@ publish.workspace = true
  
  [dependencies]
  axum.workspace = true
 +base64.workspace = true
- dblens-core.workspace = true
- dblens-dialect.workspace = true
- dblens-driver.workspace = true
+ datluma-core.workspace = true
+ datluma-dialect.workspace = true
+ datluma-driver.workspace = true
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-api/src/diagrams.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-api/src/diagrams.rs`**
 
 ```rust
 //! ER 图与逻辑外键的接口（M4b 设计文档 5.2 节），以及桌面程序导出图片时写文件。都要求 `local_files`。
@@ -1572,8 +1572,8 @@ use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use base64::Engine;
-use dblens_core::{Error, msg};
-use dblens_service::{Diagram, DiagramSummary, DiagramView, LogicalKey};
+use datluma_core::{Error, msg};
+use datluma_service::{Diagram, DiagramSummary, DiagramView, LogicalKey};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -1722,11 +1722,11 @@ pub async fn save_image(State(s): State<AppState>, Json(b): Json<ImageBody>) -> 
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -3,6 +3,7 @@
  
  mod auth;
@@ -1753,11 +1753,11 @@ pub async fn save_image(State(s): State<AppState>, Json(b): Json<ImageBody>) -> 
          .route("/exports/{id}/file", get(exports::file))
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-api/src/models.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-api/src/models.rs`**
 
 ```diff
---- a/crates/dblens-api/src/models.rs
-+++ b/crates/dblens-api/src/models.rs
+--- a/crates/datluma-api/src/models.rs
++++ b/crates/datluma-api/src/models.rs
 @@ -18,7 +18,7 @@ use serde_json::{Value, json};
  use crate::AppState;
  use crate::error::ApiResult;
@@ -1769,11 +1769,11 @@ pub async fn save_image(State(s): State<AppState>, Json(b): Json<ImageBody>) -> 
      }
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 6: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -149,6 +149,8 @@
    "model.diagram_bad_name": {"zh-CN": "图名 %{name} 不可用（不能为空，也不能是 _all）", "en": "The diagram name %{name} is not allowed (it must not be empty or _all)"},
    "model.diagram_exists": {"zh-CN": "图 %{name} 已存在", "en": "Diagram %{name} already exists"},
@@ -1791,7 +1791,7 @@ pub async fn save_image(State(s): State<AppState>, Json(b): Json<ImageBody>) -> 
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（api 的 `tests/models.rs` 新增 1 个，禁止的检查多 2 处）。
@@ -1799,7 +1799,7 @@ Expected: 全部测试通过（api 的 `tests/models.rs` 新增 1 个，禁止�
 - [ ] **Step 8: 提交**
 
 ```bash
-git add Cargo.lock crates/dblens-api/Cargo.toml crates/dblens-api/src/diagrams.rs crates/dblens-api/src/lib.rs crates/dblens-api/src/models.rs crates/dblens-api/tests/models.rs crates/dblens-core/locales/app.json
+git add Cargo.lock crates/datluma-api/Cargo.toml crates/datluma-api/src/diagrams.rs crates/datluma-api/src/lib.rs crates/datluma-api/src/models.rs crates/datluma-api/tests/models.rs crates/datluma-core/locales/app.json
 git commit -m "feat(api): ER 图与逻辑外键的接口，桌面程序导出图片" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1807,23 +1807,23 @@ git commit -m "feat(api): ER 图与逻辑外键的接口，桌面程序导出图
 
 ### Task 5: 实库测试：反向生成后的默认 ER 图
 
-`dblens-service/tests/live.rs` 的 `model_flow`：同步到库、写回模型之后，把这个 schema 再反向生成一次，读默认图，核对 `m4_ord` 指向 `m4_customer` 的外键列对应（`cust_id` → `id`），默认图没有文件（指纹为 None）。原来的第 5 步（库对库）改为第 6 步。
+`datluma-service/tests/live.rs` 的 `model_flow`：同步到库、写回模型之后，把这个 schema 再反向生成一次，读默认图，核对 `m4_ord` 指向 `m4_customer` 的外键列对应（`cust_id` → `id`），默认图没有文件（指纹为 None）。原来的第 5 步（库对库）改为第 6 步。
 
 **Files:**
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 3 的 `read_diagram`、`DEFAULT_DIAGRAM`。
 
-- [ ] **Step 1: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
-@@ -21,10 +21,10 @@ use dblens_dialect::meta::{MetaArgs, MetaKey};
- use dblens_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
- use dblens_driver::{ConnectParams, DriverId};
- use dblens_service::{
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
+@@ -21,10 +21,10 @@ use datluma_dialect::meta::{MetaArgs, MetaKey};
+ use datluma_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
+ use datluma_driver::{ConnectParams, DriverId};
+ use datluma_service::{
 -    ChangeSet, ColumnMapping, CompareRequest, CompareResult, CompareSideRef, DEFAULT_BATCH, DataOrder,
 -    DefaultPolicy, DesignRequest, DriverRegistry, Environment, ExecRequest, ExportFormat, ExportOptions,
 -    ExportRequest, ExportSource, ExportState, ExportStatus, FileOptions, FileSource, GenerateKind,
@@ -1860,7 +1860,7 @@ git commit -m "feat(api): ER 图与逻辑外键的接口，桌面程序导出图
 +    // 6. 库对库：同一个库中的第二个 schema
      let other: Option<&'static str> = match live.driver {
          DriverId::Postgres => Some("m4_b"),
-         DriverId::Mysql => Some("dblens_test_m4b"),
+         DriverId::Mysql => Some("datluma_test_m4b"),
 ```
 
 - [ ] **Step 2: 检查**
@@ -1869,10 +1869,10 @@ git commit -m "feat(api): ER 图与逻辑外键的接口，桌面程序导出图
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及国产库第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑模型的测试：`cargo test … -p dblens-service --test live model -- --test-threads=1`。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及国产库第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑模型的测试：`cargo test … -p datluma-service --test live model -- --test-threads=1`。
 - 人大金仓的开发版授权最多 10 个连接：它的测试要串行运行（`--test-threads=1`）。
 - 达梦的测试与其他测试同时运行时偶发"网络通讯失败"，失败时用 `dameng_model` 单独重跑。
 
@@ -1881,7 +1881,7 @@ Expected: 全部测试通过：模型的实库测试 11 个。
 - [ ] **Step 3: 提交**
 
 ```bash
-git add crates/dblens-service/tests/live.rs
+git add crates/datluma-service/tests/live.rs
 git commit -m "test(service): 实库测试中核对反向生成后默认 ER 图的外键" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3884,7 +3884,7 @@ export function searchTables(tables: DesignTableModel[], q: string): string[] {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -3897,7 +3897,7 @@ Expected: 全部通过（前端新增 7 个测试）。
 
 - [ ] **Step 25: 浏览器实测**
 
-浏览器实测（设计文档第 6 节）：用 `dblens-server --listen 127.0.0.1:<端口>` 启动浏览器模式。
+浏览器实测（设计文档第 6 节）：用 `datluma-server --listen 127.0.0.1:<端口>` 启动浏览器模式。
 1. 模型面板 schema 下"ER 图 → 全部表"：自动布局、列级连线、复合外键标"N 列"、自引用、其他 schema 的外键列在节点底部；悬停连线显示约束名和列的对应。
 2. 从一列拖到另一张表的列：弹框后建成逻辑外键（虚线）；选中虚线按 Delete 删除。
 3. 拖动表后标题出现"未保存"，Ctrl+S 保存，核对 `diagrams/<schema>/_all.yaml`；重新打开位置不变。
@@ -3925,7 +3925,7 @@ git commit -m "feat(web): ER 图标签（React Flow + dagre），模型面板中
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m4b-er-diagram.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
 
@@ -3972,12 +3972,12 @@ git commit -m "feat(web): ER 图标签（React Flow + dagre），模型面板中
 ## 结构
 
 ```text
-crates/dblens-service/src/model/
+crates/datluma-service/src/model/
   file.rs      LogicalKey；表文件的 logical_keys；ModelTable::new
   diagram.rs   图文件（Diagram、DiagramTables、DiagramDisplay、Position）；图的列表、读（表、逻辑外键、提示）、保存、新建、改名、删除；
                表改名、删除时更新各图（on_table_changed）
   store.rs     逻辑外键的增删；表、列改名时更新逻辑外键的引用；表改名、删除时调用 diagram::on_table_changed
-crates/dblens-api/src/diagrams.rs   /models/{id}/diagrams…、…/logical-keys…、/files/image
+crates/datluma-api/src/diagrams.rs   /models/{id}/diagrams…、…/logical-keys…、/files/image
 web/src/features/er/
   graph.ts       节点和连线、节点尺寸、dagre 自动布局、搜索
   TableNode.tsx  表节点（每列左右各一个连接点）
@@ -4007,7 +4007,7 @@ web/src/features/er/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（688 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（688 个）。
   - service：逻辑外键的校验、设计器保存后保留、表和列改名时引用跟着改、删除；图文件的写法（快照）、默认图没有文件、指纹冲突、手写字段保留；
     主题图的新建、改名、删除，表改名、删除时图跟着改；缺表和引用失效的逻辑外键进提示；文件有错的表只有名字。
   - api：没有 `local_files` 时禁止；图和逻辑外键的完整流程；导出图片只写 `.svg`、`.png`。
@@ -4017,11 +4017,11 @@ web/src/features/er/
   从列拖到列建逻辑外键（虚线）；拖动表后"未保存"标记、Ctrl+S 保存、图文件内容核对；导出 PNG（整张图）。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -332,6 +332,7 @@ trait Policy: Send + Sync {
  - 国产库第一批已完成：TiDB、OceanBase 社区版（MySQL 模式）、openGauss（A、PG 兼容模式，含 SHA256 认证）、人大金仓（Oracle、PG 模式）（设计 `docs/superpowers/specs/2026-10-27-domestic-batch1-design.md`，详细计划 `docs/superpowers/plans/2026-10-27-domestic-batch1.md`，说明 `docs/notes/domestic-batch1.md`）。第二批（PolarDB、TDSQL、GaussDB，只有云服务）、第三批（GBase 8s、OceanBase 的 Oracle 模式）尚未开始；GoldenDB 没有可用的测试环境。
  - 2026-10-27 M4 拆成三份（用户确认）：M4a 模型与比对（模型文件、反向生成、比对与同步）；M4b ER 图；M4c 数据字典和设计文档导出。
@@ -4041,6 +4041,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m4b-er-diagram.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m0-4b-api.md docs/notes/m4b-er-diagram.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M4b ER 图的说明、接口和进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

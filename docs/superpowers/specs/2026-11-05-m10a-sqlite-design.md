@@ -23,7 +23,7 @@
 
 ## 4. 驱动
 
-新 crate `dblens-driver-sqlite`，`DriverId::Sqlite`（`sqlite`），经 `blocking::into_async` 包装，每连接一个线程。
+新 crate `datluma-driver-sqlite`，`DriverId::Sqlite`（`sqlite`），经 `blocking::into_async` 包装，每连接一个线程。
 
 - 能力：`catalogs: false`、`schemas: true`、`transactional_ddl: true`、`cancel: true`、`explain: true`、`multiple_result_sets: false`。
 - 取数：语句准备后逐行 `step`，按批交出，不把结果全读进内存。结果集持有语句（Box 固定地址，行游标先于语句释放）。

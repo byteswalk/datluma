@@ -1,0 +1,306 @@
+//! 方言家族与具体产品变体的识别。
+
+use datluma_core::{Msg, msg};
+use datluma_driver::{DriverId, ServerInfo};
+use serde::{Deserialize, Serialize};
+
+/// 方言家族：语法规则基本相同的一组数据库。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Family {
+    #[serde(rename = "mysql")]
+    MySql,
+    #[serde(rename = "postgres")]
+    Postgres,
+    #[serde(rename = "oracle")]
+    Oracle,
+    #[serde(rename = "dameng")]
+    Dameng,
+    #[serde(rename = "sqlserver")]
+    SqlServer,
+    #[serde(rename = "informix")]
+    Informix,
+    #[serde(rename = "sqlite")]
+    Sqlite,
+}
+
+impl Family {
+    /// 脚本中一条语句的写法（M6b 设计文档 5.1 节）：SQL Server 后接单独一行 `GO`（`CREATE VIEW`、`CREATE TRIGGER` 等
+    /// 必须是批中第一条），其他库以 `;` 结尾。
+    pub fn terminate(self, sql: &str) -> String {
+        let sql = sql.trim_end();
+        match self {
+            Family::SqlServer => format!(
+                "{sql}
+GO"
+            ),
+            _ if sql.ends_with(';') => sql.to_string(),
+            _ => format!("{sql};"),
+        }
+    }
+}
+
+/// 兼容模式：人大金仓、openGauss 可以按 Oracle 的规则解释 SQL（空串即 NULL、`NUMBER`、`VARCHAR2`、
+/// 带时间的 `DATE`、Oracle 风格的过程块）。其他变体恒为 `Native`。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+pub enum Compat {
+    /// 产品自己的语法（人大金仓、openGauss 的 PG 模式也算）。
+    #[default]
+    #[serde(rename = "native")]
+    Native,
+    /// 人大金仓的 `database_mode = oracle`、openGauss 的 `DBCOMPATIBILITY 'A'`。
+    #[serde(rename = "oracle")]
+    Oracle,
+    /// 人大金仓的 `database_mode = sqlserver`：大体按 PG 规则，自增列写 `IDENTITY(1, 1)`。
+    #[serde(rename = "sqlserver")]
+    SqlServer,
+}
+
+impl Compat {
+    /// 由探测到的模式名得出兼容模式：人大金仓的 `oracle`、openGauss 的 `A` 是 Oracle 模式，人大金仓的 `sqlserver`
+    /// 是 SQL Server 模式，其余（含人大金仓的 `mysql`）按原生处理。
+    pub fn from_mode(mode: &str) -> Compat {
+        if mode.eq_ignore_ascii_case("oracle") || mode.eq_ignore_ascii_case("a") {
+            Compat::Oracle
+        } else if mode.eq_ignore_ascii_case("sqlserver") {
+            Compat::SqlServer
+        } else {
+            Compat::Native
+        }
+    }
+
+    /// 已适配的模式名：openGauss 的 B、C 等返回 false。人大金仓的 mysql 模式按原生规则处理即可（生成的 SQL
+    /// 避开了它改变语义的 `||`、`numeric`）。
+    pub fn is_adapted_mode(mode: &str) -> bool {
+        ["oracle", "a", "pg", "mysql", "sqlserver"].iter().any(|m| mode.eq_ignore_ascii_case(m))
+    }
+}
+
+/// 具体的数据库产品。兼容库复用所属家族的规则，只在个别地方覆盖。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum Variant {
+    #[serde(rename = "mysql")]
+    MySql,
+    #[serde(rename = "mariadb")]
+    MariaDb,
+    #[serde(rename = "tidb")]
+    TiDb,
+    /// OceanBase 的 MySQL 模式。
+    #[serde(rename = "oceanbase")]
+    OceanBase,
+    /// OceanBase 的 Oracle 模式。标准 MySQL 客户端连不上这种租户，经官方 JDBC 驱动连接。
+    #[serde(rename = "oceanbase_oracle")]
+    OceanBaseOracle,
+    /// GoldenDB。服务器报告的是 MySQL，经官方 JDBC 驱动连接时才知道是它。
+    #[serde(rename = "goldendb")]
+    GoldenDb,
+    /// 阿里云 PolarDB 的 MySQL 版。版本字符串与 MySQL 相同，靠 `Dialect::refine` 识别。
+    #[serde(rename = "polardb")]
+    PolarDb,
+    /// 南大通用 GBase 8a MPP。`VERSION()` 里没有产品名，MySQL 驱动从 `@@version_comment` 认出后补在版本号前。
+    #[serde(rename = "gbase8a")]
+    Gbase8a,
+    #[serde(rename = "postgres")]
+    Postgres,
+    #[serde(rename = "kingbase")]
+    Kingbase,
+    #[serde(rename = "opengauss")]
+    OpenGauss,
+    #[serde(rename = "gaussdb")]
+    GaussDb,
+    #[serde(rename = "highgo")]
+    HighGo,
+    #[serde(rename = "oracle")]
+    Oracle,
+    #[serde(rename = "dameng")]
+    Dameng,
+    #[serde(rename = "sqlserver")]
+    SqlServer,
+    #[serde(rename = "gbase8s")]
+    Gbase8s,
+    #[serde(rename = "sqlite")]
+    Sqlite,
+}
+
+impl Variant {
+    pub fn family(self) -> Family {
+        match self {
+            Variant::MySql
+            | Variant::MariaDb
+            | Variant::TiDb
+            | Variant::OceanBase
+            | Variant::GoldenDb
+            | Variant::PolarDb
+            | Variant::Gbase8a => Family::MySql,
+            Variant::Postgres
+            | Variant::Kingbase
+            | Variant::OpenGauss
+            | Variant::GaussDb
+            | Variant::HighGo => Family::Postgres,
+            Variant::Oracle | Variant::OceanBaseOracle => Family::Oracle,
+            Variant::Dameng => Family::Dameng,
+            Variant::SqlServer => Family::SqlServer,
+            Variant::Gbase8s => Family::Informix,
+            Variant::Sqlite => Family::Sqlite,
+        }
+    }
+
+    /// 给用户看的名称；国产库的中文名随界面语言变化。
+    pub fn display_name(self) -> Msg {
+        match self {
+            Variant::MySql => Msg::raw("MySQL"),
+            Variant::MariaDb => Msg::raw("MariaDB"),
+            Variant::TiDb => Msg::raw("TiDB"),
+            Variant::OceanBase => msg!("variant.oceanbase"),
+            Variant::OceanBaseOracle => msg!("variant.oceanbase_oracle"),
+            Variant::GoldenDb => Msg::raw("GoldenDB"),
+            Variant::PolarDb => msg!("variant.polardb"),
+            Variant::Gbase8a => Msg::raw("GBase 8a"),
+            Variant::Postgres => Msg::raw("PostgreSQL"),
+            Variant::Kingbase => msg!("variant.kingbase"),
+            Variant::OpenGauss => Msg::raw("openGauss"),
+            Variant::GaussDb => Msg::raw("GaussDB"),
+            Variant::HighGo => msg!("variant.highgo"),
+            Variant::Oracle => Msg::raw("Oracle"),
+            Variant::Dameng => msg!("variant.dameng"),
+            Variant::SqlServer => Msg::raw("SQL Server"),
+            Variant::Gbase8s => msg!("variant.gbase8s"),
+            Variant::Sqlite => Msg::raw("SQLite"),
+        }
+    }
+
+    /// 没有服务器信息时使用的基础变体。
+    pub fn base(driver: DriverId) -> Variant {
+        match driver {
+            DriverId::Mysql => Variant::MySql,
+            DriverId::Postgres => Variant::Postgres,
+            DriverId::Oracle => Variant::Oracle,
+            DriverId::Dameng => Variant::Dameng,
+            DriverId::SqlServer => Variant::SqlServer,
+            DriverId::Informix => Variant::Gbase8s,
+            DriverId::Sqlite => Variant::Sqlite,
+        }
+    }
+
+    /// 根据驱动和服务器返回的版本字符串识别具体产品，识别不出时退回基础变体。
+    /// 注意：PolarDB-MySQL 的 `VERSION()` 与 MySQL 无法区分，会识别为 MySQL，再用 `Dialect::refine` 识别。
+    /// GoldenDB 也一样，JDBC 连接在版本号前补上了产品名。
+    pub fn detect(driver: DriverId, info: &ServerInfo) -> Variant {
+        let v = info.version.to_ascii_lowercase();
+        match driver {
+            DriverId::Mysql if v.contains("mariadb") => Variant::MariaDb,
+            DriverId::Mysql if v.contains("tidb") => Variant::TiDb,
+            DriverId::Mysql if v.contains("oceanbase") => Variant::OceanBase,
+            DriverId::Mysql if v.contains("goldendb") => Variant::GoldenDb,
+            DriverId::Mysql if v.starts_with("gbase 8a") => Variant::Gbase8a,
+            DriverId::Oracle if v.contains("oceanbase") => Variant::OceanBaseOracle,
+            DriverId::Postgres if v.contains("kingbase") => Variant::Kingbase,
+            // GBase 8c 基于 openGauss（V6 S1.3 是 6.0.2），版本串里只有 `GBase8cV6 …`，数据字典与 openGauss 相同
+            DriverId::Postgres if v.contains("opengauss") || v.contains("gbase8c") => Variant::OpenGauss,
+            DriverId::Postgres if v.contains("gaussdb") => Variant::GaussDb,
+            DriverId::Postgres if v.contains("highgo") => Variant::HighGo,
+            _ => Variant::base(driver),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn info(product: &str, version: &str) -> ServerInfo {
+        ServerInfo { product: product.into(), version: version.into() }
+    }
+
+    #[test]
+    fn oceanbase_oracle_mode_is_oracle_family() {
+        let v = Variant::detect(DriverId::Oracle, &info("Oracle", "OceanBase 4.4.2.2"));
+        assert_eq!((v, v.family()), (Variant::OceanBaseOracle, Family::Oracle));
+        assert_eq!(
+            Variant::detect(DriverId::Oracle, &info("Oracle", "Oracle AI Database 26ai")),
+            Variant::Oracle
+        );
+    }
+
+    #[test]
+    fn gbase_is_informix_family() {
+        assert_eq!(Variant::base(DriverId::Informix), Variant::Gbase8s);
+        assert_eq!(Variant::Gbase8s.family(), Family::Informix);
+        assert_eq!(Variant::Gbase8s.display_name().render(datluma_core::Lang::En), "GBase 8s");
+    }
+
+    #[test]
+    fn detects_mysql_family_variants() {
+        assert_eq!(Variant::detect(DriverId::Mysql, &info("MySQL", "8.4.3")), Variant::MySql);
+        assert_eq!(
+            Variant::detect(DriverId::Mysql, &info("MySQL", "11.4.4-MariaDB-ubu2404")),
+            Variant::MariaDb
+        );
+        assert_eq!(Variant::detect(DriverId::Mysql, &info("MySQL", "8.0.11-TiDB-v7.5.1")), Variant::TiDb);
+        assert_eq!(
+            Variant::detect(DriverId::Mysql, &info("MySQL", "5.7.25-OceanBase_CE-v4.2.1.2")),
+            Variant::OceanBase
+        );
+        let gd = Variant::detect(DriverId::Mysql, &info("GoldenDB", "GoldenDB 8.9.99"));
+        assert_eq!((gd, gd.family()), (Variant::GoldenDb, Family::MySql));
+        let g8a = Variant::detect(DriverId::Mysql, &info("MySQL", "GBase 8a 9.5.3.28.12509af275af"));
+        assert_eq!((g8a, g8a.family()), (Variant::Gbase8a, Family::MySql));
+        assert_eq!(Variant::detect(DriverId::Mysql, &info("MySQL", "9.5.3.28.12509af275af")), Variant::MySql);
+    }
+
+    #[test]
+    fn detects_postgres_family_variants() {
+        let pg = "PostgreSQL 17.2 (Debian 17.2-1.pgdg120+1) on x86_64-pc-linux-gnu";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", pg)), Variant::Postgres);
+        let kb = "KingbaseES V008R006C008B0014 on x86_64-pc-linux-gnu, compiled by gcc";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", kb)), Variant::Kingbase);
+        let og = "(openGauss 5.0.1 build 33b035fd) compiled at 2023-12-15 on x86_64-unknown-linux-gnu";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", og)), Variant::OpenGauss);
+        let gb = "(GBase8cV6 S1.3.0B19 build 8a2447f6) compiled at 2026-09-23 14:29:40 commit 0 last mr 22";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", gb)), Variant::OpenGauss);
+        let gs = "gaussdb (GaussDB Kernel 505.1.0 build 2c0ba3b1) compiled at 2024-03-01";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", gs)), Variant::GaussDb);
+        let hg = "HighGo Security Enterprise Edition Release 4.5.8 on x86_64";
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("PostgreSQL", hg)), Variant::HighGo);
+    }
+
+    #[test]
+    fn oracle_and_dameng_and_families() {
+        let ora = "Oracle AI Database 26ai Free Release 23.26.0.0.0 - Develop, Learn, and Run for Free";
+        assert_eq!(Variant::detect(DriverId::Oracle, &info("Oracle", ora)), Variant::Oracle);
+        assert_eq!(
+            Variant::detect(DriverId::Dameng, &info("DM", "DM Database Server 64 V8")),
+            Variant::Dameng
+        );
+        assert_eq!(Variant::TiDb.family(), Family::MySql);
+        assert_eq!(Variant::Kingbase.family(), Family::Postgres);
+        assert_eq!(Variant::Dameng.family(), Family::Dameng);
+        assert_eq!(Variant::base(DriverId::Postgres), Variant::Postgres);
+        assert_eq!(Variant::Kingbase.display_name().render(datluma_core::Lang::ZhCn), "人大金仓 KingbaseES");
+        assert_eq!(Variant::Kingbase.display_name().render(datluma_core::Lang::En), "KingbaseES");
+    }
+
+    #[test]
+    fn detection_is_gated_by_driver_and_falls_back() {
+        assert_eq!(Variant::detect(DriverId::Postgres, &info("MySQL", "11.4.4-MariaDB")), Variant::Postgres);
+        assert_eq!(Variant::detect(DriverId::Mysql, &info("MySQL", "some unknown")), Variant::MySql);
+        assert_eq!(serde_json::to_string(&Variant::OpenGauss).unwrap(), "\"opengauss\"");
+        assert_eq!(serde_json::to_string(&Family::MySql).unwrap(), "\"mysql\"");
+    }
+
+    #[test]
+    fn script_terminators() {
+        assert_eq!(Family::MySql.terminate("SELECT 1"), "SELECT 1;");
+        assert_eq!(
+            Family::Oracle.terminate(
+                "SELECT 1 FROM DUAL;
+"
+            ),
+            "SELECT 1 FROM DUAL;"
+        );
+        assert_eq!(
+            Family::SqlServer.terminate("CREATE VIEW v AS SELECT 1"),
+            "CREATE VIEW v AS SELECT 1
+GO"
+        );
+    }
+}

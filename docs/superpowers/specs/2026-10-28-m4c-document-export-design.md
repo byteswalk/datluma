@@ -1,6 +1,6 @@
 # M4c 文档导出 设计
 
-日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-dblens-design.md` 第 11 节（M4 模型："数据字典和设计文档导出（docx/html/markdown，可选模板）"）；M4a 设计 `docs/superpowers/specs/2026-10-27-m4a-model-compare-design.md`（模型目录、表文件、`/models` 接口、后台任务）；M4b 设计 `docs/superpowers/specs/2026-10-28-m4b-er-diagram-design.md`（ER 图、逻辑外键）。
+日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-datluma-design.md` 第 11 节（M4 模型："数据字典和设计文档导出（docx/html/markdown，可选模板）"）；M4a 设计 `docs/superpowers/specs/2026-10-27-m4a-model-compare-design.md`（模型目录、表文件、`/models` 接口、后台任务）；M4b 设计 `docs/superpowers/specs/2026-10-28-m4b-er-diagram-design.md`（ER 图、逻辑外键）。
 
 ## 1. 目标与范围
 
@@ -128,7 +128,7 @@
 
 ## 6. 服务层与接口
 
-### 6.1 服务层（`dblens-service/src/document/`）
+### 6.1 服务层（`datluma-service/src/document/`）
 
 - `content.rs`：从模型（`ModelStore`，含逻辑外键、表文件错误）或库（元数据，含视图）组织 `DocContent`；按范围筛选 schema、表；算被引用、表间关系、统计。
 - `template.rs`：内置模板、minijinja 环境（`t`、过滤器、禁止读文件）、渲染 html、markdown。

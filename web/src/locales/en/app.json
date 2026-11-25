@@ -1,7 +1,7 @@
 {
   "closeAsk": {
-    "title": "Close DBLENS",
-    "content": "Minimized to the tray, DBLENS keeps running; click the tray icon to bring the window back. Your choice is remembered and can be changed in Settings → General.",
+    "title": "Close DATLUMA",
+    "content": "Minimized to the tray, DATLUMA keeps running; click the tray icon to bring the window back. Your choice is remembered and can be changed in Settings → General.",
     "tray": "Minimize to tray",
     "quit": "Quit"
   },
@@ -15,9 +15,9 @@
     "reload": "Reload"
   },
   "boot": {
-    "serverUnreachable": "Cannot connect to the DBLENS service",
+    "serverUnreachable": "Cannot connect to the DATLUMA service",
     "missingToken": "Missing access token",
-    "missingTokenHint": "Open this page with the link that dblens-server prints at startup (it ends with #token=…)."
+    "missingTokenHint": "Open this page with the link that datluma-server prints at startup (it ends with #token=…)."
   },
   "settings": {
     "title": "Settings",
@@ -123,7 +123,7 @@
       "title": "Help",
       "checkUpdate": "Check for Updates…",
       "autoCheck": "Check for Updates at Startup",
-      "about": "About DBLENS"
+      "about": "About DATLUMA"
     }
   },
   "exec": {

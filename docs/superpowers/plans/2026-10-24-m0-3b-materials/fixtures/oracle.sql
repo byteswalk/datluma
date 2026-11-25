@@ -58,7 +58,7 @@ BEGIN EXECUTE IMMEDIATE 'DROP TYPE META_OBJ_T FORCE'; EXCEPTION WHEN OTHERS THEN
 -- @@ purge
 BEGIN EXECUTE IMMEDIATE 'PURGE RECYCLEBIN'; EXCEPTION WHEN OTHERS THEN NULL; END; -- x
 
--- Oracle fixture (schema DBLENS_TEST, prefix META_). Run fixture_drop.sql first (or this is run after it).
+-- Oracle fixture (schema DATLUMA_TEST, prefix META_). Run fixture_drop.sql first (or this is run after it).
 -- @@ type_obj
 CREATE OR REPLACE TYPE META_OBJ_T AS OBJECT (a NUMBER, b VARCHAR2(10))
 -- @@ type_nest
@@ -223,14 +223,14 @@ DROP TABLE META_BIN
 CREATE TABLE "Mixed Case" (
   "Id" NUMBER NOT NULL,
   "select" NUMBER,
-  "数洞" VARCHAR2(10),
+  "数览" VARCHAR2(10),
   "with space" VARCHAR2(5),
   CONSTRAINT "Mixed PK" PRIMARY KEY ("Id")
 )
 -- @@ mixed_cmt
 COMMENT ON COLUMN "Mixed Case"."select" IS '保留字列'
 -- @@ mixed_idx
-CREATE INDEX "Mixed Idx" ON "Mixed Case" ("select", "数洞")
+CREATE INDEX "Mixed Idx" ON "Mixed Case" ("select", "数览")
 -- @@ ds_t
 CREATE TABLE META_DS_T (
   c_number NUMBER,

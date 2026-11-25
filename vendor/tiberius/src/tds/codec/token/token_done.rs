@@ -67,13 +67,13 @@ impl TokenDone {
     /// `true` when the server has set the `DONE_ATTN` status bit, indicating
     /// this DONE token acknowledges a client Attention signal (MS-TDS
     /// section 2.2.7.6).
-    // DBLens 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
+    // DATLUMA 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
     #[allow(dead_code)]
     pub(crate) fn is_attention(&self) -> bool {
         self.status.contains(DoneStatus::Attention)
     }
 
-    /// DBLens 补丁：是否设置了 DONE_COUNT（行数有效）。
+    /// DATLUMA 补丁：是否设置了 DONE_COUNT（行数有效）。
     pub(crate) fn has_count(&self) -> bool {
         self.status.contains(DoneStatus::Count)
     }

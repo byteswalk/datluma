@@ -1,4 +1,4 @@
-DBLens 随安装包发布的第三方组件
+DATLUMA 随安装包发布的第三方组件
 
 clients/jre/
   由 OpenJDK 用 jlink 生成的精简 Java 运行环境，

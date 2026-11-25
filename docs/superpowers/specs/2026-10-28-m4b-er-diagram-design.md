@@ -1,6 +1,6 @@
 # M4b ER 图 设计
 
-日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-dblens-design.md` 第 11 节（M4 模型："ER 图（按列画外键连线，支持自定义逻辑外键）"）；M4a 设计 `docs/superpowers/specs/2026-10-27-m4a-model-compare-design.md`（模型目录、表文件、指纹、`/models` 接口）。
+日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-datluma-design.md` 第 11 节（M4 模型："ER 图（按列画外键连线，支持自定义逻辑外键）"）；M4a 设计 `docs/superpowers/specs/2026-10-27-m4a-model-compare-design.md`（模型目录、表文件、指纹、`/models` 接口）。
 
 ## 1. 目标与范围
 
@@ -63,7 +63,7 @@ logical_keys:
   comment: 历史原因没建外键      # 可省
 ```
 
-- 放在服务层的模型表（`ModelTable.logical_keys`）中，不进 `dblens_core::schema::Table`：比对、同步、M3 设计器都看不到，设计器保存时原样保留。
+- 放在服务层的模型表（`ModelTable.logical_keys`）中，不进 `datluma_core::schema::Table`：比对、同步、M3 设计器都看不到，设计器保存时原样保留。
 - 表、列改名时其他表的逻辑外键引用跟着改（与真外键相同）。
 - 被引用的表或列不存在时，逻辑外键保留，图上不画线，在图的提示列表中列出。
 - 增删时校验：两边的列存在、列数一致、名字在本表中不重复（不给名字时不查）。
@@ -108,7 +108,7 @@ logical_keys:
 
 ## 5. 服务层与接口
 
-### 5.1 服务层（`dblens-service/src/model/`）
+### 5.1 服务层（`datluma-service/src/model/`）
 
 - `file.rs`：表文件加 `logical_keys`（`LogicalKey { name, columns, ref_schema, ref_table, ref_columns, comment }`），读进 `ModelTable.logical_keys`；图文件 `DiagramFile { name, tables: All | List, display, positions, extra }`。
 - `diagram.rs`（新）：列出一个 schema 的图（默认图没有文件时也列出）；读图（图、所含的表和各自的逻辑外键、文件有错的表、指纹、提示）；保存（核对指纹）；新建、改名、删除。

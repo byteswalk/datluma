@@ -10,7 +10,7 @@
 
 ## 2. 范围
 
-- 实测版本：GBase 8s V8.8_3.6.5（VM .106，容器 `gbase8s`，端口 9088，服务器名 `gbase01`，库 `dblens_test`）。
+- 实测版本：GBase 8s V8.8_3.6.5（VM .106，容器 `gbase8s`，端口 9088，服务器名 `gbase01`，库 `datluma_test`）。
 - 只做 8s。GBase 8a、8c、8t 是别的产品，不在范围内。
 - 表单只列 GBase 8s。驱动叫 `informix`，因为协议来自 Informix；IBM Informix 未实测，不列入产品，也不做产品识别。
 - 不用 CSDK、ODBC，不自己实现 SQLI 协议。
@@ -32,7 +32,7 @@
 | `DATETIME YEAR TO FRACTION(3)` | 能读；`CURRENT` 取回的毫秒是 `.0`，待确认是服务器行为还是驱动截断 |
 | 取消 | `Statement.cancel()` 后返回 `-213`，连接继续可用 |
 | 事务 | `setAutoCommit`、`rollback` 正常 |
-| `sysmaster` | `admin` 能读；`dblens_test` 有日志，locale 为 `zh_CN.57372` |
+| `sysmaster` | `admin` 能读；`datluma_test` 有日志，locale 为 `zh_CN.57372` |
 | 元数据 | 不用 `DatabaseMetaData`，查系统表（第 6 节） |
 
 实例自带的 2015 年 `ifxjdbc.jar` 不可用：`VARCHAR` 中文读成空值，读 `TEXT` 卡死。
@@ -40,15 +40,15 @@
 ## 4. 桥接架构
 
 ```text
-dblens（Rust）── stdin/stdout 帧 ──> dblens-bridge（Java 进程）── JDBC ──> GBase 8s
+datluma（Rust）── stdin/stdout 帧 ──> datluma-bridge（Java 进程）── JDBC ──> GBase 8s
 ```
 
-- **Rust：** 新 crate `dblens-driver-jdbc`，实现 `Driver`、`Connection`，`DriverId::Informix`。能力：`catalogs: true`、`schemas: true`、`transactional_ddl: true`、`cancel: true`、`explain: false`、`multiple_result_sets: false`。
-- **Java：** 新目录 `bridge/`，没有第三方依赖，只用 JDK 自带类，构建产物 `dblens-bridge.jar`。构建 Java 部分只在打包时需要 JDK，`cargo` 构建不依赖它。
+- **Rust：** 新 crate `datluma-driver-jdbc`，实现 `Driver`、`Connection`，`DriverId::Informix`。能力：`catalogs: true`、`schemas: true`、`transactional_ddl: true`、`cancel: true`、`explain: false`、`multiple_result_sets: false`。
+- **Java：** 新目录 `bridge/`，没有第三方依赖，只用 JDK 自带类，构建产物 `datluma-bridge.jar`。构建 Java 部分只在打包时需要 JDK，`cargo` 构建不依赖它。
 - **进程：** 全应用一个 Java 进程，第一次连 GBase 时才启动，不用 GBase 的用户没有额外开销。stdin 关闭时进程退出，所以主程序崩溃不会留下孤儿进程。
 - **线程：** Java 端每条连接一个工作线程，读帧线程只负责分发，因此取消请求不会被运行中的查询挡住。
 - **密码：** 只放在帧里，不进命令行和环境变量，不写日志。
-- **崩溃：** Java 进程退出时，所有桥接连接报连接错误；下一次连接重新启动。stderr 写入 DBLens 日志。
+- **崩溃：** Java 进程退出时，所有桥接连接报连接错误；下一次连接重新启动。stderr 写入 DATLUMA 日志。
 
 ### 4.1 帧协议
 
@@ -89,13 +89,13 @@ dblens（Rust）── stdin/stdout 帧 ──> dblens-bridge（Java 进程）�
 
 | 部件 | 处理 |
 |---|---|
-| `dblens-bridge.jar` | 我们自己的代码，随包发布 |
+| `datluma-bridge.jar` | 我们自己的代码，随包发布 |
 | 精简 JRE | 打包时用 `jlink` 按平台生成，放在 `clients/jre/`，模块由 `jdeps` 确定，预计每平台 40–50 MB（未实测）。基于 OpenJDK，附 GPLv2+CE 声明 |
 | `gbasedbtjdbc.jar` | 许可未确认，见下 |
 
 查找 JDBC 驱动的顺序：连接选项 `jdbc_dir`（设置中指定后只查这一处）→ 程序自带的 `clients/jdbc/`。找不到时报 `DriverUnavailable`，提示官方下载地址和放置位置。不从工作目录加载。
 
-- **打包：** 新增 `scripts/prepare-clients.mjs`，生成 JRE 并把清单里的文件复制到被 git 忽略的 `clients-staging/`，由 `tauri.bundle.json` 的 `resources` 打进安装包；`dblens-server` 的压缩包同样带上。
+- **打包：** 新增 `scripts/prepare-clients.mjs`，生成 JRE 并把清单里的文件复制到被 git 忽略的 `clients-staging/`，由 `tauri.bundle.json` 的 `resources` 打进安装包；`datluma-server` 的压缩包同样带上。
 - **发布门槛：** 清单里的文件缺失时打包失败。
 - **仓库：** 第三方 jar 和 JRE 绝不提交。公开仓库里只有脚本和清单（文件名、版本、SHA-256）。
 - **声明：** 第三方许可汇总到 `THIRD-PARTY-NOTICES`。
@@ -128,9 +128,9 @@ dblens（Rust）── stdin/stdout 帧 ──> dblens-bridge（Java 进程）�
 ## 8. 测试
 
 - 单元：帧编解码（Rust 和 Java 两端，用同一组样例）、URL 拼接、`coltype` 解码、脚本拆分、错误码归类。这些不依赖数据库。
-- 一致性：`dblens-driver` 的 conformance，环境变量 `DBLENS_TEST_GBASE_URL`，jar 路径 `DBLENS_TEST_JDBC_DIR`；密码只内联传入。
+- 一致性：`datluma-driver` 的 conformance，环境变量 `DATLUMA_TEST_GBASE_URL`，jar 路径 `DATLUMA_TEST_JDBC_DIR`；密码只内联传入。
 - 桥接：Java 进程被杀后，连接报错且下一次连接恢复；大结果集分批读取时内存不随行数增长；取消运行中的查询。
 - 元数据：`meta_snapshots` 和 `meta_live` 加 GBase 8s，夹具 `fixtures/gbase8s.sql`。
-- 服务和接口：`dblens-service`、`dblens-api` 的 live 测试串行运行，不加 `--include-ignored`。
-- 打包：Windows 安装包在没有系统 Java 的环境（Win11 VM .103）里连上实例；`dblens-server` 在 Linux 上连上实例。
+- 服务和接口：`datluma-service`、`datluma-api` 的 live 测试串行运行，不加 `--include-ignored`。
+- 打包：Windows 安装包在没有系统 Java 的环境（Win11 VM .103）里连上实例；`datluma-server` 在 Linux 上连上实例。
 - 界面：内置浏览器用真实鼠标走完连接、树、查询、编辑、危险语句确认、运维，再确认 jar 缺失时的提示。

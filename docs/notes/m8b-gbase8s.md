@@ -22,7 +22,7 @@
 
 ## 桌面窗口验证（dev 构建）
 
-用 `dblens-desktop` 的 debug 构建加 `DBLENS_DATA_DIR`，系统级真实鼠标走过：MySQL 生产连接的建用户、授权、回收、锁定、改密、输入主体名删除；GBase 的权限只读、谁能访问、设计器、规范检查、文档导出对话框。
+用 `datluma-desktop` 的 debug 构建加 `DATLUMA_DATA_DIR`，系统级真实鼠标走过：MySQL 生产连接的建用户、授权、回收、锁定、改密、输入主体名删除；GBase 的权限只读、谁能访问、设计器、规范检查、文档导出对话框。
 
 这一轮查出的问题：
 

@@ -1,6 +1,6 @@
 // SQL Server 的语言服务（M6a 设计文档第 8 节）：grammars-v4 的 T-SQL 语法生成的解析器，加 antlr4-c3 分析光标处
 // 可以出现的规则和关键字。做法同 PL/SQL（plsql/parser.ts）：先分批再逐批解析，没改动的批用缓存；先 SLL 后 LL。
-// 分批规则与后端 dblens-dialect 的 split.rs 一致：单独一行的 `GO [次数]`（行尾可有注释）结束一批；
+// 分批规则与后端 datluma-dialect 的 split.rs 一致：单独一行的 `GO [次数]`（行尾可有注释）结束一批；
 // 字符串、`[…]`、`"…"` 和注释里的 GO 由词法分析排除。"光标处的语句"就是光标所在的一批。
 
 import { CodeCompletionCore } from 'antlr4-c3'

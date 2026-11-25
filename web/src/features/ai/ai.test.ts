@@ -30,11 +30,11 @@ describe('looksLikeSql', () => {
 
 describe('mcpConfig', () => {
   it('points at the desktop exe or the server command', () => {
-    expect(JSON.parse(mcpConfig('C:\\DBLENS\\DBLENS.exe', true)).mcpServers.dblens).toEqual({
-      command: 'C:\\DBLENS\\DBLENS.exe',
+    expect(JSON.parse(mcpConfig('C:\\DATLUMA\\DATLUMA.exe', true)).mcpServers.datluma).toEqual({
+      command: 'C:\\DATLUMA\\DATLUMA.exe',
       args: ['--mcp'],
     })
-    expect(JSON.parse(mcpConfig(null, false)).mcpServers.dblens).toEqual({ command: 'dblens-server', args: ['mcp'] })
+    expect(JSON.parse(mcpConfig(null, false)).mcpServers.datluma).toEqual({ command: 'datluma-server', args: ['mcp'] })
   })
 })
 

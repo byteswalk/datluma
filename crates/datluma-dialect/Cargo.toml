@@ -1,0 +1,25 @@
+[package]
+name = "datluma-dialect"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+datluma-core.workspace = true
+datluma-driver.workspace = true
+minijinja.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+chrono.workspace = true
+datluma-driver-jdbc.workspace = true
+datluma-driver-mysql.workspace = true
+datluma-driver-oracle.workspace = true
+datluma-driver-postgres.workspace = true
+datluma-driver-sqlserver.workspace = true
+datluma-driver-sqlite.workspace = true
+insta.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+tokio.workspace = true

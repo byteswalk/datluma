@@ -1,4 +1,4 @@
-//! openGauss password authentication (DBLens patch, see `vendor/PATCHES.md`).
+//! openGauss password authentication (DATLUMA patch, see `vendor/PATCHES.md`).
 //!
 //! openGauss reuses authentication request code 10 (`AUTH_REQ_SHA256`, the same code PostgreSQL uses for
 //! SASL) for its own RFC 5802-style exchange. The request body starts with a 4-byte password storage

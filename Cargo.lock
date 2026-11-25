@@ -1210,11 +1210,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4583a4551df46e2792f82ceeac45e850d2e2d5debba0b91f102385cda5b11f06"
 
 [[package]]
-name = "dblens-ai"
+name = "datluma-ai"
 version = "0.1.0"
 dependencies = [
  "axum",
- "dblens-core",
+ "datluma-core",
  "reqwest",
  "serde",
  "serde_json",
@@ -1223,17 +1223,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-api"
+name = "datluma-api"
 version = "0.1.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
- "dblens-ai",
- "dblens-core",
- "dblens-dialect",
- "dblens-driver",
- "dblens-lint",
- "dblens-service",
+ "datluma-ai",
+ "datluma-core",
+ "datluma-dialect",
+ "datluma-driver",
+ "datluma-lint",
+ "datluma-service",
  "futures",
  "http-body-util",
  "serde",
@@ -1247,7 +1247,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-core"
+name = "datluma-core"
 version = "0.1.0"
 dependencies = [
  "base64 0.23.1",
@@ -1261,13 +1261,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-desktop"
+name = "datluma-desktop"
 version = "0.1.0"
 dependencies = [
- "dblens-api",
- "dblens-core",
- "dblens-mcp",
- "dblens-service",
+ "datluma-api",
+ "datluma-core",
+ "datluma-mcp",
+ "datluma-service",
  "serde",
  "serde_json",
  "tauri",
@@ -1285,18 +1285,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-dialect"
+name = "datluma-dialect"
 version = "0.1.0"
 dependencies = [
  "chrono",
- "dblens-core",
- "dblens-driver",
- "dblens-driver-jdbc",
- "dblens-driver-mysql",
- "dblens-driver-oracle",
- "dblens-driver-postgres",
- "dblens-driver-sqlite",
- "dblens-driver-sqlserver",
+ "datluma-core",
+ "datluma-driver",
+ "datluma-driver-jdbc",
+ "datluma-driver-mysql",
+ "datluma-driver-oracle",
+ "datluma-driver-postgres",
+ "datluma-driver-sqlite",
+ "datluma-driver-sqlserver",
  "insta",
  "minijinja",
  "serde",
@@ -1306,11 +1306,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-driver"
+name = "datluma-driver"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "dblens-core",
+ "datluma-core",
  "futures",
  "percent-encoding",
  "serde",
@@ -1320,25 +1320,25 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-driver-jdbc"
+name = "datluma-driver-jdbc"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dblens-core",
- "dblens-driver",
+ "datluma-core",
+ "datluma-driver",
  "tokio",
  "tracing",
 ]
 
 [[package]]
-name = "dblens-driver-mysql"
+name = "datluma-driver-mysql"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dblens-core",
- "dblens-driver",
+ "datluma-core",
+ "datluma-driver",
  "mysql_async",
  "native-tls",
  "serde_json",
@@ -1346,26 +1346,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-driver-oracle"
+name = "datluma-driver-oracle"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dblens-core",
- "dblens-driver",
+ "datluma-core",
+ "datluma-driver",
  "oracle",
  "tokio",
 ]
 
 [[package]]
-name = "dblens-driver-postgres"
+name = "datluma-driver-postgres"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
  "chrono",
- "dblens-core",
- "dblens-driver",
+ "datluma-core",
+ "datluma-driver",
  "futures",
  "rustls",
  "serde_json",
@@ -1377,26 +1377,26 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-driver-sqlite"
+name = "datluma-driver-sqlite"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dblens-core",
- "dblens-driver",
+ "datluma-core",
+ "datluma-driver",
  "rusqlite",
  "tempfile",
  "tokio",
 ]
 
 [[package]]
-name = "dblens-driver-sqlserver"
+name = "datluma-driver-sqlserver"
 version = "0.1.0"
 dependencies = [
  "async-trait",
  "chrono",
- "dblens-core",
- "dblens-driver",
+ "datluma-core",
+ "datluma-driver",
  "futures",
  "tiberius",
  "tokio",
@@ -1405,11 +1405,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-lint"
+name = "datluma-lint"
 version = "0.1.0"
 dependencies = [
- "dblens-core",
- "dblens-dialect",
+ "datluma-core",
+ "datluma-dialect",
  "insta",
  "regex",
  "serde",
@@ -1418,12 +1418,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-mcp"
+name = "datluma-mcp"
 version = "0.1.0"
 dependencies = [
- "dblens-core",
- "dblens-dialect",
- "dblens-service",
+ "datluma-core",
+ "datluma-dialect",
+ "datluma-service",
  "rmcp",
  "schemars 1.2.3",
  "serde",
@@ -1432,13 +1432,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-server"
+name = "datluma-server"
 version = "0.1.0"
 dependencies = [
- "dblens-api",
- "dblens-core",
- "dblens-mcp",
- "dblens-service",
+ "datluma-api",
+ "datluma-core",
+ "datluma-mcp",
+ "datluma-service",
  "reqwest",
  "semver",
  "serde",
@@ -1450,7 +1450,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "dblens-service"
+name = "datluma-service"
 version = "0.1.0"
 dependencies = [
  "argon2",
@@ -1460,17 +1460,17 @@ dependencies = [
  "chacha20poly1305",
  "chrono",
  "csv",
- "dblens-ai",
- "dblens-core",
- "dblens-dialect",
- "dblens-driver",
- "dblens-driver-jdbc",
- "dblens-driver-mysql",
- "dblens-driver-oracle",
- "dblens-driver-postgres",
- "dblens-driver-sqlite",
- "dblens-driver-sqlserver",
- "dblens-lint",
+ "datluma-ai",
+ "datluma-core",
+ "datluma-dialect",
+ "datluma-driver",
+ "datluma-driver-jdbc",
+ "datluma-driver-mysql",
+ "datluma-driver-oracle",
+ "datluma-driver-postgres",
+ "datluma-driver-sqlite",
+ "datluma-driver-sqlserver",
+ "datluma-lint",
  "directories",
  "encoding_rs",
  "encoding_rs_io",

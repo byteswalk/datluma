@@ -52,7 +52,7 @@ web/src/features/sql/
 
 验证中的调整（与设计文档不同之处）：
 - 生成工具用 `antlr-ng`（纯 TypeScript，不需要 Java），生成约 5 秒，所以生成的代码不提交，`pnpm dev` / `build` / `test` / `typecheck` 前自动生成，输入不变时跳过。
-- 按 Oracle 的规则先分句再逐句解析（与后端 `dblens-dialect` 的 split.rs 一致）：一句出错不影响后面的检查；补全只解析光标所在的一句；没改动的句子用缓存。
+- 按 Oracle 的规则先分句再逐句解析（与后端 `datluma-dialect` 的 split.rs 一致）：一句出错不影响后面的检查；补全只解析光标所在的一句；没改动的句子用缓存。
 - 表和别名按词扫描（FROM / JOIN / INTO / UPDATE / USING / TABLE 之后），写到一半的语句也能识别。
 
 ### 语法补丁

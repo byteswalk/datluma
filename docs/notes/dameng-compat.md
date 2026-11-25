@@ -4,9 +4,9 @@
 
 ## 测试库
 
-- `COMPATIBLE_MODE`：用 VM .106 上独立的 5237 实例（`/dmdata/jdbc`，账号 `DBLENS_JDBC`）依次切到 0、2、3、4、7，各跑一遍工作区全量测试，测完改回 0 并停掉。连接串 `DBLENS_TEST_DM5237_URL`。
-- 大小写不敏感：另建了 5238 实例（`/dmdata/ci`，`CASE_SENSITIVE=N`，账号 `DBLENS_TEST`，密码是 creds.env 的 `DM_CI`），连接串 `DBLENS_TEST_DM_CI_URL`。平时停着，启动方法和 5237 一样，`dm.ini` 换成 `/dmdata/ci/DAMENG/dm.ini`。
-- 跑的时候把上面的连接串赋给 `DBLENS_TEST_DM_URL`。
+- `COMPATIBLE_MODE`：用 VM .106 上独立的 5237 实例（`/dmdata/jdbc`，账号 `DATLUMA_JDBC`）依次切到 0、2、3、4、7，各跑一遍工作区全量测试，测完改回 0 并停掉。连接串 `DATLUMA_TEST_DM5237_URL`。
+- 大小写不敏感：另建了 5238 实例（`/dmdata/ci`，`CASE_SENSITIVE=N`，账号 `DATLUMA_TEST`，密码是 creds.env 的 `DM_CI`），连接串 `DATLUMA_TEST_DM_CI_URL`。平时停着，启动方法和 5237 一样，`dm.ini` 换成 `/dmdata/ci/DAMENG/dm.ini`。
+- 跑的时候把上面的连接串赋给 `DATLUMA_TEST_DM_URL`。
 
 ## 结果
 
@@ -42,7 +42,7 @@
 
 ## 其他
 
-- 元数据测试原先写死 `DBLENS_TEST` schema，换成 5237 的 `DBLENS_JDBC` 账号就找不到表。改成按连接账号取 schema。
+- 元数据测试原先写死 `DATLUMA_TEST` schema，换成 5237 的 `DATLUMA_JDBC` 账号就找不到表。改成按连接账号取 schema。
 
 ## 没有验证的
 

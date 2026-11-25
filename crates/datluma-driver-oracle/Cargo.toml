@@ -1,0 +1,18 @@
+[package]
+name = "datluma-driver-oracle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait.workspace = true
+chrono.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
+oracle.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+datluma-driver = { workspace = true, features = ["conformance"] }
+tokio.workspace = true

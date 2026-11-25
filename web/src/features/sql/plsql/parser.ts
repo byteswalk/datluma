@@ -2,7 +2,7 @@
 // 加 antlr4-c3 分析光标处可以出现的规则和关键字。做法参照 dt-sql-parser：
 // - 先分句，再逐句解析：一句出错不影响后面的检查；补全只解析光标所在的一句；没改动的句子用缓存；
 // - 先用 SLL 解析，出错再用 LL 重新解析（SLL 快，但个别语句会误报）。
-// 分句规则与后端 dblens-dialect 的 split.rs 一致：`;` 结束语句；PL/SQL 块以单独一行的 `/` 结束。
+// 分句规则与后端 datluma-dialect 的 split.rs 一致：`;` 结束语句；PL/SQL 块以单独一行的 `/` 结束。
 
 import { CodeCompletionCore } from 'antlr4-c3'
 import {

@@ -4,7 +4,7 @@
 
 **Goal:** 支持 SQL Server 2017 及以上：连接（SQL 账号、Windows 账号、当前 Windows 用户；实例名；TLS 和信任服务器证书）、像 SSMS 一样按"连接 → 库 → 架构 → 对象"浏览、按 `GO` 分批执行 T-SQL（多结果集、PRINT 消息、错误行号、取消）、结果编辑、运维查询、执行计划、生产环境危险语句确认；表设计器、导入、文档导出、比对和迁移留给 M6b，入口置灰。
 
-**Architecture:** 新驱动 `dblens-driver-sqlserver` 基于 tiberius 0.13（打了补丁：结果流带出影响行数和 INFO 消息，取消后按包丢弃到确认为止），后台任务独占连接；方言层加 `Family::SqlServer`（方括号、`@P1`、`N''`、`GO` 分批、类型、元数据和运维模板、危险语句）；服务层的元数据连接池和缓存按"连接 + 库"区分，接口加 `catalog` 参数和库列表；前端把库名和架构合成一个字符串在各处传递，编辑器用 grammars-v4 的 T-SQL 语法做检查和补全。
+**Architecture:** 新驱动 `datluma-driver-sqlserver` 基于 tiberius 0.13（打了补丁：结果流带出影响行数和 INFO 消息，取消后按包丢弃到确认为止），后台任务独占连接；方言层加 `Family::SqlServer`（方括号、`@P1`、`N''`、`GO` 分批、类型、元数据和运维模板、危险语句）；服务层的元数据连接池和缓存按"连接 + 库"区分，接口加 `catalog` 参数和库列表；前端把库名和架构合成一个字符串在各处传递，编辑器用 grammars-v4 的 T-SQL 语法做检查和补全。
 
 **Tech Stack:** Rust（tiberius 0.13 + tokio-util compat、sqlparser 的 MsSqlDialect、insta）；React 19 + TypeScript、antd 6、Monaco、antlr-ng / antlr4-c3、sql-formatter（transactsql）、Vitest。
 
@@ -22,7 +22,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级（有意固定版本的记入 `scripts/check-deps.mjs` 的 `HOLD`）。tiberius 的 `sspi-rs`（非 Windows 的 Windows 认证）依赖预发布的 sha1，不启用。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误和提示用 `msg!` 词条（`src` 中的中文字面量只能出现在 `#[cfg(test)]` 之后，单独的测试文件中也不能有）；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 实库测试一律串行（`--test-threads=1`），不加 `--include-ignored`（会跑达梦的 spike 测试并卡住）。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
@@ -30,7 +30,7 @@
 ## 与设计文档的差异（写计划时实测后调整）
 
 - 按库取元数据：不用模板函数 `{{ catalog() }}` 拼三段名，改为元数据连接池按"连接 + 库"区分、连接时指定库（`Profile::in_catalog`）；模板只查当前库的 `sys.*` 视图，库名不进入 SQL 文本。
-- TLS 三档：关闭（`EncryptionLevel::Off`，登录报文仍加密，服务器强制加密时由服务器决定）、必须（`Required`，不校验证书）、校验证书（`Required`，打开"信任服务器证书"时不校验，否则用指定的 CA）。DBLens 的 TLS 选项没有"优先"。
+- TLS 三档：关闭（`EncryptionLevel::Off`，登录报文仍加密，服务器强制加密时由服务器决定）、必须（`Required`，不校验证书）、校验证书（`Required`，打开"信任服务器证书"时不校验，否则用指定的 CA）。DATLUMA 的 TLS 选项没有"优先"。
 - Windows 认证只在 Windows 上可用（见上）。表单在所有平台都显示这两项，附说明。
 - 取消：tiberius 0.13 能发 attention 包，但原来的清理按令牌读，结果集读到一半时会读乱，下一条查询得到空结果。补丁改为按包丢弃，直到收到带 attention 标志的 DONE；取消后连接保留，会话状态都还在。
 - 危险语句：sqlparser 解析不了的批（过程式代码、没有分号分隔的多条语句）按关键字扫描（DROP、TRUNCATE、DELETE、UPDATE 及 SQL Server 特有的几个），不含 MERGE。
@@ -51,19 +51,19 @@
 
 ```text
 Cargo.toml（tiberius、tokio-util，[patch.crates-io] tiberius）; vendor/tiberius/（补丁）; vendor/PATCHES.md
-crates/dblens-driver-sqlserver/{Cargo.toml, src/{lib,actor,conn,exec,types,error}.rs, tests/conformance.rs}（新增）
-crates/dblens-driver/{Cargo.toml, src/params.rs}
-crates/dblens-dialect/sql/{sqlserver.sql, ops/sqlserver.sql}（新增）
-crates/dblens-dialect/src/{variant,ident,literal,ddl,dml,types,split,session,ops,lib}.rs, src/meta/{mod,template}.rs,
+crates/datluma-driver-sqlserver/{Cargo.toml, src/{lib,actor,conn,exec,types,error}.rs, tests/conformance.rs}（新增）
+crates/datluma-driver/{Cargo.toml, src/params.rs}
+crates/datluma-dialect/sql/{sqlserver.sql, ops/sqlserver.sql}（新增）
+crates/datluma-dialect/src/{variant,ident,literal,ddl,dml,types,split,session,ops,lib}.rs, src/meta/{mod,template}.rs,
   src/design/{catalog,rebuild,sql}.rs, src/migrate/{data,expr,mod,names,script,types}.rs, src/compare/normalize.rs
-crates/dblens-dialect/tests/{meta_snapshots.rs, meta_live.rs, fixtures/sqlserver.sql, snapshots/meta_snapshots__sqlserver.snap}
-crates/dblens-service/src/{policy,profile,metadata,registry,service,session,changes,compare,design}.rs,
+crates/datluma-dialect/tests/{meta_snapshots.rs, meta_live.rs, fixtures/sqlserver.sql, snapshots/meta_snapshots__sqlserver.snap}
+crates/datluma-service/src/{policy,profile,metadata,registry,service,session,changes,compare,design}.rs,
   src/{document/job,import/job,migrate/mod,model/ops}.rs; tests/{live,migrate_live}.rs
-crates/dblens-api/src/{routes,lib}.rs, tests/live.rs; crates/dblens-core/locales/app.json
+crates/datluma-api/src/{routes,lib}.rs, tests/live.rs; crates/datluma-core/locales/app.json
 web/grammars/tsql/（新增）; web/scripts/gen-tsql.mjs（新增）; web/package.json; .gitignore
 web/src/features/sql/tsql/{parser.ts, parser.test.ts}（新增）; web/src/features/sql/{types,parsers,dialects,completion,functions,provider,metadata}.ts
 web/src/features/{tree,connections,editor,data,er,import,compare,migrate,model}/…; web/src/shared/{api,dbIcons}.ts; web/src/locales/{zh-CN,en}/{connections,editor,tree}.json
-docs/notes/{m6a-sqlserver.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m6a-sqlserver.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -116,7 +116,7 @@ Expected：输出中没有"查询失败"；以执行当天的结果为准，输�
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -145,51 +145,51 @@ git commit -m "chore: M6a 依赖复查（i18next 26.5.5、react-i18next 17.1.2�
 - `types.rs`：逻辑类型与原生类型的映射（时间精度最大 7）；`design/catalog.rs`：类型目录和能力；`design/sql.rs`、`migrate/*`、`compare/normalize.rs`：SqlServer 分支（设计器和迁移报 `sqlserver.later`）。
 - `session.rs`、`lib.rs`：`explain_cleanup`（执行计划后执行 `SET SHOWPLAN_ALL OFF`）；`ops.rs`：运维模板。
 - `meta/mod.rs`：`MetaKey::Catalogs`、`MetaArgs.catalog`；`meta/template.rs`；模板 `sql/sqlserver.sql`（catalogs、schemas、tables、views、sequences、routines、synonyms、columns、keys、checks、indexes、triggers、view_definition、routine_source、referencing_keys、dependent_views、grants、table_storage）和 `sql/ops/sqlserver.sql`；快照测试。
-- `dblens-service/src/policy.rs`：`classify_batch`（MsSqlDialect 拆成语句，取最危险的一条；解析不了时跳过字符串、方括号和注释扫描关键字）；KILL、SHUTDOWN、DBCC、RESTORE、ALTER DATABASE 一律确认。
+- `datluma-service/src/policy.rs`：`classify_batch`（MsSqlDialect 拆成语句，取最危险的一条；解析不了时跳过字符串、方括号和注释扫描关键字）；KILL、SHUTDOWN、DBCC、RESTORE、ALTER DATABASE 一律确认。
 - 后端词条加 `sqlserver.later`。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-dialect/sql/ops/sqlserver.sql`
-- Create: `crates/dblens-dialect/sql/sqlserver.sql`
-- Modify: `crates/dblens-dialect/src/compare/normalize.rs`
-- Modify: `crates/dblens-dialect/src/ddl.rs`
-- Modify: `crates/dblens-dialect/src/design/catalog.rs`
-- Modify: `crates/dblens-dialect/src/design/rebuild.rs`
-- Modify: `crates/dblens-dialect/src/design/sql.rs`
-- Modify: `crates/dblens-dialect/src/dml.rs`
-- Modify: `crates/dblens-dialect/src/ident.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Modify: `crates/dblens-dialect/src/literal.rs`
-- Modify: `crates/dblens-dialect/src/meta/mod.rs`
-- Modify: `crates/dblens-dialect/src/meta/template.rs`
-- Modify: `crates/dblens-dialect/src/migrate/data.rs`
-- Modify: `crates/dblens-dialect/src/migrate/expr.rs`
-- Modify: `crates/dblens-dialect/src/migrate/mod.rs`
-- Modify: `crates/dblens-dialect/src/migrate/names.rs`
-- Modify: `crates/dblens-dialect/src/migrate/script.rs`
-- Modify: `crates/dblens-dialect/src/migrate/types.rs`
-- Modify: `crates/dblens-dialect/src/ops.rs`
-- Modify: `crates/dblens-dialect/src/session.rs`
-- Modify: `crates/dblens-dialect/src/split.rs`
-- Modify: `crates/dblens-dialect/src/types.rs`
-- Modify: `crates/dblens-dialect/src/variant.rs`
-- Modify: `crates/dblens-dialect/tests/meta_snapshots.rs`
-- Create: `crates/dblens-dialect/tests/snapshots/meta_snapshots__sqlserver.snap`
-- Modify: `crates/dblens-service/src/policy.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-dialect/sql/ops/sqlserver.sql`
+- Create: `crates/datluma-dialect/sql/sqlserver.sql`
+- Modify: `crates/datluma-dialect/src/compare/normalize.rs`
+- Modify: `crates/datluma-dialect/src/ddl.rs`
+- Modify: `crates/datluma-dialect/src/design/catalog.rs`
+- Modify: `crates/datluma-dialect/src/design/rebuild.rs`
+- Modify: `crates/datluma-dialect/src/design/sql.rs`
+- Modify: `crates/datluma-dialect/src/dml.rs`
+- Modify: `crates/datluma-dialect/src/ident.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Modify: `crates/datluma-dialect/src/literal.rs`
+- Modify: `crates/datluma-dialect/src/meta/mod.rs`
+- Modify: `crates/datluma-dialect/src/meta/template.rs`
+- Modify: `crates/datluma-dialect/src/migrate/data.rs`
+- Modify: `crates/datluma-dialect/src/migrate/expr.rs`
+- Modify: `crates/datluma-dialect/src/migrate/mod.rs`
+- Modify: `crates/datluma-dialect/src/migrate/names.rs`
+- Modify: `crates/datluma-dialect/src/migrate/script.rs`
+- Modify: `crates/datluma-dialect/src/migrate/types.rs`
+- Modify: `crates/datluma-dialect/src/ops.rs`
+- Modify: `crates/datluma-dialect/src/session.rs`
+- Modify: `crates/datluma-dialect/src/split.rs`
+- Modify: `crates/datluma-dialect/src/types.rs`
+- Modify: `crates/datluma-dialect/src/variant.rs`
+- Modify: `crates/datluma-dialect/tests/meta_snapshots.rs`
+- Create: `crates/datluma-dialect/tests/snapshots/meta_snapshots__sqlserver.snap`
+- Modify: `crates/datluma-service/src/policy.rs`
 
 **Interfaces:**
 - Consumes：现有的 `Dialect`、元数据模板机制、`Policy`。
-- Produces（`dblens_dialect`）：`Family::SqlServer`、`Variant::SqlServer`、`MetaKey::Catalogs`、`MetaArgs { catalog: Option<String>, .. }`、`split::MAX_GO_COUNT`、`Dialect::explain_cleanup(&self) -> Option<&'static str>`、`session::explain_cleanup(Family)`；
-  `dblens_service::policy` 对 `Family::SqlServer` 的分类。
+- Produces（`datluma_dialect`）：`Family::SqlServer`、`Variant::SqlServer`、`MetaKey::Catalogs`、`MetaArgs { catalog: Option<String>, .. }`、`split::MAX_GO_COUNT`、`Dialect::explain_cleanup(&self) -> Option<&'static str>`、`session::explain_cleanup(Family)`；
+  `datluma_service::policy` 对 `Family::SqlServer` 的分类。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/tests/meta_snapshots.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/tests/meta_snapshots.rs`**
 
 ```diff
---- a/crates/dblens-dialect/tests/meta_snapshots.rs
-+++ b/crates/dblens-dialect/tests/meta_snapshots.rs
-@@ -5,7 +5,7 @@ use dblens_dialect::meta::{MetaArgs, MetaKey};
- use dblens_dialect::{Dialect, Family, Variant};
+--- a/crates/datluma-dialect/tests/meta_snapshots.rs
++++ b/crates/datluma-dialect/tests/meta_snapshots.rs
+@@ -5,7 +5,7 @@ use datluma_dialect::meta::{MetaArgs, MetaKey};
+ use datluma_dialect::{Dialect, Family, Variant};
  
  /// 有自己的模板覆盖文件的变体（PolarDB、GaussDB、HighGo 沿用家族模板）。
 -const VARIANTS: [Variant; 9] = [
@@ -242,11 +242,11 @@ git commit -m "chore: M6a 依赖复查（i18next 26.5.5、react-i18next 17.1.2�
          name: Some("EMP".into()),
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-dialect/tests/snapshots/meta_snapshots__sqlserver.snap`**
+- [ ] **Step 2: 新建 `crates/datluma-dialect/tests/snapshots/meta_snapshots__sqlserver.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/tests/meta_snapshots.rs
+source: crates/datluma-dialect/tests/meta_snapshots.rs
 expression: out
 ---
 -- [catalogs] [String("%员工%")]
@@ -529,11 +529,11 @@ WHERE t.schema_id = SCHEMA_ID(@P1)
   AND t.name = @P2
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 3: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -298,6 +298,7 @@
    "session.disconnected": {"zh-CN": "连接已断开", "en": "The connection is closed"},
    "session.explain_single": {"zh-CN": "执行计划只能针对一条语句", "en": "An execution plan can only be shown for a single statement"},
@@ -544,7 +544,7 @@ WHERE t.schema_id = SCHEMA_ID(@P1)
    "sqlfile.log_failed": {"zh-CN": "第 %{n} 条语句失败（第 %{line} 行）：", "en": "Statement %{n} failed (line %{line}):"},
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/sql/ops/sqlserver.sql`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/sql/ops/sqlserver.sql`**
 
 ```sql
 -- SQL Server ops queries (M6a). Dynamic management views need VIEW SERVER STATE (VIEW SERVER PERFORMANCE STATE on
@@ -637,7 +637,7 @@ CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) t
 ORDER BY qs.total_elapsed_time / qs.execution_count DESC
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/sql/sqlserver.sql`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/sql/sqlserver.sql`**
 
 ```sql
 -- SQL Server metadata queries (catalog views only). Base: SQL Server 2017+ (STRING_AGG); tested on 2022.
@@ -953,11 +953,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
   AND t.name = {{ bind("table") }}
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-dialect/src/compare/normalize.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-dialect/src/compare/normalize.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/compare/normalize.rs
-+++ b/crates/dblens-dialect/src/compare/normalize.rs
+--- a/crates/datluma-dialect/src/compare/normalize.rs
++++ b/crates/datluma-dialect/src/compare/normalize.rs
 @@ -259,7 +259,8 @@ fn same_check(a: &str, b: &str) -> bool {
  }
  
@@ -978,11 +978,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
              let n = name.to_ascii_lowercase();
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-dialect/src/ddl.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-dialect/src/ddl.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/ddl.rs
-+++ b/crates/dblens-dialect/src/ddl.rs
+--- a/crates/datluma-dialect/src/ddl.rs
++++ b/crates/datluma-dialect/src/ddl.rs
 @@ -114,6 +114,27 @@ impl Dialect {
                  | DdlKind::Procedure => Ok(None),
                  _ => Err(unsupported()),
@@ -1185,11 +1185,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
          let mut c = col("ID", "NUMBER");
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-dialect/src/design/catalog.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-dialect/src/design/catalog.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/catalog.rs
-+++ b/crates/dblens-dialect/src/design/catalog.rs
+--- a/crates/datluma-dialect/src/design/catalog.rs
++++ b/crates/datluma-dialect/src/design/catalog.rs
 @@ -154,6 +154,33 @@ const DAMENG_TYPES: &[TypeEntry] = &[
      t("TIMESTAMP WITH TIME ZONE", L),
  ];
@@ -1242,11 +1242,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  }
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-dialect/src/design/rebuild.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-dialect/src/design/rebuild.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/rebuild.rs
-+++ b/crates/dblens-dialect/src/design/rebuild.rs
+--- a/crates/datluma-dialect/src/design/rebuild.rs
++++ b/crates/datluma-dialect/src/design/rebuild.rs
 @@ -75,7 +75,7 @@ impl Dialect {
              Family::MySql => 64,
              Family::Postgres => 63,
@@ -1268,11 +1268,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
          if !mysql {
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-dialect/src/design/sql.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-dialect/src/design/sql.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/sql.rs
-+++ b/crates/dblens-dialect/src/design/sql.rs
+--- a/crates/datluma-dialect/src/design/sql.rs
++++ b/crates/datluma-dialect/src/design/sql.rs
 @@ -53,7 +53,7 @@ impl Dialect {
                          out.push(msg!("design.unsupported.serial", column = to.name));
                      }
@@ -1287,17 +1287,17 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
              Family::Postgres => self.pg_design(schema, table, &diff.changes),
              Family::Oracle | Family::Dameng => self.oracle_design(schema, table, &diff.changes),
 +            // 表设计器的 SQL Server 支持在 M6b
-+            Family::SqlServer => Err(dblens_core::Error::invalid(dblens_core::msg!("sqlserver.later"))),
++            Family::SqlServer => Err(datluma_core::Error::invalid(datluma_core::msg!("sqlserver.later"))),
          }
      }
  
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-dialect/src/dml.rs`**
+- [ ] **Step 11: 修改 `crates/datluma-dialect/src/dml.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/dml.rs
-+++ b/crates/dblens-dialect/src/dml.rs
+--- a/crates/datluma-dialect/src/dml.rs
++++ b/crates/datluma-dialect/src/dml.rs
 @@ -50,7 +50,9 @@ impl Dialect {
          let sql = if cols.is_empty() {
              match (self.family(), table.columns.iter().find(|c| c.generated.is_none())) {
@@ -1311,11 +1311,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
                  }
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-dialect/src/ident.rs`**
+- [ ] **Step 12: 修改 `crates/datluma-dialect/src/ident.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/ident.rs
-+++ b/crates/dblens-dialect/src/ident.rs
+--- a/crates/datluma-dialect/src/ident.rs
++++ b/crates/datluma-dialect/src/ident.rs
 @@ -7,11 +7,12 @@ pub fn quote_ident(family: Family, name: &str) -> String {
      match family {
          Family::MySql => format!("`{}`", name.replace('`', "``")),
@@ -1569,7 +1569,7 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
 +        assert_eq!(ident(Family::SqlServer, "PUBLIC"), "[PUBLIC]");
 +        assert_eq!(ident(Family::SqlServer, "IDENTITY_INSERT"), "[IDENTITY_INSERT]");
 +        assert_eq!(ident(Family::SqlServer, "x; DROP TABLE t"), "[x; DROP TABLE t]");
-+        assert_eq!(ident(Family::SqlServer, "数洞"), "[数洞]");
++        assert_eq!(ident(Family::SqlServer, "数览"), "[数览]");
 +        assert!(SQLSERVER_RESERVED.windows(2).all(|w| w[0] < w[1]));
      }
  
@@ -1581,15 +1581,15 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
 -        for f in [Family::MySql, Family::Postgres, Family::Oracle, Family::Dameng] {
 +        for f in [Family::MySql, Family::Postgres, Family::Oracle, Family::Dameng, Family::SqlServer] {
              for name in
-                 ["a", "A", "a b", "a\"b", "a`b", "x;--", "数洞", "", "_", "1a", "$x", "ORDER", "order"]
+                 ["a", "A", "a b", "a\"b", "a`b", "x;--", "数览", "", "_", "1a", "$x", "ORDER", "order"]
              {
 ```
 
-- [ ] **Step 13: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 13: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -155,6 +155,11 @@ impl Dialect {
          session::explain(self.family(), sql)
      }
@@ -1604,11 +1604,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
          session::current_schema(self.family())
 ```
 
-- [ ] **Step 14: 修改 `crates/dblens-dialect/src/literal.rs`**
+- [ ] **Step 14: 修改 `crates/datluma-dialect/src/literal.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/literal.rs
-+++ b/crates/dblens-dialect/src/literal.rs
+--- a/crates/datluma-dialect/src/literal.rs
++++ b/crates/datluma-dialect/src/literal.rs
 @@ -22,6 +22,14 @@ pub fn literal(family: Family, v: &Value) -> Result<String> {
          Value::Json(j) => string_literal(family, &j.to_string())?,
          Value::Uuid(u) => string_literal(family, &u.to_string())?,
@@ -1711,7 +1711,7 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
 +    fn sqlserver_literals() {
 +        let f = Family::SqlServer;
 +        assert_eq!(lit(f, Value::Bool(true)), "1");
-+        assert_eq!(lit(f, Value::String("it's 数洞".into())), "N'it''s 数洞'");
++        assert_eq!(lit(f, Value::String("it's 数览".into())), "N'it''s 数览'");
 +        assert_eq!(lit(f, Value::Bytes(vec![0x01, 0xab])), "0x01AB");
 +        assert_eq!(lit(f, Value::Bytes(vec![])), "0x");
 +        let d = NaiveDate::from_ymd_opt(2024, 2, 29).unwrap();
@@ -1730,11 +1730,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  }
 ```
 
-- [ ] **Step 15: 修改 `crates/dblens-dialect/src/meta/mod.rs`**
+- [ ] **Step 15: 修改 `crates/datluma-dialect/src/meta/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/mod.rs
-+++ b/crates/dblens-dialect/src/meta/mod.rs
+--- a/crates/datluma-dialect/src/meta/mod.rs
++++ b/crates/datluma-dialect/src/meta/mod.rs
 @@ -21,6 +21,9 @@ pub use rows::{MetaRow, MetaRows};
  #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
  #[serde(rename_all = "snake_case")]
@@ -1774,11 +1774,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
      pub name: Option<String>,
 ```
 
-- [ ] **Step 16: 修改 `crates/dblens-dialect/src/meta/template.rs`**
+- [ ] **Step 16: 修改 `crates/datluma-dialect/src/meta/template.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/template.rs
-+++ b/crates/dblens-dialect/src/meta/template.rs
+--- a/crates/datluma-dialect/src/meta/template.rs
++++ b/crates/datluma-dialect/src/meta/template.rs
 @@ -23,8 +23,9 @@ const KINGBASE: &str = include_str!("../../sql/kingbase.sql");
  const OPENGAUSS: &str = include_str!("../../sql/opengauss.sql");
  const TIDB: &str = include_str!("../../sql/tidb.sql");
@@ -1808,11 +1808,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  
 ```
 
-- [ ] **Step 17: 修改 `crates/dblens-dialect/src/migrate/data.rs`**
+- [ ] **Step 17: 修改 `crates/datluma-dialect/src/migrate/data.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/data.rs
-+++ b/crates/dblens-dialect/src/migrate/data.rs
+--- a/crates/datluma-dialect/src/migrate/data.rs
++++ b/crates/datluma-dialect/src/migrate/data.rs
 @@ -124,15 +124,15 @@ pub fn keyset_params(last: &[Value]) -> Vec<Value> {
      (0..last.len()).flat_map(|i| last[..=i].iter().cloned()).collect()
  }
@@ -1878,11 +1878,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  }
 ```
 
-- [ ] **Step 18: 修改 `crates/dblens-dialect/src/migrate/expr.rs`**
+- [ ] **Step 18: 修改 `crates/datluma-dialect/src/migrate/expr.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/expr.rs
-+++ b/crates/dblens-dialect/src/migrate/expr.rs
+--- a/crates/datluma-dialect/src/migrate/expr.rs
++++ b/crates/datluma-dialect/src/migrate/expr.rs
 @@ -308,6 +308,7 @@ pub(super) fn convert_default(
                  .map(|s| Some(format!("nextval({s})")))
                  .map_err(|_| ()),
@@ -1893,11 +1893,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
      }
 ```
 
-- [ ] **Step 19: 修改 `crates/dblens-dialect/src/migrate/mod.rs`**
+- [ ] **Step 19: 修改 `crates/datluma-dialect/src/migrate/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/mod.rs
-+++ b/crates/dblens-dialect/src/migrate/mod.rs
+--- a/crates/datluma-dialect/src/migrate/mod.rs
++++ b/crates/datluma-dialect/src/migrate/mod.rs
 @@ -316,7 +316,8 @@ impl Context<'_> {
              })
      }
@@ -1918,11 +1918,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
          (!system).then(|| self.case.apply(n))
 ```
 
-- [ ] **Step 20: 修改 `crates/dblens-dialect/src/migrate/names.rs`**
+- [ ] **Step 20: 修改 `crates/datluma-dialect/src/migrate/names.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/names.rs
-+++ b/crates/dblens-dialect/src/migrate/names.rs
+--- a/crates/datluma-dialect/src/migrate/names.rs
++++ b/crates/datluma-dialect/src/migrate/names.rs
 @@ -18,12 +18,12 @@ pub enum NameCase {
  }
  
@@ -1958,11 +1958,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  
 ```
 
-- [ ] **Step 21: 修改 `crates/dblens-dialect/src/migrate/script.rs`**
+- [ ] **Step 21: 修改 `crates/datluma-dialect/src/migrate/script.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/script.rs
-+++ b/crates/dblens-dialect/src/migrate/script.rs
+--- a/crates/datluma-dialect/src/migrate/script.rs
++++ b/crates/datluma-dialect/src/migrate/script.rs
 @@ -213,7 +213,7 @@ fn design(tgt: &Dialect, schema: &str, table: &str, change: TableChange) -> Resu
  fn drop_sql(tgt: &Dialect, schema: &str, name: &str) -> String {
      let q = tgt.qualified(Some(schema), name);
@@ -1974,11 +1974,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
      }
 ```
 
-- [ ] **Step 22: 修改 `crates/dblens-dialect/src/migrate/types.rs`**
+- [ ] **Step 22: 修改 `crates/datluma-dialect/src/migrate/types.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/types.rs
-+++ b/crates/dblens-dialect/src/migrate/types.rs
+--- a/crates/datluma-dialect/src/migrate/types.rs
++++ b/crates/datluma-dialect/src/migrate/types.rs
 @@ -135,11 +135,13 @@ pub(super) fn identity_supported(tgt: &Dialect) -> bool {
      !(tgt.family() == Family::Oracle && tgt.version().is_some_and(|v| v < 120000))
  }
@@ -1996,11 +1996,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  }
 ```
 
-- [ ] **Step 23: 修改 `crates/dblens-dialect/src/ops.rs`**
+- [ ] **Step 23: 修改 `crates/datluma-dialect/src/ops.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/ops.rs
-+++ b/crates/dblens-dialect/src/ops.rs
+--- a/crates/datluma-dialect/src/ops.rs
++++ b/crates/datluma-dialect/src/ops.rs
 @@ -25,6 +25,7 @@ const DAMENG: &str = include_str!("../sql/ops/dameng.sql");
  const TIDB: &str = include_str!("../sql/ops/tidb.sql");
  const OCEANBASE: &str = include_str!("../sql/ops/oceanbase.sql");
@@ -2019,11 +2019,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  
 ```
 
-- [ ] **Step 24: 修改 `crates/dblens-dialect/src/session.rs`**
+- [ ] **Step 24: 修改 `crates/datluma-dialect/src/session.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/session.rs
-+++ b/crates/dblens-dialect/src/session.rs
+--- a/crates/datluma-dialect/src/session.rs
++++ b/crates/datluma-dialect/src/session.rs
 @@ -1,11 +1,14 @@
  //! 会话级 SQL：执行计划、读取和切换当前 schema。
 +//! SQL Server 不能在会话中切换默认架构，会话的"当前 schema"是当前数据库（`USE`），与 MySQL 的库相同。
@@ -2086,11 +2086,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  }
 ```
 
-- [ ] **Step 25: 修改 `crates/dblens-dialect/src/split.rs`**
+- [ ] **Step 25: 修改 `crates/datluma-dialect/src/split.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/split.rs
-+++ b/crates/dblens-dialect/src/split.rs
+--- a/crates/datluma-dialect/src/split.rs
++++ b/crates/datluma-dialect/src/split.rs
 @@ -1,6 +1,10 @@
  //! SQL 语句拆分：处理字符串、注释、PG 的 $$ 引号、MySQL 的 DELIMITER 命令，
  //! 以及 Oracle/达梦的 PL/SQL 块和 `/` 结束符。保留每条语句在原文中的字节范围和起始行号，便于定位出错位置。
@@ -2287,11 +2287,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
      #[test]
 ```
 
-- [ ] **Step 26: 修改 `crates/dblens-dialect/src/types.rs`**
+- [ ] **Step 26: 修改 `crates/datluma-dialect/src/types.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/types.rs
-+++ b/crates/dblens-dialect/src/types.rs
+--- a/crates/datluma-dialect/src/types.rs
++++ b/crates/datluma-dialect/src/types.rs
 @@ -2,7 +2,7 @@
  //! `timestamp(6) with time zone`），逻辑类型用于跨库映射和设计器。
  //!
@@ -2478,11 +2478,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
          let inputs = [
 ```
 
-- [ ] **Step 27: 修改 `crates/dblens-dialect/src/variant.rs`**
+- [ ] **Step 27: 修改 `crates/datluma-dialect/src/variant.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/variant.rs
-+++ b/crates/dblens-dialect/src/variant.rs
+--- a/crates/datluma-dialect/src/variant.rs
++++ b/crates/datluma-dialect/src/variant.rs
 @@ -15,6 +15,8 @@ pub enum Family {
      Oracle,
      #[serde(rename = "dameng")]
@@ -2519,11 +2519,11 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
  
 ```
 
-- [ ] **Step 28: 修改 `crates/dblens-service/src/policy.rs`**
+- [ ] **Step 28: 修改 `crates/datluma-service/src/policy.rs`**
 
 ```diff
---- a/crates/dblens-service/src/policy.rs
-+++ b/crates/dblens-service/src/policy.rs
+--- a/crates/datluma-service/src/policy.rs
++++ b/crates/datluma-service/src/policy.rs
 @@ -1,12 +1,15 @@
  //! 执行策略（设计文档 7.7 节）：所有执行路径都要先问 `Policy`。个人版的 `DefaultPolicy` 只在生产环境的连接上，
 -//! 对不带 WHERE 的 UPDATE/DELETE、DROP、TRUNCATE 要求确认；团队版以后用同一接口实现授权、审计等。
@@ -2533,8 +2533,8 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
 +//! SQL Server 按 `GO` 分批执行，一批里可以有多条语句：分析时取批中最危险的一条（见 `classify_batch`）。
  
  use async_trait::async_trait;
- use dblens_core::{Msg, msg};
- use dblens_dialect::{Dialect, Family};
+ use datluma_core::{Msg, msg};
+ use datluma_dialect::{Dialect, Family};
  use serde::{Deserialize, Serialize};
  use sqlparser::ast::{ObjectName, Statement};
 -use sqlparser::dialect::{GenericDialect, MySqlDialect, PostgreSqlDialect};
@@ -2699,7 +2699,7 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
 +
  #[cfg(test)]
  mod tests {
-     use dblens_dialect::Variant;
+     use datluma_dialect::Variant;
 @@ -239,6 +367,46 @@ mod tests {
          assert_eq!(classify(&pg(), "# c\nSELECT 1").keyword, "SELECT");
      }
@@ -2755,7 +2755,7 @@ WHERE t.schema_id = SCHEMA_ID({{ bind("schema") }})
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（GO 分批、标识符和字面量、类型、DDL、危险语句的单元测试；`meta_snapshots__sqlserver.snap`）。快照文件随本任务给出；改了模板时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
@@ -2763,7 +2763,7 @@ Expected: 全部测试通过（GO 分批、标识符和字面量、类型、DDL�
 - [ ] **Step 30: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/sql/ops/sqlserver.sql crates/dblens-dialect/sql/sqlserver.sql crates/dblens-dialect/src/compare/normalize.rs crates/dblens-dialect/src/ddl.rs crates/dblens-dialect/src/design/catalog.rs crates/dblens-dialect/src/design/rebuild.rs crates/dblens-dialect/src/design/sql.rs crates/dblens-dialect/src/dml.rs crates/dblens-dialect/src/ident.rs crates/dblens-dialect/src/lib.rs crates/dblens-dialect/src/literal.rs crates/dblens-dialect/src/meta/mod.rs crates/dblens-dialect/src/meta/template.rs crates/dblens-dialect/src/migrate/data.rs crates/dblens-dialect/src/migrate/expr.rs crates/dblens-dialect/src/migrate/mod.rs crates/dblens-dialect/src/migrate/names.rs crates/dblens-dialect/src/migrate/script.rs crates/dblens-dialect/src/migrate/types.rs crates/dblens-dialect/src/ops.rs crates/dblens-dialect/src/session.rs crates/dblens-dialect/src/split.rs crates/dblens-dialect/src/types.rs crates/dblens-dialect/src/variant.rs crates/dblens-dialect/tests/meta_snapshots.rs crates/dblens-dialect/tests/snapshots/meta_snapshots__sqlserver.snap crates/dblens-service/src/policy.rs
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/sql/ops/sqlserver.sql crates/datluma-dialect/sql/sqlserver.sql crates/datluma-dialect/src/compare/normalize.rs crates/datluma-dialect/src/ddl.rs crates/datluma-dialect/src/design/catalog.rs crates/datluma-dialect/src/design/rebuild.rs crates/datluma-dialect/src/design/sql.rs crates/datluma-dialect/src/dml.rs crates/datluma-dialect/src/ident.rs crates/datluma-dialect/src/lib.rs crates/datluma-dialect/src/literal.rs crates/datluma-dialect/src/meta/mod.rs crates/datluma-dialect/src/meta/template.rs crates/datluma-dialect/src/migrate/data.rs crates/datluma-dialect/src/migrate/expr.rs crates/datluma-dialect/src/migrate/mod.rs crates/datluma-dialect/src/migrate/names.rs crates/datluma-dialect/src/migrate/script.rs crates/datluma-dialect/src/migrate/types.rs crates/datluma-dialect/src/ops.rs crates/datluma-dialect/src/session.rs crates/datluma-dialect/src/split.rs crates/datluma-dialect/src/types.rs crates/datluma-dialect/src/variant.rs crates/datluma-dialect/tests/meta_snapshots.rs crates/datluma-dialect/tests/snapshots/meta_snapshots__sqlserver.snap crates/datluma-service/src/policy.rs
 git commit -m "feat(dialect): SQL Server 家族（标识符、字面量、GO 分批、类型、元数据和运维模板、危险语句）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2772,54 +2772,54 @@ git commit -m "feat(dialect): SQL Server 家族（标识符、字面量、GO 分
 ### Task 3: 驱动、服务层与接口
 
 - `vendor/tiberius`：crates.io 的 0.13.0 加补丁（见 Step 1–2 和 `vendor/PATCHES.md`）。工作区 `Cargo.toml`：`tiberius = { version = "0.13", default-features = false, features = ["tds80", "rustls", "chrono", "sql-browser-tokio", "winauth"] }`、`tokio-util`（compat），`[patch.crates-io] tiberius = { path = "vendor/tiberius" }`，`vendor/tiberius` 加进 `exclude`。
-- `dblens-driver`：`DriverId::SqlServer`（序列化为 `sqlserver`，与前端一致）、URL 前缀 `sqlserver://` / `mssql://`、默认端口 1433。
-- `dblens-driver-sqlserver`（新）：`SqlServerDriver`、`SqlServerConnection`。后台任务独占 `Client<Compat<TcpStream>>`，命令走 mpsc、结果走有界通道（256）；无参数时 `simple_query` 整批执行（`USE`、临时表留在会话里），有参数时 `query`（sp_executesql）；结果集后面的 DONE 结束结果集，否则是影响行数；INFO 是消息；取消用 `Notify`（执行开始时 `notified().enable()`）；批内行号换算成错误位置；手动提交时 `BEGIN TRANSACTION`，提交、回滚前看 `@@TRANCOUNT`。选项：`auth=sql|windows|integrated`、`instance`（填了就经 SQL Browser 查端口）、`trust_server_certificate`。
-- `dblens-service`：`Profile::in_catalog`、`Profile::scope`（SQL Server 为"连接 id + \u{1f} + 库名"）；元数据连接池和缓存按 scope 区分，`scope_of` 认前缀；`MetadataService::catalogs`；`Service::feature_profile`（M6b 的功能对 SQL Server 报 `sqlserver.later`），设计器、导入、文档导出、比对、迁移、模型的入口改用它；会话执行完执行计划后执行 `explain_cleanup`；`ChangeSet.catalog`（serde 默认值，表结构从该库读取）；注册表加 SQL Server；Cargo 特性 `sqlserver`。
-- `dblens-api`：元数据接口加 `?catalog=`，新接口 `GET /profiles/{id}/catalogs`。
+- `datluma-driver`：`DriverId::SqlServer`（序列化为 `sqlserver`，与前端一致）、URL 前缀 `sqlserver://` / `mssql://`、默认端口 1433。
+- `datluma-driver-sqlserver`（新）：`SqlServerDriver`、`SqlServerConnection`。后台任务独占 `Client<Compat<TcpStream>>`，命令走 mpsc、结果走有界通道（256）；无参数时 `simple_query` 整批执行（`USE`、临时表留在会话里），有参数时 `query`（sp_executesql）；结果集后面的 DONE 结束结果集，否则是影响行数；INFO 是消息；取消用 `Notify`（执行开始时 `notified().enable()`）；批内行号换算成错误位置；手动提交时 `BEGIN TRANSACTION`，提交、回滚前看 `@@TRANCOUNT`。选项：`auth=sql|windows|integrated`、`instance`（填了就经 SQL Browser 查端口）、`trust_server_certificate`。
+- `datluma-service`：`Profile::in_catalog`、`Profile::scope`（SQL Server 为"连接 id + \u{1f} + 库名"）；元数据连接池和缓存按 scope 区分，`scope_of` 认前缀；`MetadataService::catalogs`；`Service::feature_profile`（M6b 的功能对 SQL Server 报 `sqlserver.later`），设计器、导入、文档导出、比对、迁移、模型的入口改用它；会话执行完执行计划后执行 `explain_cleanup`；`ChangeSet.catalog`（serde 默认值，表结构从该库读取）；注册表加 SQL Server；Cargo 特性 `sqlserver`。
+- `datluma-api`：元数据接口加 `?catalog=`，新接口 `GET /profiles/{id}/catalogs`。
 - 实库测试：`meta_live`（`fixtures/sqlserver.sql`）、`service/tests/live.rs` 的 `sqlserver_*`（流程、工作台、取消、对象、运维、导出、库和分批与 M6b 拦截、SQL 文件、编辑）、api 的 `sqlserver` 和 `sqlserver_catalogs`、迁移测试的分支；驱动一致性测试（含多结果集、影响行数、PRINT、取消后连接可用、Windows 认证）。
 - 后端词条加 `sqlserver.bad_auth`、`sqlserver.connection_lost`、`sqlserver.windows_auth_only`。
 
 **Files:**
 - Create（复制自 crates.io，再套补丁）：`vendor/tiberius/`
 - Modify: `Cargo.toml`
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/src/routes.rs`
-- Modify: `crates/dblens-api/tests/live.rs`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-dialect/Cargo.toml`
-- Modify: `crates/dblens-dialect/src/variant.rs`
-- Create: `crates/dblens-dialect/tests/fixtures/sqlserver.sql`
-- Modify: `crates/dblens-dialect/tests/meta_live.rs`
-- Create: `crates/dblens-driver-sqlserver/Cargo.toml`
-- Create: `crates/dblens-driver-sqlserver/src/actor.rs`
-- Create: `crates/dblens-driver-sqlserver/src/conn.rs`
-- Create: `crates/dblens-driver-sqlserver/src/error.rs`
-- Create: `crates/dblens-driver-sqlserver/src/exec.rs`
-- Create: `crates/dblens-driver-sqlserver/src/lib.rs`
-- Create: `crates/dblens-driver-sqlserver/src/types.rs`
-- Create: `crates/dblens-driver-sqlserver/tests/conformance.rs`
-- Modify: `crates/dblens-driver/Cargo.toml`
-- Modify: `crates/dblens-driver/src/params.rs`
-- Modify: `crates/dblens-service/Cargo.toml`
-- Modify: `crates/dblens-service/src/changes.rs`
-- Modify: `crates/dblens-service/src/compare.rs`
-- Modify: `crates/dblens-service/src/design.rs`
-- Modify: `crates/dblens-service/src/document/job.rs`
-- Modify: `crates/dblens-service/src/import/job.rs`
-- Modify: `crates/dblens-service/src/metadata.rs`
-- Modify: `crates/dblens-service/src/migrate/mod.rs`
-- Modify: `crates/dblens-service/src/model/ops.rs`
-- Modify: `crates/dblens-service/src/profile.rs`
-- Modify: `crates/dblens-service/src/registry.rs`
-- Modify: `crates/dblens-service/src/service.rs`
-- Modify: `crates/dblens-service/src/session.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
-- Modify: `crates/dblens-service/tests/migrate_live.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/src/routes.rs`
+- Modify: `crates/datluma-api/tests/live.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-dialect/Cargo.toml`
+- Modify: `crates/datluma-dialect/src/variant.rs`
+- Create: `crates/datluma-dialect/tests/fixtures/sqlserver.sql`
+- Modify: `crates/datluma-dialect/tests/meta_live.rs`
+- Create: `crates/datluma-driver-sqlserver/Cargo.toml`
+- Create: `crates/datluma-driver-sqlserver/src/actor.rs`
+- Create: `crates/datluma-driver-sqlserver/src/conn.rs`
+- Create: `crates/datluma-driver-sqlserver/src/error.rs`
+- Create: `crates/datluma-driver-sqlserver/src/exec.rs`
+- Create: `crates/datluma-driver-sqlserver/src/lib.rs`
+- Create: `crates/datluma-driver-sqlserver/src/types.rs`
+- Create: `crates/datluma-driver-sqlserver/tests/conformance.rs`
+- Modify: `crates/datluma-driver/Cargo.toml`
+- Modify: `crates/datluma-driver/src/params.rs`
+- Modify: `crates/datluma-service/Cargo.toml`
+- Modify: `crates/datluma-service/src/changes.rs`
+- Modify: `crates/datluma-service/src/compare.rs`
+- Modify: `crates/datluma-service/src/design.rs`
+- Modify: `crates/datluma-service/src/document/job.rs`
+- Modify: `crates/datluma-service/src/import/job.rs`
+- Modify: `crates/datluma-service/src/metadata.rs`
+- Modify: `crates/datluma-service/src/migrate/mod.rs`
+- Modify: `crates/datluma-service/src/model/ops.rs`
+- Modify: `crates/datluma-service/src/profile.rs`
+- Modify: `crates/datluma-service/src/registry.rs`
+- Modify: `crates/datluma-service/src/service.rs`
+- Modify: `crates/datluma-service/src/session.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
+- Modify: `crates/datluma-service/tests/migrate_live.rs`
 - Modify: `vendor/PATCHES.md`
 
 **Interfaces:**
 - Consumes：任务 2 的 `Family::SqlServer`、`MetaKey::Catalogs`、`MetaArgs.catalog`、`explain_cleanup`。
-- Produces：`DriverId::SqlServer`；`dblens_driver_sqlserver::{SqlServerDriver, SqlServerConnection}`；`Profile::in_catalog(&self, Option<&str>) -> Profile`、`Profile::scope(&self) -> String`；
+- Produces：`DriverId::SqlServer`；`datluma_driver_sqlserver::{SqlServerDriver, SqlServerConnection}`；`Profile::in_catalog(&self, Option<&str>) -> Profile`、`Profile::scope(&self) -> String`；
   `MetadataService::catalogs(&self, &Profile, filter: Option<&str>) -> Result<Vec<SchemaInfo>>`；接口 `GET /profiles/{id}/catalogs?filter=` → `[{name, is_system}]`、元数据接口的 `catalog` 参数。
 
 - [ ] **Step 1: 复制 tiberius 0.13.0 的原版**
@@ -2859,7 +2859,7 @@ rm -f vendor/tiberius/.cargo-ok
 +        self.drain_to_attention_ack().await
 +    }
 +
-+    /// DBLens 补丁：取消时按包丢弃剩下的响应，直到某条响应以带 DONE_ATTN 的 DONE 令牌结束。
++    /// DATLUMA 补丁：取消时按包丢弃剩下的响应，直到某条响应以带 DONE_ATTN 的 DONE 令牌结束。
 +    ///
 +    /// 原来的做法按令牌读到当前响应的末尾为止：结果集读到一半被丢弃时，缓冲区停在令牌中间，而且服务器的
 +    /// 取消确认常在单独的一条响应中，留在连接上被下一个请求读到（那次请求就得到空结果）。确认是响应的最后
@@ -2912,13 +2912,13 @@ rm -f vendor/tiberius/.cargo-ok
      /// `true` when the server has set the `DONE_ATTN` status bit, indicating
      /// this DONE token acknowledges a client Attention signal (MS-TDS
      /// section 2.2.7.6).
-+    // DBLens 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
++    // DATLUMA 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
 +    #[allow(dead_code)]
      pub(crate) fn is_attention(&self) -> bool {
          self.status.contains(DoneStatus::Attention)
      }
  
-+    /// DBLens 补丁：是否设置了 DONE_COUNT（行数有效）。
++    /// DATLUMA 补丁：是否设置了 DONE_COUNT（行数有效）。
 +    pub(crate) fn has_count(&self) -> bool {
 +        self.status.contains(DoneStatus::Count)
 +    }
@@ -2932,7 +2932,7 @@ rm -f vendor/tiberius/.cargo-ok
  
              match item {
                  Some(ReceivedToken::NewResultset(_)) => break,
-+                // DBLens 补丁：结果集之前的行数和 INFO 消息也要交给调用方，不能跳过
++                // DATLUMA 补丁：结果集之前的行数和 INFO 消息也要交给调用方，不能跳过
 +                Some(ReceivedToken::Info(_)) => break,
 +                Some(ReceivedToken::Done(done) | ReceivedToken::DoneInProc(done)) if done.has_count() => break,
                  Some(_) => {
@@ -2959,13 +2959,13 @@ rm -f vendor/tiberius/.cargo-ok
      Row(Row),
      /// Information of the upcoming row data.
      Metadata(ResultMetadata),
-+    /// DBLens 补丁：语句结束，带影响（或返回）的行数（DONE / DONEINPROC 设置了 DONE_COUNT）。
++    /// DATLUMA 补丁：语句结束，带影响（或返回）的行数（DONE / DONEINPROC 设置了 DONE_COUNT）。
 +    Done(u64),
-+    /// DBLens 补丁：服务器的 INFO 消息（`PRINT`、级别 10 及以下的 `RAISERROR`）。
++    /// DATLUMA 补丁：服务器的 INFO 消息（`PRINT`、级别 10 及以下的 `RAISERROR`）。
 +    Info(InfoMessage),
 +}
 +
-+/// DBLens 补丁：服务器的 INFO 消息。
++/// DATLUMA 补丁：服务器的 INFO 消息。
 +#[derive(Debug, Clone)]
 +pub struct InfoMessage {
 +    /// 消息号。
@@ -3022,7 +3022,7 @@ rm -f vendor/tiberius/.cargo-ok
  
                      Poll::Ready(Some(Ok(QueryItem::Row(row))))
                  }
-+                // DBLens 补丁：带行数的 DONE / DONEINPROC，以及 INFO 消息
++                // DATLUMA 补丁：带行数的 DONE / DONEINPROC，以及 INFO 消息
 +                ReceivedToken::Done(done) | ReceivedToken::DoneInProc(done) if done.has_count() => {
 +                    Poll::Ready(Some(Ok(QueryItem::Done(done.rows()))))
 +                }
@@ -3042,24 +3042,24 @@ rm -f vendor/tiberius/.cargo-ok
      /// acknowledging DONE token (with the `DONE_ATTN` status bit set) is
      /// received, per MS-TDS section 2.2.1.6. Returns that DONE token so the
      /// connection is left clean and ready for reuse.
-+    // DBLens 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
++    // DATLUMA 补丁：取消改为按包查找确认（Connection::drain_to_attention_ack），这里不再使用
 +    #[allow(dead_code)]
      pub(crate) async fn flush_done_attention(self) -> crate::Result<TokenDone> {
          let mut stream = self.try_unfold();
  
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-api/tests/live.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-api/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/live.rs
-+++ b/crates/dblens-api/tests/live.rs
+--- a/crates/datluma-api/tests/live.rs
++++ b/crates/datluma-api/tests/live.rs
 @@ -1,7 +1,7 @@
  //! 接口的实库测试。设置对应的环境变量时运行，否则直接通过：
- //! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL；
- //! 国产库第一批：DBLENS_TEST_TIDB_URL、DBLENS_TEST_OCEANBASE_URL、DBLENS_TEST_OPENGAUSS_URL、
--//! DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL。
-+//! DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL；DBLENS_TEST_SQLSERVER_URL。
+ //! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL；
+ //! 国产库第一批：DATLUMA_TEST_TIDB_URL、DATLUMA_TEST_OCEANBASE_URL、DATLUMA_TEST_OPENGAUSS_URL、
+-//! DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL。
++//! DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL；DATLUMA_TEST_SQLSERVER_URL。
  //!
  //! 通过 REST 保存连接配置（MySQL、MariaDB、PG 的测试库开了 TLS，要求走 TLS）、测试连接、浏览元数据、打开会话，
  //! 再通过 WebSocket 分批取回 900 行结果。
@@ -3080,13 +3080,13 @@ rm -f vendor/tiberius/.cargo-ok
  
 +#[tokio::test]
 +async fn sqlserver() {
-+    flow("DBLENS_TEST_SQLSERVER_URL", true).await;
++    flow("DATLUMA_TEST_SQLSERVER_URL", true).await;
 +}
 +
 +/// SQL Server 的数据库层：库列表；按库取架构和对象（`catalog` 参数）；M6b 之前的功能返回 400。
 +#[tokio::test]
 +async fn sqlserver_catalogs() {
-+    let Ok(url) = std::env::var("DBLENS_TEST_SQLSERVER_URL") else { return };
++    let Ok(url) = std::env::var("DATLUMA_TEST_SQLSERVER_URL") else { return };
 +    let (driver, params) = ConnectParams::from_url(&url).unwrap();
 +    let dir = tempfile::tempdir().unwrap();
 +    let store = Arc::new(Store::open(dir.path()).unwrap());
@@ -3124,33 +3124,33 @@ rm -f vendor/tiberius/.cargo-ok
 +
  #[tokio::test]
  async fn mysql() {
-     flow("DBLENS_TEST_MYSQL_URL", true).await;
+     flow("DATLUMA_TEST_MYSQL_URL", true).await;
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/tests/fixtures/sqlserver.sql`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/tests/fixtures/sqlserver.sql`**
 
 ```sql
 -- @@ drop_objects
-DROP SYNONYM IF EXISTS dblens_meta.syn_emp;
-DROP VIEW IF EXISTS dblens_meta.v_emp;
-DROP PROCEDURE IF EXISTS dblens_meta.p_meta;
-DROP FUNCTION IF EXISTS dblens_meta.f_meta;
-DROP TABLE IF EXISTS dblens_meta.emp;
-DROP TABLE IF EXISTS dblens_meta.dept;
-DROP TABLE IF EXISTS dblens_meta.[Mixed Case];
-DROP TABLE IF EXISTS dblens_meta.ds_t;
-DROP SEQUENCE IF EXISTS dblens_meta.seq_meta;
-DROP SCHEMA IF EXISTS dblens_meta
+DROP SYNONYM IF EXISTS datluma_meta.syn_emp;
+DROP VIEW IF EXISTS datluma_meta.v_emp;
+DROP PROCEDURE IF EXISTS datluma_meta.p_meta;
+DROP FUNCTION IF EXISTS datluma_meta.f_meta;
+DROP TABLE IF EXISTS datluma_meta.emp;
+DROP TABLE IF EXISTS datluma_meta.dept;
+DROP TABLE IF EXISTS datluma_meta.[Mixed Case];
+DROP TABLE IF EXISTS datluma_meta.ds_t;
+DROP SEQUENCE IF EXISTS datluma_meta.seq_meta;
+DROP SCHEMA IF EXISTS datluma_meta
 -- @@ create_schema
-CREATE SCHEMA dblens_meta
+CREATE SCHEMA datluma_meta
 -- @@ dept
-CREATE TABLE dblens_meta.dept (id int IDENTITY(1,1) PRIMARY KEY, name nvarchar(50) NOT NULL UNIQUE, note nvarchar(max))
+CREATE TABLE datluma_meta.dept (id int IDENTITY(1,1) PRIMARY KEY, name nvarchar(50) NOT NULL UNIQUE, note nvarchar(max))
 -- @@ dept_c
-EXEC sys.sp_addextendedproperty N'MS_Description', N'部门表', N'SCHEMA', N'dblens_meta', N'TABLE', N'dept'
+EXEC sys.sp_addextendedproperty N'MS_Description', N'部门表', N'SCHEMA', N'datluma_meta', N'TABLE', N'dept'
 -- @@ seq_meta
-CREATE SEQUENCE dblens_meta.seq_meta AS bigint START WITH 100 INCREMENT BY 5 MAXVALUE 99999 CYCLE CACHE 10
+CREATE SEQUENCE datluma_meta.seq_meta AS bigint START WITH 100 INCREMENT BY 5 MAXVALUE 99999 CYCLE CACHE 10
 -- @@ emp
-CREATE TABLE dblens_meta.emp (
+CREATE TABLE datluma_meta.emp (
   id bigint PRIMARY KEY,
   dept_id int,
   manager_id bigint,
@@ -3160,31 +3160,31 @@ CREATE TABLE dblens_meta.emp (
   bio nvarchar(max),
   photo varbinary(max),
   name_upper AS UPPER(name),
-  CONSTRAINT fk_emp_dept FOREIGN KEY (dept_id) REFERENCES dblens_meta.dept(id) ON DELETE CASCADE,
-  CONSTRAINT fk_emp_mgr FOREIGN KEY (manager_id) REFERENCES dblens_meta.emp(id),
+  CONSTRAINT fk_emp_dept FOREIGN KEY (dept_id) REFERENCES datluma_meta.dept(id) ON DELETE CASCADE,
+  CONSTRAINT fk_emp_mgr FOREIGN KEY (manager_id) REFERENCES datluma_meta.emp(id),
   CONSTRAINT uq_emp_dept_name UNIQUE (dept_id, name))
 -- @@ emp_c1
-EXEC sys.sp_addextendedproperty N'MS_Description', N'员工表 employees', N'SCHEMA', N'dblens_meta', N'TABLE', N'emp'
+EXEC sys.sp_addextendedproperty N'MS_Description', N'员工表 employees', N'SCHEMA', N'datluma_meta', N'TABLE', N'emp'
 -- @@ emp_c2
-EXEC sys.sp_addextendedproperty N'MS_Description', N'员工姓名', N'SCHEMA', N'dblens_meta', N'TABLE', N'emp', N'COLUMN', N'name'
+EXEC sys.sp_addextendedproperty N'MS_Description', N'员工姓名', N'SCHEMA', N'datluma_meta', N'TABLE', N'emp', N'COLUMN', N'name'
 -- @@ idx_created
-CREATE INDEX idx_emp_created ON dblens_meta.emp (created DESC)
+CREATE INDEX idx_emp_created ON datluma_meta.emp (created DESC)
 -- @@ idx_salary
-CREATE INDEX idx_emp_salary ON dblens_meta.emp (salary) INCLUDE (bio) WHERE salary > 1000
+CREATE INDEX idx_emp_salary ON datluma_meta.emp (salary) INCLUDE (bio) WHERE salary > 1000
 -- @@ trg
-CREATE TRIGGER dblens_meta.trg_emp_aiu ON dblens_meta.emp AFTER INSERT, UPDATE AS BEGIN SET NOCOUNT ON; END
+CREATE TRIGGER datluma_meta.trg_emp_aiu ON datluma_meta.emp AFTER INSERT, UPDATE AS BEGIN SET NOCOUNT ON; END
 -- @@ v_emp
-CREATE VIEW dblens_meta.v_emp AS SELECT e.id, e.name, d.name AS dept_name FROM dblens_meta.emp e LEFT JOIN dblens_meta.dept d ON d.id = e.dept_id
+CREATE VIEW datluma_meta.v_emp AS SELECT e.id, e.name, d.name AS dept_name FROM datluma_meta.emp e LEFT JOIN datluma_meta.dept d ON d.id = e.dept_id
 -- @@ p_meta
-CREATE PROCEDURE dblens_meta.p_meta @a int AS BEGIN SET NOCOUNT ON; END
+CREATE PROCEDURE datluma_meta.p_meta @a int AS BEGIN SET NOCOUNT ON; END
 -- @@ f_meta
-CREATE FUNCTION dblens_meta.f_meta(@a int) RETURNS int AS BEGIN RETURN @a + 1; END
+CREATE FUNCTION datluma_meta.f_meta(@a int) RETURNS int AS BEGIN RETURN @a + 1; END
 -- @@ syn_emp
-CREATE SYNONYM dblens_meta.syn_emp FOR dblens_meta.emp
+CREATE SYNONYM datluma_meta.syn_emp FOR datluma_meta.emp
 -- @@ mixed
-CREATE TABLE dblens_meta.[Mixed Case] ([数洞] nvarchar(10), [select] int NOT NULL PRIMARY KEY)
+CREATE TABLE datluma_meta.[Mixed Case] ([数览] nvarchar(10), [select] int NOT NULL PRIMARY KEY)
 -- @@ ds_t
-CREATE TABLE dblens_meta.ds_t (
+CREATE TABLE datluma_meta.ds_t (
   c_bit bit,
   c_tinyint tinyint,
   c_money money,
@@ -3197,29 +3197,29 @@ CREATE TABLE dblens_meta.ds_t (
   c_geo geography,
   c_rv rowversion)
 -- @@ rows
-INSERT INTO dblens_meta.dept (name) VALUES (N'研发'), (N'市场')
+INSERT INTO datluma_meta.dept (name) VALUES (N'研发'), (N'市场')
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-dialect/tests/meta_live.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-dialect/tests/meta_live.rs`**
 
 ```diff
---- a/crates/dblens-dialect/tests/meta_live.rs
-+++ b/crates/dblens-dialect/tests/meta_live.rs
+--- a/crates/datluma-dialect/tests/meta_live.rs
++++ b/crates/datluma-dialect/tests/meta_live.rs
 @@ -1,7 +1,8 @@
  //! 元数据查询的实库测试。设置对应的环境变量时运行，否则直接通过（与驱动一致性测试相同的约定）：
- //! DBLENS_TEST_MYSQL_URL、DBLENS_TEST_MARIADB_URL、DBLENS_TEST_PG_URL、DBLENS_TEST_ORACLE_URL、DBLENS_TEST_DM_URL；
- //! 国产库第一批：DBLENS_TEST_TIDB_URL、DBLENS_TEST_OCEANBASE_URL、DBLENS_TEST_OPENGAUSS_URL、
--//! DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL。
-+//! DBLENS_TEST_OPENGAUSS_A_URL、DBLENS_TEST_KINGBASE_URL、DBLENS_TEST_KINGBASE_PG_URL；
-+//! SQL Server：DBLENS_TEST_SQLSERVER_URL（库写测试库，如 `/dblens_test`；元数据查询在连接的当前库中执行）。
+ //! DATLUMA_TEST_MYSQL_URL、DATLUMA_TEST_MARIADB_URL、DATLUMA_TEST_PG_URL、DATLUMA_TEST_ORACLE_URL、DATLUMA_TEST_DM_URL；
+ //! 国产库第一批：DATLUMA_TEST_TIDB_URL、DATLUMA_TEST_OCEANBASE_URL、DATLUMA_TEST_OPENGAUSS_URL、
+-//! DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL。
++//! DATLUMA_TEST_OPENGAUSS_A_URL、DATLUMA_TEST_KINGBASE_URL、DATLUMA_TEST_KINGBASE_PG_URL；
++//! SQL Server：DATLUMA_TEST_SQLSERVER_URL（库写测试库，如 `/datluma_test`；元数据查询在连接的当前库中执行）。
  //!
  //! 每个家族先执行 `tests/fixtures/<家族>.sql` 建测试对象，再用全部元数据查询读回来逐项核对。
  //! 兼容库沿用所属家族的脚本，跳过不支持的段、替换写法不同的段（`run_script_with`）。
 @@ -33,6 +34,7 @@ async fn connect(env: &str) -> Option<Live> {
-         DriverId::Postgres => Box::new(dblens_driver_postgres::PgDriver),
-         DriverId::Oracle => Box::new(dblens_driver_oracle::OracleDriver),
-         DriverId::Dameng => Box::new(dblens_driver_dameng::DmDriver),
-+        DriverId::SqlServer => Box::new(dblens_driver_sqlserver::SqlServerDriver),
+         DriverId::Postgres => Box::new(datluma_driver_postgres::PgDriver),
+         DriverId::Oracle => Box::new(datluma_driver_oracle::OracleDriver),
+         DriverId::Dameng => Box::new(datluma_driver_dameng::DmDriver),
++        DriverId::SqlServer => Box::new(datluma_driver_sqlserver::SqlServerDriver),
      };
      let mut conn = driver.connect(&params).await.unwrap();
      let info = conn.server_info().await.unwrap();
@@ -3230,10 +3230,10 @@ INSERT INTO dblens_meta.dept (name) VALUES (N'研发'), (N'市场')
 +/// SQL Server 没有 BEFORE 触发器，自引用外键不能级联，不按 `check_common` 检查，逐项核对。
 +#[tokio::test]
 +async fn sqlserver_metadata() {
-+    let Some(mut live) = connect("DBLENS_TEST_SQLSERVER_URL").await else { return };
++    let Some(mut live) = connect("DATLUMA_TEST_SQLSERVER_URL").await else { return };
 +    assert_eq!(live.d.variant(), Variant::SqlServer);
 +    live.run_script(include_str!("fixtures/sqlserver.sql")).await;
-+    let s = "dblens_meta";
++    let s = "datluma_meta";
 +
 +    let catalogs = meta::schemas(&live.rows(MetaKey::Catalogs, &MetaArgs::default()).await).unwrap();
 +    assert!(catalogs.iter().any(|c| c.name == "master" && c.is_system), "{catalogs:?}");
@@ -3290,8 +3290,8 @@ INSERT INTO dblens_meta.dept (name) VALUES (N'研发'), (N'市场')
 +    assert_eq!(&one[0], emp);
 +
 +    let mixed = table(&all, "Mixed Case");
-+    assert_eq!(live.d.qualified(Some(s), &mixed.name), "dblens_meta.[Mixed Case]");
-+    assert!(mixed.columns.iter().any(|c| c.name == "数洞") && mixed.primary_key.is_some());
++    assert_eq!(live.d.qualified(Some(s), &mixed.name), "datluma_meta.[Mixed Case]");
++    assert!(mixed.columns.iter().any(|c| c.name == "数览") && mixed.primary_key.is_some());
 +
 +    let ds = table(&all, "ds_t");
 +    assert_eq!(logical(ds, "c_bit"), LogicalType::Bool);
@@ -3347,23 +3347,23 @@ INSERT INTO dblens_meta.dept (name) VALUES (N'研发'), (N'市场')
 +
  #[tokio::test]
  async fn postgres_metadata() {
-     let Some(mut live) = connect("DBLENS_TEST_PG_URL").await else { return };
+     let Some(mut live) = connect("DATLUMA_TEST_PG_URL").await else { return };
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-driver-sqlserver/tests/conformance.rs`**
+- [ ] **Step 6: 新建 `crates/datluma-driver-sqlserver/tests/conformance.rs`**
 
 ```rust
 //! 一致性测试，加上 SQL Server 特有的：一批多个结果集、影响行数与 PRINT 消息、批内错误的位置、读一半丢弃后连接仍可用、
 //! 手动提交时批里自己提交、Windows 认证。
-//! `DBLENS_TEST_SQLSERVER_URL`（如 `sqlserver://sa:密码@192.168.139.106:1433/master`）；
-//! Windows 认证：`DBLENS_TEST_SQLSERVER_WINAUTH_URL`（`?auth=windows`，用户名写 `机器名\用户`）、
-//! `DBLENS_TEST_SQLSERVER_INTEGRATED_URL`（`?auth=integrated`，在 Windows 上运行）。
+//! `DATLUMA_TEST_SQLSERVER_URL`（如 `sqlserver://sa:密码@192.168.139.106:1433/master`）；
+//! Windows 认证：`DATLUMA_TEST_SQLSERVER_WINAUTH_URL`（`?auth=windows`，用户名写 `机器名\用户`）、
+//! `DATLUMA_TEST_SQLSERVER_INTEGRATED_URL`（`?auth=integrated`，在 Windows 上运行）。
 
 use chrono::{FixedOffset, NaiveDate, TimeZone};
-use dblens_core::{Error, Value};
-use dblens_driver::conformance::{Fixture, load};
-use dblens_driver::{ConnectParams, Connection, Driver, ExecEvent, collect_all};
-use dblens_driver_sqlserver::SqlServerDriver;
+use datluma_core::{Error, Value};
+use datluma_driver::conformance::{Fixture, load};
+use datluma_driver::{ConnectParams, Connection, Driver, ExecEvent, collect_all};
+use datluma_driver_sqlserver::SqlServerDriver;
 
 fn fixture(params: ConnectParams) -> Fixture {
     let day = NaiveDate::from_ymd_opt(2024, 2, 29).unwrap();
@@ -3383,7 +3383,7 @@ fn fixture(params: ConnectParams) -> Fixture {
         insert_with_params: |t| format!("INSERT INTO {t} (id, name) VALUES (@P1, @P2)"),
         select_name_by_id: |t| format!("SELECT name FROM {t} WHERE id = @P1"),
         count_rows: |t| format!("SELECT COUNT(*) FROM {t}"),
-        missing_table_query: "SELECT * FROM dblens_no_such_table",
+        missing_table_query: "SELECT * FROM datluma_no_such_table",
         type_cases: vec![
             ("SELECT CAST(NULL AS int)", Value::Null),
             ("SELECT CAST(1 AS bit)", Value::Bool(true)),
@@ -3399,7 +3399,7 @@ fn fixture(params: ConnectParams) -> Fixture {
                 Value::Decimal("12345678901234567890123456789012345678".into()),
             ),
             ("SELECT CAST(12.34 AS money)", Value::Decimal("12.3400".into())),
-            ("SELECT N'数洞'", Value::String("数洞".into())),
+            ("SELECT N'数览'", Value::String("数览".into())),
             ("SELECT CAST('abc' AS varchar(10))", Value::String("abc".into())),
             ("SELECT CAST('2024-02-29' AS date)", Value::Date(day)),
             (
@@ -3433,7 +3433,7 @@ fn fixture(params: ConnectParams) -> Fixture {
     }
 }
 
-dblens_driver::conformance_tests!("DBLENS_TEST_SQLSERVER_URL", fixture);
+datluma_driver::conformance_tests!("DATLUMA_TEST_SQLSERVER_URL", fixture);
 
 async fn connect(env: &str) -> Option<Box<dyn Connection>> {
     let f = load(env, fixture)?;
@@ -3460,7 +3460,7 @@ fn kinds(events: &[ExecEvent]) -> Vec<String> {
 
 #[tokio::test]
 async fn batch_with_results_counts_and_messages() {
-    let Some(mut c) = connect("DBLENS_TEST_SQLSERVER_URL").await else { return };
+    let Some(mut c) = connect("DATLUMA_TEST_SQLSERVER_URL").await else { return };
     let events = run(
         c.as_mut(),
         "CREATE TABLE #t (id int)\nINSERT INTO #t VALUES (1), (2)\nPRINT N'完成'\nSELECT id FROM #t ORDER BY id\nSELECT 'x' AS a, 2 AS b WHERE 1 = 0\nUPDATE #t SET id = id + 1",
@@ -3481,8 +3481,8 @@ async fn batch_with_results_counts_and_messages() {
 
 #[tokio::test]
 async fn error_reports_code_and_line_and_keeps_earlier_results() {
-    let Some(mut c) = connect("DBLENS_TEST_SQLSERVER_URL").await else { return };
-    let sql = "SELECT 1\n\n  SELECT * FROM dblens_missing_table";
+    let Some(mut c) = connect("DATLUMA_TEST_SQLSERVER_URL").await else { return };
+    let sql = "SELECT 1\n\n  SELECT * FROM datluma_missing_table";
     let mut s = c.execute(sql, &[]).await.unwrap();
     let mut events = Vec::new();
     let err = loop {
@@ -3506,7 +3506,7 @@ async fn error_reports_code_and_line_and_keeps_earlier_results() {
 
 #[tokio::test]
 async fn abandoned_stream_leaves_connection_usable() {
-    let Some(mut c) = connect("DBLENS_TEST_SQLSERVER_URL").await else { return };
+    let Some(mut c) = connect("DATLUMA_TEST_SQLSERVER_URL").await else { return };
     let mut s = c
         .execute("SELECT TOP (200000) a.object_id FROM sys.all_columns a CROSS JOIN sys.all_columns b", &[])
         .await
@@ -3521,26 +3521,26 @@ async fn abandoned_stream_leaves_connection_usable() {
 
 #[tokio::test]
 async fn manual_commit_survives_commit_inside_the_batch() {
-    let Some(mut c) = connect("DBLENS_TEST_SQLSERVER_URL").await else { return };
-    run(c.as_mut(), "DROP TABLE IF EXISTS dblens_conf_tx2; CREATE TABLE dblens_conf_tx2 (id int)")
+    let Some(mut c) = connect("DATLUMA_TEST_SQLSERVER_URL").await else { return };
+    run(c.as_mut(), "DROP TABLE IF EXISTS datluma_conf_tx2; CREATE TABLE datluma_conf_tx2 (id int)")
         .await
         .unwrap();
     c.set_autocommit(false).await.unwrap();
-    run(c.as_mut(), "INSERT INTO dblens_conf_tx2 VALUES (1)\nCOMMIT").await.unwrap();
+    run(c.as_mut(), "INSERT INTO datluma_conf_tx2 VALUES (1)\nCOMMIT").await.unwrap();
     // 事务已在批里提交，再提交不报错
     c.commit().await.unwrap();
-    run(c.as_mut(), "INSERT INTO dblens_conf_tx2 VALUES (2)").await.unwrap();
+    run(c.as_mut(), "INSERT INTO datluma_conf_tx2 VALUES (2)").await.unwrap();
     c.rollback().await.unwrap();
     c.set_autocommit(true).await.unwrap();
-    let events = run(c.as_mut(), "SELECT COUNT(*) FROM dblens_conf_tx2").await.unwrap();
+    let events = run(c.as_mut(), "SELECT COUNT(*) FROM datluma_conf_tx2").await.unwrap();
     assert!(matches!(&events[1], ExecEvent::Rows(r) if r[0][0] == Value::Int(1)), "{events:?}");
-    run(c.as_mut(), "DROP TABLE dblens_conf_tx2").await.unwrap();
+    run(c.as_mut(), "DROP TABLE datluma_conf_tx2").await.unwrap();
 }
 
 #[tokio::test]
 async fn wrong_password_is_auth_error() {
-    let Some(f) = load("DBLENS_TEST_SQLSERVER_URL", fixture) else { return };
-    let params = ConnectParams { password: "dblens-wrong-password".into(), ..f.params };
+    let Some(f) = load("DATLUMA_TEST_SQLSERVER_URL", fixture) else { return };
+    let params = ConnectParams { password: "datluma-wrong-password".into(), ..f.params };
     assert!(matches!(SqlServerDriver.connect(&params).await.err(), Some(Error::Auth { .. })));
 }
 
@@ -3555,20 +3555,20 @@ async fn windows_login(env: &str) {
 
 #[tokio::test]
 async fn windows_account_login() {
-    windows_login("DBLENS_TEST_SQLSERVER_WINAUTH_URL").await;
+    windows_login("DATLUMA_TEST_SQLSERVER_WINAUTH_URL").await;
 }
 
 #[tokio::test]
 async fn integrated_login() {
-    windows_login("DBLENS_TEST_SQLSERVER_INTEGRATED_URL").await;
+    windows_login("DATLUMA_TEST_SQLSERVER_INTEGRATED_URL").await;
 }
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -40,6 +40,8 @@ struct Live {
      compat: Compat,
      /// 测试表所在的 schema。
@@ -3630,39 +3630,39 @@ async fn integrated_login() {
  
 +#[tokio::test]
 +async fn sqlserver_flow() {
-+    full_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    full_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn sqlserver_workbench() {
-+    workbench_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    workbench_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn sqlserver_cancel() {
-+    cancel_flow("DBLENS_TEST_SQLSERVER_URL", "WAITFOR DELAY '00:00:30'").await;
++    cancel_flow("DATLUMA_TEST_SQLSERVER_URL", "WAITFOR DELAY '00:00:30'").await;
 +}
 +
 +#[tokio::test]
 +async fn sqlserver_objects() {
-+    objects_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    objects_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn sqlserver_ops() {
-+    ops_flow("DBLENS_TEST_SQLSERVER_URL", &[]).await;
++    ops_flow("DATLUMA_TEST_SQLSERVER_URL", &[]).await;
 +}
 +
 +#[tokio::test]
 +async fn sqlserver_export() {
-+    export_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    export_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
 +/// SQL Server：库列表、按库浏览（元数据连接以所选库为初始库）、执行计划后会话恢复正常、
 +/// 一批里的多个结果集、M6b 之前的功能被拒绝。
 +#[tokio::test]
 +async fn sqlserver_catalogs_batches_and_gating() {
-+    let Some(live) = setup("DBLENS_TEST_SQLSERVER_URL").await else { return };
++    let Some(live) = setup("DATLUMA_TEST_SQLSERVER_URL").await else { return };
 +    let s = &live.service;
 +    let profile = s.profile(&live.profile_id).unwrap();
 +    let catalogs = s.metadata.catalogs(&profile, None).await.unwrap();
@@ -3693,7 +3693,7 @@ async fn integrated_login() {
 +
  #[tokio::test]
  async fn mysql_flow() {
-     full_flow("DBLENS_TEST_MYSQL_URL").await;
+     full_flow("DATLUMA_TEST_MYSQL_URL").await;
 @@ -349,6 +420,13 @@ async fn objects_flow(env: &str) {
          DriverId::Mysql => {
              &["DROP VIEW IF EXISTS c2_v", "DROP TABLE IF EXISTS c2_child", "DROP TABLE IF EXISTS c2_parent"]
@@ -3845,17 +3845,17 @@ async fn integrated_login() {
  
 +#[tokio::test]
 +async fn sqlserver_sql_file() {
-+    sql_file_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    sql_file_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn sqlserver_editing() {
-+    editing_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    editing_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
  #[tokio::test]
  async fn mysql_sql_file() {
-     sql_file_flow("DBLENS_TEST_MYSQL_URL").await;
+     sql_file_flow("DATLUMA_TEST_MYSQL_URL").await;
 @@ -1167,6 +1304,8 @@ async fn design_flow(env: &str) {
          DriverId::Postgres => ["bigint", "varchar(20)", "numeric(10,2)", "varchar(40)"],
          DriverId::Oracle => ["NUMBER(19)", "VARCHAR2(20)", "NUMBER(10,2)", "VARCHAR2(40)"],
@@ -3885,7 +3885,7 @@ async fn integrated_login() {
 @@ -1658,7 +1798,7 @@ async fn model_flow(env: &str) {
      let other: Option<&'static str> = match live.driver {
          DriverId::Postgres => Some("m4_b"),
-         DriverId::Mysql => Some("dblens_test_m4b"),
+         DriverId::Mysql => Some("datluma_test_m4b"),
 -        DriverId::Oracle | DriverId::Dameng => None,
 +        DriverId::Oracle | DriverId::Dameng | DriverId::SqlServer => None,
      };
@@ -3893,11 +3893,11 @@ async fn integrated_login() {
          Some(o) => {
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-service/tests/migrate_live.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-service/tests/migrate_live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/migrate_live.rs
-+++ b/crates/dblens-service/tests/migrate_live.rs
+--- a/crates/datluma-service/tests/migrate_live.rs
++++ b/crates/datluma-service/tests/migrate_live.rs
 @@ -68,6 +68,7 @@ async fn setup(envs: [&str; 2]) -> Option<(Arc<Service>, Vec<End>, tempfile::Tem
              DriverId::Mysql => params.database.clone().unwrap(),
              DriverId::Postgres => "public".to_string(),
@@ -3938,11 +3938,11 @@ async fn integrated_login() {
 ```diff
 --- a/Cargo.toml
 +++ b/Cargo.toml
-@@ -22,6 +22,7 @@ dblens-driver-dameng = { path = "crates/dblens-driver-dameng" }
- dblens-driver-mysql = { path = "crates/dblens-driver-mysql" }
- dblens-driver-oracle = { path = "crates/dblens-driver-oracle" }
- dblens-driver-postgres = { path = "crates/dblens-driver-postgres" }
-+dblens-driver-sqlserver = { path = "crates/dblens-driver-sqlserver" }
+@@ -22,6 +22,7 @@ datluma-driver-dameng = { path = "crates/datluma-driver-dameng" }
+ datluma-driver-mysql = { path = "crates/datluma-driver-mysql" }
+ datluma-driver-oracle = { path = "crates/datluma-driver-oracle" }
+ datluma-driver-postgres = { path = "crates/datluma-driver-postgres" }
++datluma-driver-sqlserver = { path = "crates/datluma-driver-sqlserver" }
  
  argon2 = "0.6.0"
  async-trait = "0.1.92"
@@ -3972,11 +3972,11 @@ async fn integrated_login() {
  tokio-postgres = { path = "vendor/tokio-postgres" }
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -75,6 +75,7 @@ pub fn router(service: Arc<Service>, config: ApiConfig) -> Router {
          )
          .route("/profiles/{id}/password", put(routes::set_password))
@@ -3987,11 +3987,11 @@ async fn integrated_login() {
          .route("/profiles/{id}/schemas/{schema}/tables", get(routes::tables))
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-api/src/routes.rs`**
+- [ ] **Step 11: 修改 `crates/datluma-api/src/routes.rs`**
 
 ```diff
---- a/crates/dblens-api/src/routes.rs
-+++ b/crates/dblens-api/src/routes.rs
+--- a/crates/datluma-api/src/routes.rs
++++ b/crates/datluma-api/src/routes.rs
 @@ -238,12 +238,29 @@ pub struct FilterQuery {
      pub filter: Option<String>,
  }
@@ -4152,11 +4152,11 @@ async fn integrated_login() {
      Ok(Json(json!({ "sql": sql })))
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 12: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -298,7 +298,10 @@
    "session.disconnected": {"zh-CN": "连接已断开", "en": "The connection is closed"},
    "session.explain_single": {"zh-CN": "执行计划只能针对一条语句", "en": "An execution plan can only be shown for a single statement"},
@@ -4170,26 +4170,26 @@ async fn integrated_login() {
    "sqlfile.log_failed": {"zh-CN": "第 %{n} 条语句失败（第 %{line} 行）：", "en": "Statement %{n} failed (line %{line}):"},
 ```
 
-- [ ] **Step 13: 修改 `crates/dblens-dialect/Cargo.toml`**
+- [ ] **Step 13: 修改 `crates/datluma-dialect/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-dialect/Cargo.toml
-+++ b/crates/dblens-dialect/Cargo.toml
-@@ -17,6 +17,7 @@ dblens-driver-dameng.workspace = true
- dblens-driver-mysql.workspace = true
- dblens-driver-oracle.workspace = true
- dblens-driver-postgres.workspace = true
-+dblens-driver-sqlserver.workspace = true
+--- a/crates/datluma-dialect/Cargo.toml
++++ b/crates/datluma-dialect/Cargo.toml
+@@ -17,6 +17,7 @@ datluma-driver-dameng.workspace = true
+ datluma-driver-mysql.workspace = true
+ datluma-driver-oracle.workspace = true
+ datluma-driver-postgres.workspace = true
++datluma-driver-sqlserver.workspace = true
  insta.workspace = true
  serde_json.workspace = true
  tokio.workspace = true
 ```
 
-- [ ] **Step 14: 修改 `crates/dblens-dialect/src/variant.rs`**
+- [ ] **Step 14: 修改 `crates/datluma-dialect/src/variant.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/variant.rs
-+++ b/crates/dblens-dialect/src/variant.rs
+--- a/crates/datluma-dialect/src/variant.rs
++++ b/crates/datluma-dialect/src/variant.rs
 @@ -124,6 +124,7 @@ impl Variant {
              DriverId::Postgres => Variant::Postgres,
              DriverId::Oracle => Variant::Oracle,
@@ -4200,11 +4200,11 @@ async fn integrated_login() {
  
 ```
 
-- [ ] **Step 15: 新建 `crates/dblens-driver-sqlserver/Cargo.toml`**
+- [ ] **Step 15: 新建 `crates/datluma-driver-sqlserver/Cargo.toml`**
 
 ```toml
 [package]
-name = "dblens-driver-sqlserver"
+name = "datluma-driver-sqlserver"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -4213,8 +4213,8 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 chrono.workspace = true
-dblens-core.workspace = true
-dblens-driver.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
 futures.workspace = true
 tiberius.workspace = true
 tokio = { workspace = true, features = ["net"] }
@@ -4222,11 +4222,11 @@ tokio-util.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-dblens-driver = { workspace = true, features = ["conformance"] }
+datluma-driver = { workspace = true, features = ["conformance"] }
 tokio.workspace = true
 ```
 
-- [ ] **Step 16: 新建 `crates/dblens-driver-sqlserver/src/actor.rs`**
+- [ ] **Step 16: 新建 `crates/datluma-driver-sqlserver/src/actor.rs`**
 
 ```rust
 //! 持有 tiberius 连接的后台任务（见 lib.rs 开头的说明）。
@@ -4237,8 +4237,8 @@ tokio.workspace = true
 use std::pin::Pin;
 use std::sync::Arc;
 
-use dblens_core::{Error, Result, Row, Value};
-use dblens_driver::ColumnMeta;
+use datluma_core::{Error, Result, Row, Value};
+use datluma_driver::ColumnMeta;
 use futures::TryStreamExt;
 use tiberius::{ColumnType, QueryItem, ToSql};
 use tokio::sync::futures::Notified;
@@ -4433,14 +4433,14 @@ async fn stream(
 }
 ```
 
-- [ ] **Step 17: 新建 `crates/dblens-driver-sqlserver/src/conn.rs`**
+- [ ] **Step 17: 新建 `crates/datluma-driver-sqlserver/src/conn.rs`**
 
 ```rust
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value, msg};
-use dblens_driver::{CancelHandle, Connection, ExecStream, ServerInfo};
+use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Error, Result, Value, msg};
+use datluma_driver::{CancelHandle, Connection, ExecStream, ServerInfo};
 use tokio::sync::{Notify, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
@@ -4564,10 +4564,10 @@ impl Connection for SqlServerConnection {
 }
 ```
 
-- [ ] **Step 18: 新建 `crates/dblens-driver-sqlserver/src/error.rs`**
+- [ ] **Step 18: 新建 `crates/datluma-driver-sqlserver/src/error.rs`**
 
 ```rust
-use dblens_core::{Error, Msg, char_position};
+use datluma_core::{Error, Msg, char_position};
 use tiberius::error::Error as TdsError;
 
 /// 登录失败（密码错误、账号不存在或被禁用、无权访问默认库时也报这个）。
@@ -4632,7 +4632,7 @@ mod tests {
 
     #[test]
     fn line_becomes_position() {
-        let sql = "SELECT '数洞'\n  SELECT * FROM nope";
+        let sql = "SELECT '数览'\n  SELECT * FROM nope";
         // 第 2 行的 SELECT 前面有 11 个字符、一个换行、两个空格，位置从 1 开始
         let e = with_line(sql_error("Invalid object name 'nope2'."), sql, Some(2));
         assert!(matches!(e, Error::Sql { position: Some(15), .. }), "{e:?}");
@@ -4642,7 +4642,7 @@ mod tests {
 
     #[test]
     fn syntax_error_points_at_the_token() {
-        let sql = "SELECT '数洞', FROM t";
+        let sql = "SELECT '数览', FROM t";
         let e = with_line(sql_error("Incorrect syntax near the keyword 'FROM'."), sql, Some(1));
         let Error::Sql { position: Some(p), .. } = e else { panic!("{e:?}") };
         assert_eq!(p as usize, sql[..sql.find("FROM").unwrap()].chars().count() + 1);
@@ -4653,7 +4653,7 @@ mod tests {
     #[test]
     fn syntax_error_in_other_languages() {
         // 服务器的消息语言随登录名的默认语言（中文 Windows 上装的实例默认是简体中文）
-        let sql = "SELECT '数洞', FROM t";
+        let sql = "SELECT '数览', FROM t";
         let e = with_line(
             Error::Sql {
                 code: "156".into(),
@@ -4670,12 +4670,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 19: 新建 `crates/dblens-driver-sqlserver/src/exec.rs`**
+- [ ] **Step 19: 新建 `crates/datluma-driver-sqlserver/src/exec.rs`**
 
 ```rust
 use async_trait::async_trait;
-use dblens_core::Result;
-use dblens_driver::{ExecEvent, ExecStream};
+use datluma_core::Result;
+use datluma_driver::{ExecEvent, ExecStream};
 use tokio::sync::mpsc;
 
 use crate::actor::Item;
@@ -4728,7 +4728,7 @@ impl ExecStream for MsExec {
 }
 ```
 
-- [ ] **Step 20: 新建 `crates/dblens-driver-sqlserver/src/lib.rs`**
+- [ ] **Step 20: 新建 `crates/datluma-driver-sqlserver/src/lib.rs`**
 
 ```rust
 //! SQL Server 驱动（tiberius，TDS 协议；M6a 设计文档第 3 节）。
@@ -4751,8 +4751,8 @@ mod exec;
 mod types;
 
 use async_trait::async_trait;
-use dblens_core::{Error, Result, msg};
-use dblens_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId, TlsMode};
+use datluma_core::{Error, Result, msg};
+use datluma_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId, TlsMode};
 use tiberius::{AuthMethod, Client, Config, EncryptionLevel, SqlBrowser};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
@@ -4821,7 +4821,7 @@ fn option<'a>(p: &'a ConnectParams, key: &str) -> Option<&'a str> {
 fn config(p: &ConnectParams) -> Result<Config> {
     let mut cfg = Config::new();
     cfg.host(&p.host);
-    cfg.application_name("DBLens");
+    cfg.application_name("DATLUMA");
     // 命名实例的端口由 SQL Browser 给出，不设端口（设了会直接连这个端口）
     match option(p, "instance") {
         Some(instance) => cfg.instance_name(instance),
@@ -4898,13 +4898,13 @@ mod tests {
 }
 ```
 
-- [ ] **Step 21: 新建 `crates/dblens-driver-sqlserver/src/types.rs`**
+- [ ] **Step 21: 新建 `crates/datluma-driver-sqlserver/src/types.rs`**
 
 ```rust
-//! TDS 值与 DBLens 值的互相转换（M6a 设计文档 3.5 节）。
+//! TDS 值与 DATLUMA 值的互相转换（M6a 设计文档 3.5 节）。
 
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
-use dblens_core::{Error, Result, Value, msg};
+use datluma_core::{Error, Result, Value, msg};
 use tiberius::numeric::Numeric;
 use tiberius::{ColumnData, ColumnType, FromSql, ToSql};
 
@@ -5077,7 +5077,7 @@ mod tests {
         assert!(matches!(Param(Value::Decimal("1e5".into())).to_sql(), ColumnData::String(Some(_))));
         assert!(matches!(Param(Value::UInt(u64::MAX)).to_sql(), ColumnData::Numeric(Some(_))));
         assert!(
-            Param::new(&Value::Lob(dblens_core::LobPreview {
+            Param::new(&Value::Lob(datluma_core::LobPreview {
                 binary: false,
                 preview: String::new(),
                 total_len: 1,
@@ -5108,11 +5108,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 22: 修改 `crates/dblens-driver/Cargo.toml`**
+- [ ] **Step 22: 修改 `crates/datluma-driver/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-driver/Cargo.toml
-+++ b/crates/dblens-driver/Cargo.toml
+--- a/crates/datluma-driver/Cargo.toml
++++ b/crates/datluma-driver/Cargo.toml
 @@ -18,4 +18,5 @@ tokio.workspace = true
  url.workspace = true
  
@@ -5121,11 +5121,11 @@ mod tests {
  tokio.workspace = true
 ```
 
-- [ ] **Step 23: 修改 `crates/dblens-driver/src/params.rs`**
+- [ ] **Step 23: 修改 `crates/datluma-driver/src/params.rs`**
 
 ```diff
---- a/crates/dblens-driver/src/params.rs
-+++ b/crates/dblens-driver/src/params.rs
+--- a/crates/datluma-driver/src/params.rs
++++ b/crates/datluma-driver/src/params.rs
 @@ -14,6 +14,8 @@ pub enum DriverId {
      Postgres,
      Oracle,
@@ -5185,40 +5185,40 @@ mod tests {
          let (_, p) = ConnectParams::from_url("mysql://u:p@h/db?connect_timeout=3").unwrap();
 ```
 
-- [ ] **Step 24: 修改 `crates/dblens-service/Cargo.toml`**
+- [ ] **Step 24: 修改 `crates/datluma-service/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-service/Cargo.toml
-+++ b/crates/dblens-service/Cargo.toml
+--- a/crates/datluma-service/Cargo.toml
++++ b/crates/datluma-service/Cargo.toml
 @@ -6,11 +6,12 @@ rust-version.workspace = true
  publish.workspace = true
  
  [features]
 -default = ["mysql", "postgres", "oracle", "dameng"]
 +default = ["mysql", "postgres", "oracle", "dameng", "sqlserver"]
- mysql = ["dep:dblens-driver-mysql"]
- postgres = ["dep:dblens-driver-postgres"]
- oracle = ["dep:dblens-driver-oracle"]
- dameng = ["dep:dblens-driver-dameng"]
-+sqlserver = ["dep:dblens-driver-sqlserver"]
+ mysql = ["dep:datluma-driver-mysql"]
+ postgres = ["dep:datluma-driver-postgres"]
+ oracle = ["dep:datluma-driver-oracle"]
+ dameng = ["dep:datluma-driver-dameng"]
++sqlserver = ["dep:datluma-driver-sqlserver"]
  # 公开测试用的假驱动 `fake`
  testing = []
  
-@@ -29,6 +30,7 @@ dblens-driver-dameng = { workspace = true, optional = true }
- dblens-driver-mysql = { workspace = true, optional = true }
- dblens-driver-oracle = { workspace = true, optional = true }
- dblens-driver-postgres = { workspace = true, optional = true }
-+dblens-driver-sqlserver = { workspace = true, optional = true }
+@@ -29,6 +30,7 @@ datluma-driver-dameng = { workspace = true, optional = true }
+ datluma-driver-mysql = { workspace = true, optional = true }
+ datluma-driver-oracle = { workspace = true, optional = true }
+ datluma-driver-postgres = { workspace = true, optional = true }
++datluma-driver-sqlserver = { workspace = true, optional = true }
  directories.workspace = true
  encoding_rs.workspace = true
  encoding_rs_io.workspace = true
 ```
 
-- [ ] **Step 25: 修改 `crates/dblens-service/src/changes.rs`**
+- [ ] **Step 25: 修改 `crates/datluma-service/src/changes.rs`**
 
 ```diff
---- a/crates/dblens-service/src/changes.rs
-+++ b/crates/dblens-service/src/changes.rs
+--- a/crates/datluma-service/src/changes.rs
++++ b/crates/datluma-service/src/changes.rs
 @@ -11,6 +11,9 @@ use crate::session::{ApplyOutcome, SessionId};
  /// 前端提交的改动集。
  #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -5239,11 +5239,11 @@ mod tests {
              .metadata
 ```
 
-- [ ] **Step 26: 修改 `crates/dblens-service/src/compare.rs`**
+- [ ] **Step 26: 修改 `crates/datluma-service/src/compare.rs`**
 
 ```diff
---- a/crates/dblens-service/src/compare.rs
-+++ b/crates/dblens-service/src/compare.rs
+--- a/crates/datluma-service/src/compare.rs
++++ b/crates/datluma-service/src/compare.rs
 @@ -266,7 +266,7 @@ impl Service {
                  })
              }
@@ -5255,11 +5255,11 @@ mod tests {
                  let args = MetaArgs { schema: Some(schema.clone()), ..Default::default() };
 ```
 
-- [ ] **Step 27: 修改 `crates/dblens-service/src/design.rs`**
+- [ ] **Step 27: 修改 `crates/datluma-service/src/design.rs`**
 
 ```diff
---- a/crates/dblens-service/src/design.rs
-+++ b/crates/dblens-service/src/design.rs
+--- a/crates/datluma-service/src/design.rs
++++ b/crates/datluma-service/src/design.rs
 @@ -180,7 +180,7 @@ impl Service {
  
      /// 打开设计器：原表（直接从库读取）、存储属性和行数估计、指纹。
@@ -5280,11 +5280,11 @@ mod tests {
          if let Some(name) = &req.name {
 ```
 
-- [ ] **Step 28: 修改 `crates/dblens-service/src/document/job.rs`**
+- [ ] **Step 28: 修改 `crates/datluma-service/src/document/job.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/job.rs
-+++ b/crates/dblens-service/src/document/job.rs
+--- a/crates/datluma-service/src/document/job.rs
++++ b/crates/datluma-service/src/document/job.rs
 @@ -204,7 +204,7 @@ impl Service {
                  }
              }
@@ -5296,11 +5296,11 @@ mod tests {
                  for key in MetaKey::TABLE_DETAIL.into_iter().chain([MetaKey::Views]) {
 ```
 
-- [ ] **Step 29: 修改 `crates/dblens-service/src/import/job.rs`**
+- [ ] **Step 29: 修改 `crates/datluma-service/src/import/job.rs`**
 
 ```diff
---- a/crates/dblens-service/src/import/job.rs
-+++ b/crates/dblens-service/src/import/job.rs
+--- a/crates/datluma-service/src/import/job.rs
++++ b/crates/datluma-service/src/import/job.rs
 @@ -264,7 +264,7 @@ impl Service {
          table: &str,
          def: &NewTable,
@@ -5321,11 +5321,11 @@ mod tests {
          let (table, create_sql) = match &req.create {
 ```
 
-- [ ] **Step 30: 修改 `crates/dblens-service/src/metadata.rs`**
+- [ ] **Step 30: 修改 `crates/datluma-service/src/metadata.rs`**
 
 ```diff
---- a/crates/dblens-service/src/metadata.rs
-+++ b/crates/dblens-service/src/metadata.rs
+--- a/crates/datluma-service/src/metadata.rs
++++ b/crates/datluma-service/src/metadata.rs
 @@ -1,5 +1,6 @@
  //! 元数据浏览（设计文档 5.3、6.4 节）：每个连接配置一个小连接池（默认 2 个连接），不会被编辑器里正在跑的
  //! 长查询堵住；查询结果按（连接配置、查询种类、参数）缓存，手动刷新或执行 DDL 后失效。
@@ -5333,7 +5333,7 @@ mod tests {
  
  use std::collections::HashMap;
  use std::sync::{Arc, Mutex};
-@@ -12,13 +13,14 @@ use dblens_driver::{Connection, collect_all};
+@@ -12,13 +13,14 @@ use datluma_driver::{Connection, collect_all};
  use tokio::sync::Semaphore;
  
  use crate::policy::ObjectRef;
@@ -5445,11 +5445,11 @@ mod tests {
          meta::schemas(&*self.rows_or_empty(profile, MetaKey::Schemas, &args).await?)
 ```
 
-- [ ] **Step 31: 修改 `crates/dblens-service/src/migrate/mod.rs`**
+- [ ] **Step 31: 修改 `crates/datluma-service/src/migrate/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/migrate/mod.rs
-+++ b/crates/dblens-service/src/migrate/mod.rs
+--- a/crates/datluma-service/src/migrate/mod.rs
++++ b/crates/datluma-service/src/migrate/mod.rs
 @@ -176,8 +176,8 @@ fn problems(plan: &MigrationPlan, draft: &MigrationDraft) -> Vec<Msg> {
  impl Service {
      /// 读两端的结构。`fresh`：跳过元数据缓存（开始执行前以库中最新的结构为准）。
@@ -5474,11 +5474,11 @@ mod tests {
          let source_password = self.secrets.get(&source.id)?.unwrap_or_default();
 ```
 
-- [ ] **Step 32: 修改 `crates/dblens-service/src/model/ops.rs`**
+- [ ] **Step 32: 修改 `crates/datluma-service/src/model/ops.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/ops.rs
-+++ b/crates/dblens-service/src/model/ops.rs
+--- a/crates/datluma-service/src/model/ops.rs
++++ b/crates/datluma-service/src/model/ops.rs
 @@ -92,7 +92,7 @@ impl Service {
  
      /// 反向生成：作为任务执行，返回任务 id；结束后模型已打开，任务状态的 `model` 是模型编号。
@@ -5490,11 +5490,11 @@ mod tests {
          }
 ```
 
-- [ ] **Step 33: 修改 `crates/dblens-service/src/profile.rs`**
+- [ ] **Step 33: 修改 `crates/datluma-service/src/profile.rs`**
 
 ```diff
---- a/crates/dblens-service/src/profile.rs
-+++ b/crates/dblens-service/src/profile.rs
+--- a/crates/datluma-service/src/profile.rs
++++ b/crates/datluma-service/src/profile.rs
 @@ -68,6 +68,14 @@ pub struct ProfileInput {
      pub product: Option<Variant>,
  }
@@ -5557,11 +5557,11 @@ mod tests {
          }
 ```
 
-- [ ] **Step 34: 修改 `crates/dblens-service/src/registry.rs`**
+- [ ] **Step 34: 修改 `crates/datluma-service/src/registry.rs`**
 
 ```diff
---- a/crates/dblens-service/src/registry.rs
-+++ b/crates/dblens-service/src/registry.rs
+--- a/crates/datluma-service/src/registry.rs
++++ b/crates/datluma-service/src/registry.rs
 @@ -56,7 +56,7 @@ fn native_lib(id: DriverId) -> Option<(NativeLib, &'static str)> {
      match id {
          DriverId::Oracle => Some((NativeLib::OracleClient, "oracle_client_lib_dir")),
@@ -5580,11 +5580,11 @@ mod tests {
  }
  
 @@ -90,6 +91,8 @@ impl DriverRegistry {
-             Box::new(dblens_driver_oracle::OracleDriver),
+             Box::new(datluma_driver_oracle::OracleDriver),
              #[cfg(feature = "dameng")]
-             Box::new(dblens_driver_dameng::DmDriver),
+             Box::new(datluma_driver_dameng::DmDriver),
 +            #[cfg(feature = "sqlserver")]
-+            Box::new(dblens_driver_sqlserver::SqlServerDriver),
++            Box::new(datluma_driver_sqlserver::SqlServerDriver),
          ];
          Self::with_drivers(store, drivers)
      }
@@ -5610,19 +5610,19 @@ mod tests {
  
 ```
 
-- [ ] **Step 35: 修改 `crates/dblens-service/src/service.rs`**
+- [ ] **Step 35: 修改 `crates/datluma-service/src/service.rs`**
 
 ```diff
---- a/crates/dblens-service/src/service.rs
-+++ b/crates/dblens-service/src/service.rs
+--- a/crates/datluma-service/src/service.rs
++++ b/crates/datluma-service/src/service.rs
 @@ -3,8 +3,9 @@
  use std::path::Path;
  use std::sync::Arc;
  
--use dblens_core::{Lang, Result, set_default_lang};
-+use dblens_core::{Error, Lang, Result, msg, set_default_lang};
- use dblens_dialect::{Dialect, OpsQuery, Variant};
-+use dblens_driver::DriverId;
+-use datluma_core::{Lang, Result, set_default_lang};
++use datluma_core::{Error, Lang, Result, msg, set_default_lang};
+ use datluma_dialect::{Dialect, OpsQuery, Variant};
++use datluma_driver::DriverId;
  
  use crate::export::ExportManager;
  use crate::history::HistoryLog;
@@ -5645,11 +5645,11 @@ mod tests {
          let p = self.store.create_profile(input)?;
 ```
 
-- [ ] **Step 36: 修改 `crates/dblens-service/src/session.rs`**
+- [ ] **Step 36: 修改 `crates/datluma-service/src/session.rs`**
 
 ```diff
---- a/crates/dblens-service/src/session.rs
-+++ b/crates/dblens-service/src/session.rs
+--- a/crates/datluma-service/src/session.rs
++++ b/crates/datluma-service/src/session.rs
 @@ -864,6 +864,13 @@ impl Actor {
                      break;
                  }
@@ -5702,8 +5702,8 @@ mod tests {
 -2. 按上表重新套用改动（`gauss.rs` 整个文件复制过去；其余是几行的插入）；
 +2. 按上表重新套用改动（`gauss.rs` 整个文件复制过去；其余是几行的插入或分支）；
  3. 更新上表中的上游版本；
--4. 运行 `CARGO_TARGET_DIR=target cargo test --manifest-path vendor/postgres-protocol/Cargo.toml --lib authentication`（构建目录用工作区的 `target`，不要在 vendor 下生成），再用 `DBLENS_TEST_OPENGAUSS_SHA_URL` 跑 PG 驱动的一致性测试。
-+4. 运行 `CARGO_TARGET_DIR=target cargo test --manifest-path vendor/postgres-protocol/Cargo.toml --lib authentication`（构建目录用工作区的 `target`，不要在 vendor 下生成），再用 `DBLENS_TEST_OPENGAUSS_SHA_URL` 跑 PG 驱动的一致性测试；tiberius 用 `DBLENS_TEST_SQLSERVER_URL` 跑 SQL Server 驱动的一致性测试（其中多结果集、影响行数和 PRINT 消息的用例覆盖补丁）。
+-4. 运行 `CARGO_TARGET_DIR=target cargo test --manifest-path vendor/postgres-protocol/Cargo.toml --lib authentication`（构建目录用工作区的 `target`，不要在 vendor 下生成），再用 `DATLUMA_TEST_OPENGAUSS_SHA_URL` 跑 PG 驱动的一致性测试。
++4. 运行 `CARGO_TARGET_DIR=target cargo test --manifest-path vendor/postgres-protocol/Cargo.toml --lib authentication`（构建目录用工作区的 `target`，不要在 vendor 下生成），再用 `DATLUMA_TEST_OPENGAUSS_SHA_URL` 跑 PG 驱动的一致性测试；tiberius 用 `DATLUMA_TEST_SQLSERVER_URL` 跑 SQL Server 驱动的一致性测试（其中多结果集、影响行数和 PRINT 消息的用例覆盖补丁）。
 ```
 
 - [ ] **Step 38: 更新锁文件**
@@ -5716,28 +5716,28 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试（SQL Server）：测试虚拟机 192.168.139.106 上的 Docker 容器 `mssql2022`（`mcr.microsoft.com/mssql/server:2022-latest`，1433，`--restart unless-stopped`）。sa 密码在 root 的 `/root/dblens-test/creds.env`（`MSSQL_SA=`），读进 shell 变量后做 URL 编码，以内联环境变量传入，不写进任何文件：
+实库测试（SQL Server）：测试虚拟机 192.168.139.106 上的 Docker 容器 `mssql2022`（`mcr.microsoft.com/mssql/server:2022-latest`，1433，`--restart unless-stopped`）。sa 密码在 root 的 `/root/datluma-test/creds.env`（`MSSQL_SA=`），读进 shell 变量后做 URL 编码，以内联环境变量传入，不写进任何文件：
 
 ```bash
 H=192.168.139.106
-P=$(ssh -i ~/.ssh/nexa_linux_vm -o IdentitiesOnly=yes nexa@$H 'sudo grep "^MSSQL_SA=" /root/dblens-test/creds.env | cut -d= -f2-')
+P=$(ssh -i ~/.ssh/nexa_linux_vm -o IdentitiesOnly=yes nexa@$H 'sudo grep "^MSSQL_SA=" /root/datluma-test/creds.env | cut -d= -f2-')
 ENC=$(python -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "$P")
-DBLENS_TEST_SQLSERVER_URL="sqlserver://sa:$ENC@$H:1433/dblens_test" DBLENS_LANG=en CARGO_INCREMENTAL=0 \
+DATLUMA_TEST_SQLSERVER_URL="sqlserver://sa:$ENC@$H:1433/datluma_test" DATLUMA_LANG=en CARGO_INCREMENTAL=0 \
   cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace -- --test-threads=1 sqlserver
 ```
 
-测试库 `dblens_test` 由测试自己建（不存在时）。全部实库测试串行运行（`--test-threads=1`），不加 `--include-ignored`。
+测试库 `datluma_test` 由测试自己建（不存在时）。全部实库测试串行运行（`--test-threads=1`），不加 `--include-ignored`。
 
 回归：再带上原有 12 个实库目标的环境变量（MySQL、MariaDB、PG、Oracle、达梦，以及 TiDB、OceanBase、openGauss 三个、人大金仓两个；密码读法同上）跑一遍 `cargo test … --workspace -- --test-threads=1`。
 - OceanBase 在虚拟机开机后要几分钟才能连上（"Server is initializing"），连接被拒或报这个错时等它启动完再重跑。
 - 达梦偶发"网络通讯失败"，失败时单独重跑该用例。
 
-Windows 认证（设计文档 10 节，只能在 Windows 上运行）：Win11 测试虚拟机 192.168.139.103 上的 SQL Server Express（实例 `SQLEXPRESS`，固定端口 1433），本地账号 `dbltest` 已映射为登录名。密码在虚拟机的 `C:\ProgramData\dblens-test\creds.txt`（只有管理员可读）。
-- 指定账号（NTLM，从开发机连）：`DBLENS_TEST_SQLSERVER_WINAUTH_URL="sqlserver://DESKTOP-F4O6PL4%5Cdbltest:<编码后的密码>@192.168.139.103:1433/dblens_test?auth=windows&trust_server_certificate=true"`；
-- 当前用户（在虚拟机上以 `dbltest` 身份运行）：`DBLENS_TEST_SQLSERVER_INTEGRATED_URL="sqlserver://localhost:1433/dblens_test?auth=integrated&trust_server_certificate=true"`。
+Windows 认证（设计文档 10 节，只能在 Windows 上运行）：Win11 测试虚拟机 192.168.139.103 上的 SQL Server Express（实例 `SQLEXPRESS`，固定端口 1433），本地账号 `dbltest` 已映射为登录名。密码在虚拟机的 `C:\ProgramData\datluma-test\creds.txt`（只有管理员可读）。
+- 指定账号（NTLM，从开发机连）：`DATLUMA_TEST_SQLSERVER_WINAUTH_URL="sqlserver://DESKTOP-F4O6PL4%5Cdbltest:<编码后的密码>@192.168.139.103:1433/datluma_test?auth=windows&trust_server_certificate=true"`；
+- 当前用户（在虚拟机上以 `dbltest` 身份运行）：`DATLUMA_TEST_SQLSERVER_INTEGRATED_URL="sqlserver://localhost:1433/datluma_test?auth=integrated&trust_server_certificate=true"`。
 没设置时这两个测试跳过。
 
 Expected: 全部测试通过；SQL Server 的实库测试（驱动一致性、元数据、服务、接口）全部通过；回归无失败。
@@ -5745,7 +5745,7 @@ Expected: 全部测试通过；SQL Server 的实库测试（驱动一致性、�
 - [ ] **Step 40: 提交**
 
 ```bash
-git add Cargo.lock Cargo.toml crates/dblens-api/src/lib.rs crates/dblens-api/src/routes.rs crates/dblens-api/tests/live.rs crates/dblens-core/locales/app.json crates/dblens-dialect/Cargo.toml crates/dblens-dialect/src/variant.rs crates/dblens-dialect/tests/fixtures/sqlserver.sql crates/dblens-dialect/tests/meta_live.rs crates/dblens-driver-sqlserver/Cargo.toml crates/dblens-driver-sqlserver/src/actor.rs crates/dblens-driver-sqlserver/src/conn.rs crates/dblens-driver-sqlserver/src/error.rs crates/dblens-driver-sqlserver/src/exec.rs crates/dblens-driver-sqlserver/src/lib.rs crates/dblens-driver-sqlserver/src/types.rs crates/dblens-driver-sqlserver/tests/conformance.rs crates/dblens-driver/Cargo.toml crates/dblens-driver/src/params.rs crates/dblens-service/Cargo.toml crates/dblens-service/src/changes.rs crates/dblens-service/src/compare.rs crates/dblens-service/src/design.rs crates/dblens-service/src/document/job.rs crates/dblens-service/src/import/job.rs crates/dblens-service/src/metadata.rs crates/dblens-service/src/migrate/mod.rs crates/dblens-service/src/model/ops.rs crates/dblens-service/src/profile.rs crates/dblens-service/src/registry.rs crates/dblens-service/src/service.rs crates/dblens-service/src/session.rs crates/dblens-service/tests/live.rs crates/dblens-service/tests/migrate_live.rs vendor/PATCHES.md vendor/tiberius
+git add Cargo.lock Cargo.toml crates/datluma-api/src/lib.rs crates/datluma-api/src/routes.rs crates/datluma-api/tests/live.rs crates/datluma-core/locales/app.json crates/datluma-dialect/Cargo.toml crates/datluma-dialect/src/variant.rs crates/datluma-dialect/tests/fixtures/sqlserver.sql crates/datluma-dialect/tests/meta_live.rs crates/datluma-driver-sqlserver/Cargo.toml crates/datluma-driver-sqlserver/src/actor.rs crates/datluma-driver-sqlserver/src/conn.rs crates/datluma-driver-sqlserver/src/error.rs crates/datluma-driver-sqlserver/src/exec.rs crates/datluma-driver-sqlserver/src/lib.rs crates/datluma-driver-sqlserver/src/types.rs crates/datluma-driver-sqlserver/tests/conformance.rs crates/datluma-driver/Cargo.toml crates/datluma-driver/src/params.rs crates/datluma-service/Cargo.toml crates/datluma-service/src/changes.rs crates/datluma-service/src/compare.rs crates/datluma-service/src/design.rs crates/datluma-service/src/document/job.rs crates/datluma-service/src/import/job.rs crates/datluma-service/src/metadata.rs crates/datluma-service/src/migrate/mod.rs crates/datluma-service/src/model/ops.rs crates/datluma-service/src/profile.rs crates/datluma-service/src/registry.rs crates/datluma-service/src/service.rs crates/datluma-service/src/session.rs crates/datluma-service/tests/live.rs crates/datluma-service/tests/migrate_live.rs vendor/PATCHES.md vendor/tiberius
 git commit -m "feat: SQL Server 驱动（tiberius）、按库浏览元数据、M6b 功能拦截" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -6157,7 +6157,7 @@ describe('T-SQL 补全', () => {
 +# 生成的 T-SQL 解析器（web/scripts/gen-tsql.mjs）
 +/web/src/features/sql/tsql/gen/
  # tauri-build 生成的权限描述
- /crates/dblens-desktop/gen/
+ /crates/datluma-desktop/gen/
  # tauri-build 按 build.rs 中的命令列表自动生成的权限定义
 ```
 
@@ -6197,7 +6197,7 @@ describe('T-SQL 补全', () => {
 +    "test": "node scripts/gen-plsql.mjs && node scripts/gen-tsql.mjs && vitest run",
 +    "typecheck": "node scripts/gen-plsql.mjs && node scripts/gen-tsql.mjs && tsc --noEmit",
      "tauri": "cd .. && tauri",
-     "package": "cd .. && tauri build --config crates/dblens-desktop/tauri.bundle.json"
+     "package": "cd .. && tauri build --config crates/datluma-desktop/tauri.bundle.json"
    },
 ```
 
@@ -7113,7 +7113,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) main()
 ```ts
 // SQL Server 的语言服务（M6a 设计文档第 8 节）：grammars-v4 的 T-SQL 语法生成的解析器，加 antlr4-c3 分析光标处
 // 可以出现的规则和关键字。做法同 PL/SQL（plsql/parser.ts）：先分批再逐批解析，没改动的批用缓存；先 SLL 后 LL。
-// 分批规则与后端 dblens-dialect 的 split.rs 一致：单独一行的 `GO [次数]`（行尾可有注释）结束一批；
+// 分批规则与后端 datluma-dialect 的 split.rs 一致：单独一行的 `GO [次数]`（行尾可有注释）结束一批；
 // 字符串、`[…]`、`"…"` 和注释里的 GO 由词法分析排除。"光标处的语句"就是光标所在的一批。
 
 import { CodeCompletionCore } from 'antlr4-c3'
@@ -7783,7 +7783,7 @@ export const tsql: SqlParser = {
 +      "integrated": "Current Windows user"
 +    },
 +    "windowsHint": "Write the user name as DOMAIN-or-HOST\\user (NTLM); available on Windows only",
-+    "integratedHint": "Logs in as the Windows account running the DBLens service, without a user name or password; in browser mode that is the server's account, not the browser machine's. Available on Windows only",
++    "integratedHint": "Logs in as the Windows account running the DATLUMA service, without a user name or password; in browser mode that is the server's account, not the browser machine's. Available on Windows only",
 +    "instance": "Instance",
 +    "instancePlaceholder": "Optional, e.g. SQLEXPRESS; the port is ignored when set",
 +    "trustCert": "Server certificate",
@@ -7875,7 +7875,7 @@ export const tsql: SqlParser = {
 +      "integrated": "当前 Windows 用户"
 +    },
 +    "windowsHint": "用户名写成 域或机器名\\用户（NTLM）；只能在 Windows 上使用",
-+    "integratedHint": "用运行 DBLens 服务的 Windows 账号登录，不需要用户名和密码；浏览器访问时是服务端的账号，不是浏览器所在电脑的账号。只能在 Windows 上使用",
++    "integratedHint": "用运行 DATLUMA 服务的 Windows 账号登录，不需要用户名和密码；浏览器访问时是服务端的账号，不是浏览器所在电脑的账号。只能在 Windows 上使用",
 +    "instance": "实例名",
 +    "instancePlaceholder": "可选，如 SQLEXPRESS；填写后忽略端口",
 +    "trustCert": "服务器证书",
@@ -7980,7 +7980,7 @@ export const tsql: SqlParser = {
 +  return driver !== 'sqlserver'
 +}
 +
- /** 服务端的错误对象（dblens_core::Error），按 kind 区分。 */
+ /** 服务端的错误对象（datluma_core::Error），按 kind 区分。 */
  export interface ErrorBody {
    kind: string
 @@ -251,11 +300,18 @@ export type RowChange =
@@ -8123,7 +8123,7 @@ export const tsql: SqlParser = {
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -8136,9 +8136,9 @@ Expected: 全部通过（前端新增 T-SQL 解析、库节点、ER 图的测试
 
 - [ ] **Step 50: 浏览器实测**
 
-浏览器实测（设计文档 10 节）：用 `dblens-server --listen 127.0.0.1:<端口> --data-dir <临时目录> --web-dir web/dist --no-update-check` 启动浏览器模式，按 `DBLENS_TEST_SQLSERVER_URL` 建一个"生产"环境的 SQL Server 连接（可用接口 `POST /api/profiles`，驱动名 `sqlserver`）。
-1. 展开连接：列出各库，系统库标"系统"；展开 `dblens_test` → 架构 → 表。
-2. 新建查询，库选 `dblens_test`，执行带 `PRINT`、两个 SELECT、`GO`、`GO 2` 和一条查不存在的表的脚本：结果 1–4 各自显示，消息页有 PRINT 的内容和各批耗时，错误标在原文的行上。
+浏览器实测（设计文档 10 节）：用 `datluma-server --listen 127.0.0.1:<端口> --data-dir <临时目录> --web-dir web/dist --no-update-check` 启动浏览器模式，按 `DATLUMA_TEST_SQLSERVER_URL` 建一个"生产"环境的 SQL Server 连接（可用接口 `POST /api/profiles`，驱动名 `sqlserver`）。
+1. 展开连接：列出各库，系统库标"系统"；展开 `datluma_test` → 架构 → 表。
+2. 新建查询，库选 `datluma_test`，执行带 `PRINT`、两个 SELECT、`GO`、`GO 2` 和一条查不存在的表的脚本：结果 1–4 各自显示，消息页有 PRINT 的内容和各批耗时，错误标在原文的行上。
 3. 打开表数据：中文正常；改一个单元格提交，预览的语句带 `N''` 和原值条件，生产环境要求确认；不带 WHERE 的 UPDATE 要求确认。
 4. 执行计划显示 SHOWPLAN 的表格；之后正常执行得到的是数据而不是计划。
 5. 右键架构和表：页面不崩溃，设计表、导入、比对、另存为模型、导出文档、迁移置灰；查看 DDL 的标题是 `库.架构.表`；"生成 SQL → INSERT"跳过计算列；ER 图画出外键连线、没有误报的图外引用。
@@ -8163,7 +8163,7 @@ git commit -m "feat(web): SQL Server 连接、按库浏览、T-SQL 语法检查�
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m6a-sqlserver.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 - Modify: `vendor/PATCHES.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
@@ -8211,7 +8211,7 @@ git commit -m "feat(web): SQL Server 连接、按库浏览、T-SQL 语法检查�
 ## 结构
 
 ```text
-crates/dblens-driver-sqlserver/       新驱动（tiberius 0.13）
+crates/datluma-driver-sqlserver/       新驱动（tiberius 0.13）
   src/lib.rs     URL 解析成 tiberius 的 Config（认证、实例名、TLS、信任服务器证书）、连接（Azure 重定向重连一次）
   src/actor.rs   后台任务独占连接，命令走 mpsc，结果走有界通道（256）；取消用 Notify；
                  无参数时整批 simple_query（USE、临时表留在会话里），有参数时 sp_executesql
@@ -8221,18 +8221,18 @@ crates/dblens-driver-sqlserver/       新驱动（tiberius 0.13）
   src/error.rs   错误号、批内行号换算成位置
 vendor/tiberius/                      tiberius 0.13.0 的补丁（见 vendor/PATCHES.md）：
                                       QueryItem::Done / Info（影响行数和 PRINT 消息不丢）、取消后丢弃到 attention 确认为止
-crates/dblens-dialect/
+crates/datluma-dialect/
   src/variant.rs ident.rs literal.rs  SqlServer 家族：方括号、@P1 占位符、N'' 字符串、0x 二进制、OFFSET FETCH
   src/split.rs   GO 分批（单独一行、可带次数和行尾注释；字符串、方括号、嵌套注释里的不算；次数上限 1000）
   src/ddl.rs types.rs design/catalog.rs migrate/*  DDL 生成、类型映射；表设计器和迁移的入口报"暂不支持"
   sql/sqlserver.sql  元数据模板（含 catalogs）；sql/ops/sqlserver.sql 运维查询
-crates/dblens-service/
+crates/datluma-service/
   src/profile.rs   in_catalog、scope（连接 id + 库名）
   src/metadata.rs  元数据池和缓存按 scope 区分；catalogs()
   src/policy.rs    classify_batch（危险语句）
   src/service.rs   feature_profile：M6b 的功能对 SQL Server 报 sqlserver.later
   src/session.rs   执行计划的收尾语句（SET SHOWPLAN_ALL OFF）
-crates/dblens-api/src/routes.rs  元数据接口加 ?catalog=，GET /profiles/{id}/catalogs
+crates/datluma-api/src/routes.rs  元数据接口加 ?catalog=，GET /profiles/{id}/catalogs
 web/grammars/tsql/                    grammars-v4 的 T-SQL 语法（固定提交，MIT）
 web/scripts/gen-tsql.mjs              生成解析器到 src/features/sql/tsql/gen/（不提交）
 web/src/features/sql/tsql/parser.ts   GO 分批、语法检查、补全（三段名、别名）
@@ -8246,7 +8246,7 @@ web/src/features/connections/         认证方式、实例名、信任服务器
 - 按库取元数据不用模板函数 `{{ catalog() }}` 拼三段名，而是元数据连接池按库区分，连接时指定库（`in_catalog`）；
   模板里只写 `sys.tables` 这类当前库的视图，库名不进入 SQL 文本。
 - TLS 只有三档：关闭（`EncryptionLevel::Off`，登录报文仍加密）、必须（`Required`，不校验证书）、校验证书
-  （`Required`，打开"信任服务器证书"时不校验，否则用指定的 CA）。DBLens 的 TLS 选项本来就没有"优先"。
+  （`Required`，打开"信任服务器证书"时不校验，否则用指定的 CA）。DATLUMA 的 TLS 选项本来就没有"优先"。
 - Windows 认证（指定账号和当前用户）只在 Windows 上可用：tiberius 在其他平台走 sspi-rs，其依赖 sha1 只有预发布版，
   不符合依赖原则。其他平台选了会报 `sqlserver.windows_auth_only`。表单在所有平台都显示这两项并加提示。
 - 过程式代码等解析不了的批，按关键字扫描时只看 DROP、TRUNCATE、DELETE、UPDATE 和 SQL Server 特有的几个，不含 MERGE
@@ -8268,7 +8268,7 @@ web/src/features/connections/         认证方式、实例名、信任服务器
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过。
   - 方言层：`GO` 分批（字符串、注释、方括号里的 GO，`GO n`、次数上限、行尾注释、行号）、标识符和字面量、类型往返、DDL、危险语句分类、元数据模板快照。
   - 驱动：错误行号换算成位置（含中文消息）。
 - 实库（串行）：
@@ -8282,11 +8282,11 @@ web/src/features/connections/         认证方式、实例名、信任服务器
 - 未验证：桌面程序（Tauri）中的 SQL Server 连接；命名实例经 SQL Browser 查端口（测试实例固定了 1433）；Azure SQL 的重定向。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -337,6 +337,8 @@ trait Policy: Send + Sync {
  - 2026-10-28 M5 拆成两份（用户确认）：M5a 结构迁移；M5b 数据迁移（分批迁数据、断点续传、行数和抽样校验，插在 M5a 的建表和建约束之间）。
  - M5a 已完成（设计 `docs/superpowers/specs/2026-10-28-m5a-structure-migration-design.md`，详细计划 `docs/superpowers/plans/2026-10-28-m5a-structure-migration.md`，说明 `docs/notes/m5a-structure-migration.md`）。
@@ -8323,6 +8323,6 @@ Expected: 无。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m6a-sqlserver.md docs/superpowers/specs/2026-10-22-dblens-design.md vendor/PATCHES.md
+git add docs/notes/m0-4b-api.md docs/notes/m6a-sqlserver.md docs/superpowers/specs/2026-10-22-datluma-design.md vendor/PATCHES.md
 git commit -m "docs: M6a 说明文档、接口与总设计文档更新" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

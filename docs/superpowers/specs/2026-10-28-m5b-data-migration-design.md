@@ -1,6 +1,6 @@
 # M5b 数据迁移 设计
 
-日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-dblens-design.md` 第 11 节（M5 迁移）；
+日期：2026-10-28。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-datluma-design.md` 第 11 节（M5 迁移）；
 M5a 设计 `docs/superpowers/specs/2026-10-28-m5a-structure-migration-design.md`（迁移方案、两步脚本、迁移标签、迁移报告）；
 M2b 设计 `docs/superpowers/specs/2026-10-27-m2b-import-design.md`（分批写入、出错停止或跳过）。
 

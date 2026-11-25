@@ -1,0 +1,214 @@
+//! 桌面模式入口（设计文档 4.1 节）：进程内启动接口服务，只绑定 127.0.0.1 的随机端口，
+//! 每次启动生成新的访问令牌，经 Tauri 注入页面。前端只通过 HTTP 和 WebSocket 调用业务；
+//! Tauri 只负责窗口、菜单等原生能力。
+
+// 发布版不弹出控制台窗口
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod geometry;
+mod json_file;
+mod logging;
+mod notice;
+mod shell;
+mod update;
+#[cfg(windows)]
+mod win_dialog;
+mod window;
+mod window_state;
+
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+
+use datluma_api::{ApiConfig, new_token, router, serve, with_web};
+use datluma_core::msg;
+use datluma_service::{Service, default_data_dir};
+use tauri::Manager;
+
+/// 前端页面目录，按顺序查找：
+/// 1. 环境变量 `DATLUMA_WEB_DIR`；
+/// 2. 安装包中的资源目录 `web/`（打包在 M0-4d 中配置）；
+/// 3. 调试构建时，源码树中的 `web/dist`。
+fn web_dir(resource_dir: Option<PathBuf>) -> Option<PathBuf> {
+    let dev = cfg!(debug_assertions).then(|| Path::new(env!("CARGO_MANIFEST_DIR")).join("../../web/dist"));
+    std::env::var_os("DATLUMA_WEB_DIR")
+        .map(PathBuf::from)
+        .into_iter()
+        .chain(resource_dir.map(|d| d.join("web")))
+        .chain(dev)
+        .find(|d| d.join("index.html").is_file())
+}
+
+/// WebView 拒绝访问的端口（ERR_UNSAFE_PORT），1024 以下的系统不会随机分配。
+const UNSAFE_PORTS: [u16; 17] =
+    [1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668, 6669, 6697];
+
+fn is_unsafe_port(port: u16) -> bool {
+    UNSAFE_PORTS.contains(&port) || port == 6679 || port == 10080
+}
+
+/// 绑定系统分配的本机端口，避开 WebView 拒绝的端口：绑到它们时窗口打不开。
+/// 不合适的监听先留着，系统才不会再分配同一个端口。
+fn bind_local() -> std::io::Result<std::net::TcpListener> {
+    let mut rejected = Vec::new();
+    loop {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0")?;
+        if !is_unsafe_port(listener.local_addr()?.port()) {
+            return Ok(listener);
+        }
+        rejected.push(listener);
+    }
+}
+
+fn run(data_dir: PathBuf) -> Result<(), String> {
+    let service = Arc::new(Service::open(&data_dir).map_err(|e| e.to_string())?);
+    let token = new_token();
+    // 先在当前线程绑定端口，窗口创建时地址已经确定
+    let listener = bind_local().map_err(|e| msg!("desktop.bind_failed", error = e).current())?;
+    listener.set_nonblocking(true).map_err(|e| e.to_string())?;
+    let addr = listener.local_addr().map_err(|e| e.to_string())?;
+    let base = format!("http://{addr}/");
+    tracing::info!("接口服务地址 {base}，数据目录 {}", data_dir.display());
+
+    tauri::Builder::default()
+        // 单实例：程序已在运行（可能在托盘里）时，再次启动只唤出已有窗口，新进程随即退出。要最先注册
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| window::show_main(app)))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().with_handler(window::on_shortcut).build())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            shell::shell_info,
+            shell::window_action,
+            shell::set_auto_check_update,
+            shell::set_close_action,
+            shell::set_title,
+            shell::save_dialog,
+            shell::open_dialog,
+            shell::folder_dialog,
+            shell::reveal_in_folder,
+            notice::notice_pending,
+            notice::notice_reply
+        ])
+        .setup(move |app| {
+            let mut api = router(
+                service,
+                ApiConfig {
+                    token: token.clone(),
+                    allowed_origins: Vec::new(),
+                    local_files: true,
+                    max_result_rows: None,
+                },
+            );
+            match web_dir(app.path().resource_dir().ok()) {
+                Some(dir) => {
+                    tracing::info!("前端页面目录 {}", dir.display());
+                    api = with_web(api, dir);
+                }
+                None => tracing::error!("没有找到前端页面（web/dist），请先在 web/ 下执行 pnpm build"),
+            }
+            tauri::async_runtime::spawn(async move {
+                let result = match tokio::net::TcpListener::from_std(listener) {
+                    Ok(l) => serve(l, api).await,
+                    Err(e) => Err(e),
+                };
+                if let Err(e) = result {
+                    tracing::error!("接口服务异常退出：{e}");
+                }
+            });
+            notice::init(app);
+            let help = update::init(app, data_dir.join("update.json"))?;
+            window::create_main(app, &base, &token, data_dir.join("window.json"), &help)?;
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .map_err(|e| e.to_string())
+}
+
+fn run_mcp(data_dir: &Path) -> Result<(), String> {
+    let service = Arc::new(Service::open(data_dir).map_err(|e| e.to_string())?);
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(datluma_mcp::serve_stdio(service)).map_err(|e| e.to_string())
+}
+
+/// 数据目录：环境变量 `DATLUMA_DATA_DIR`（开发和测试时用，避免碰到真实数据）优先，否则用默认的用户数据目录。
+fn data_dir() -> datluma_core::Result<PathBuf> {
+    match std::env::var_os("DATLUMA_DATA_DIR") {
+        Some(d) => Ok(PathBuf::from(d)),
+        None => default_data_dir(),
+    }
+}
+
+fn main() {
+    let data_dir = match data_dir() {
+        Ok(d) => d,
+        Err(e) => {
+            eprintln!("{e}");
+            std::process::exit(1);
+        }
+    };
+    let _guard = match logging::init(&data_dir.join("logs")) {
+        Ok(g) => Some(g),
+        Err(e) => {
+            eprintln!("日志初始化失败：{e}");
+            None
+        }
+    };
+    // `--mcp`：不开窗口，作为 MCP 服务在标准输入输出上运行（智能体启动的子进程）
+    if std::env::args().skip(1).any(|a| a == "--mcp") {
+        tracing::info!("DATLUMA {} 以 MCP 服务方式启动", env!("CARGO_PKG_VERSION"));
+        if let Err(e) = run_mcp(&data_dir) {
+            tracing::error!("MCP 服务失败：{e}");
+            std::process::exit(1);
+        }
+        return;
+    }
+    tracing::info!("DATLUMA {} 启动", env!("CARGO_PKG_VERSION"));
+    if let Err(e) = run(data_dir) {
+        tracing::error!("启动失败：{e}");
+        std::process::exit(1);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn web_dir_prefers_resource_dir_and_needs_index_html() {
+        let tmp = tempfile::tempdir().unwrap();
+        let res = tmp.path().join("res");
+        std::fs::create_dir_all(res.join("web")).unwrap();
+        // 资源目录中还没有 index.html：调试构建回退到源码树的 web/dist（存在时），否则找不到
+        let found = web_dir(Some(res.clone()));
+        assert_ne!(found, Some(res.join("web")));
+        std::fs::write(res.join("web").join("index.html"), "x").unwrap();
+        assert_eq!(web_dir(Some(res.clone())), Some(res.join("web")));
+    }
+
+    /// 页面调用的命令都要放行，否则按钮没有反应，只在日志里有一条 not allowed。
+    #[test]
+    fn every_command_is_allowed() {
+        let main = include_str!("main.rs");
+        let handlers = main.split("generate_handler![").nth(1).unwrap().split(']').next().unwrap();
+        let capability = include_str!("../capabilities/main.json");
+        let build = include_str!("../build.rs");
+        let commands: Vec<&str> =
+            handlers.split(',').filter_map(|c| c.trim().strip_prefix("shell::")).collect();
+        assert!(commands.len() >= 7, "{commands:?}");
+        for command in commands {
+            let allow = format!("\"allow-{}\"", command.replace('_', "-"));
+            assert!(capability.contains(&allow), "capabilities/main.json 缺 {allow}");
+            assert!(build.contains(&format!("\"{command}\"")), "build.rs 缺 {command}");
+        }
+    }
+
+    #[test]
+    fn unsafe_ports_are_refused() {
+        for port in [5060, 5061, 6000, 6667, 6679, 10080] {
+            assert!(is_unsafe_port(port), "{port}");
+        }
+        assert!(!is_unsafe_port(5173));
+        assert!(!is_unsafe_port(50000));
+        let listener = bind_local().unwrap();
+        assert!(!is_unsafe_port(listener.local_addr().unwrap().port()));
+    }
+}

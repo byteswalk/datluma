@@ -39,7 +39,7 @@ const AI_ACTIONS: { id: EditorCommand; label: CommandLabel; keys: number[] }[] =
   { id: 'ai-explain', label: 'editor.command.aiExplain', keys: [] },
   { id: 'ai-optimize', label: 'editor.command.aiOptimize', keys: [] },
 ]
-const AI_CONTEXT = 'dblensAi'
+const AI_CONTEXT = 'datlumaAi'
 
 export interface SqlEditorProps {
   path: string
@@ -73,21 +73,21 @@ export default function SqlEditor({ path, language, defaultValue, marks, sql, on
     checker.current = attachChecker(editor)
     for (const a of ACTIONS) {
       editor.addAction({
-        id: `dblens.${a.id}`,
+        id: `datluma.${a.id}`,
         label: t(a.label),
         keybindings: a.keys,
-        contextMenuGroupId: a.id === 'cancel' ? undefined : '0_dblens',
+        contextMenuGroupId: a.id === 'cancel' ? undefined : '0_datluma',
         run: () => sendCommand(a.id),
       })
     }
     aiKey.current = editor.createContextKey(AI_CONTEXT, aiEnabled)
     for (const a of AI_ACTIONS) {
       editor.addAction({
-        id: `dblens.${a.id}`,
+        id: `datluma.${a.id}`,
         label: t(a.label),
         keybindings: a.keys,
         precondition: AI_CONTEXT,
-        contextMenuGroupId: '1_dblens_ai',
+        contextMenuGroupId: '1_datluma_ai',
         run: () => sendCommand(a.id),
       })
     }
@@ -107,7 +107,7 @@ export default function SqlEditor({ path, language, defaultValue, marks, sql, on
     if (!model || model.uri.path !== monaco.Uri.parse(path).path) return
     monaco.editor.setModelMarkers(
       model,
-      'dblens',
+      'datluma',
       marks.map((m) => {
         const s = model.getPositionAt(m.start)
         const e = model.getPositionAt(m.end)
@@ -130,7 +130,7 @@ export default function SqlEditor({ path, language, defaultValue, marks, sql, on
       keepCurrentModel
       language={language}
       defaultValue={defaultValue}
-      theme={`dblens-${theme}`}
+      theme={`datluma-${theme}`}
       onMount={onMount}
       onChange={(v) => onChange(v ?? '')}
       options={{

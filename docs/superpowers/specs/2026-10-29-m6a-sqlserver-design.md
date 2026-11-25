@@ -1,6 +1,6 @@
 # M6a SQL Server（连接、浏览、查询）设计
 
-日期：2026-10-29。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-dblens-design.md`（驱动、方言、元数据模板的分层）；
+日期：2026-10-29。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-datluma-design.md`（驱动、方言、元数据模板的分层）；
 国产库第一批设计 `docs/superpowers/specs/2026-10-27-domestic-batch1-design.md`（新增变体的做法）；
 M1b2 设计 `docs/superpowers/specs/2026-10-25-m1b2-completion-design.md`（grammars-v4 语法、补全）。
 
@@ -31,7 +31,7 @@ M6 拆成两段：
 | 脚本执行 | 按单独一行的 `GO` 分批，每批整段发给服务器（与 SSMS、sqlcmd 一致） |
 | 版本 | 支持 2017 及以上；日常实测 2022，2017、2025 各跑一轮 |
 
-## 3. 驱动：`dblens-driver-sqlserver`
+## 3. 驱动：`datluma-driver-sqlserver`
 
 ### 3.1 连接
 
@@ -54,7 +54,7 @@ M6 拆成两段：
 
 ### 3.3 加密
 
-| DBLens 的 TLS 选项 | tiberius |
+| DATLUMA 的 TLS 选项 | tiberius |
 |---|---|
 | 关闭 | `EncryptionLevel::NotSupported`（服务器强制加密时由服务器报错） |
 | 优先 | `EncryptionLevel::On`，不校验证书 |
@@ -76,7 +76,7 @@ M6 拆成两段：
 
 ### 3.5 类型映射
 
-| SQL Server | DBLens 的值 |
+| SQL Server | DATLUMA 的值 |
 |---|---|
 | bit | 布尔 |
 | tinyint、smallint、int、bigint | 整数 |
@@ -168,7 +168,7 @@ TDS 协议支持取消（attention 包）。计划的第一项实现任务先做
 
 - 编辑器标签选的库与连接当前的库不同时，执行前先执行 `USE [库]`；当前库用 `DB_NAME()` 读取。
 - SQL Server 不能在会话中切换默认架构，不带架构的名称按登录用户的默认架构解析；标签上选的架构只影响补全。
-  DBLens 生成的 SQL 一律带架构名。
+  DATLUMA 生成的 SQL 一律带架构名。
 
 ## 6. 运维与执行计划
 
@@ -215,11 +215,11 @@ TDS 协议支持取消（attention 包）。计划的第一项实现任务先做
 
 - 单元测试：`GO` 切分（字符串、注释、方括号里的 GO，`GO 5`，行尾注释，行号）、类型转换、标识符和字面量、
   分页、危险语句分类、元数据模板快照（含 `catalog()` 的转义）。
-- 驱动一致性测试（`dblens-driver` 的 conformance）：类型往返、多结果集、事务、取消、大字段截断。
-- 实库测试：`DBLENS_TEST_SQLSERVER_URL`，串行运行（`--test-threads=1`，不加 `--include-ignored`）。
+- 驱动一致性测试（`datluma-driver` 的 conformance）：类型往返、多结果集、事务、取消、大字段截断。
+- 实库测试：`DATLUMA_TEST_SQLSERVER_URL`，串行运行（`--test-threads=1`，不加 `--include-ignored`）。
   日常用测试虚拟机上 Docker 的 SQL Server 2022；2017、2025 各跑一轮。
-- Windows 认证：`DBLENS_TEST_SQLSERVER_WINAUTH_URL`（指定账号，宿主机到 Win11 虚拟机）和
-  `DBLENS_TEST_SQLSERVER_INTEGRATED_URL`（当前用户，在 Win11 虚拟机上运行），没设置就跳过。
+- Windows 认证：`DATLUMA_TEST_SQLSERVER_WINAUTH_URL`（指定账号，宿主机到 Win11 虚拟机）和
+  `DATLUMA_TEST_SQLSERVER_INTEGRATED_URL`（当前用户，在 Win11 虚拟机上运行），没设置就跳过。
 - 浏览器验证：连接、树（多个库）、执行带 `GO` 的脚本、多结果集、PRINT 消息、错误行号、编辑结果、运维页面、执行计划。
 - 第一个任务是依赖审查：全部直接依赖升到最新稳定版（发布满 7 天），全量测试，单独提交。
 

@@ -48,13 +48,13 @@ Oracle 模式租户开 Oracle 兼容（`sql_mode` 含 `ORA_COMPATIBLE_MODE`、`A
 ## 不支持或有风险
 
 - **按主键更新的导入**：`ON DUPLICATE KEY UPDATE` 被代理拒绝（`12071`，要求 `SW`），报服务器原文。`REPLACE INTO` 能用，但语义不同，没有替换。
-- **回收站**：`recyclebin=ON` 时 `DROP TABLE` 是移进回收站，表还占着 CHECK 约束名。同名约束的表再删或再建报 `3822`。重建带 CHECK 的表第二次会在删旧表这步失败，数据不受影响，新表 `*_dblens_new` 留着。可以先 `ALTER TABLE … DROP CHECK` 再删。
+- **回收站**：`recyclebin=ON` 时 `DROP TABLE` 是移进回收站，表还占着 CHECK 约束名。同名约束的表再删或再建报 `3822`。重建带 CHECK 的表第二次会在删旧表这步失败，数据不受影响，新表 `*_datluma_new` 留着。可以先 `ALTER TABLE … DROP CHECK` 再删。
 - **删库**：集群配置 `drop_database_enabled` 默认关。
 - **取消**：只验证过 `SLEEP`。三表笛卡尔积取消后 8 秒内没结束，共用机器上不要用这种语句测试。
 
 ## 已验证
 
-实库：GoldenDB V6.1.03.12SP5，经公网 8880 连接实例，只用 `dblens_test` 库。
+实库：GoldenDB V6.1.03.12SP5，经公网 8880 连接实例，只用 `datluma_test` 库。
 
 - 服务层 11 个流程：完整流程、工作台、取消、对象、运维、导出、数据编辑、导入、SQL 文件、表设计器、模型。表设计器重建后触发器保留并生效；导入按上面的限制断言。
 - 规范检查的存储信息查询。

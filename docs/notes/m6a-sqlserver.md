@@ -5,7 +5,7 @@
 ## 结构
 
 ```text
-crates/dblens-driver-sqlserver/       新驱动（tiberius 0.13）
+crates/datluma-driver-sqlserver/       新驱动（tiberius 0.13）
   src/lib.rs     URL 解析成 tiberius 的 Config（认证、实例名、TLS、信任服务器证书）、连接（Azure 重定向重连一次）
   src/actor.rs   后台任务独占连接，命令走 mpsc，结果走有界通道（256）；取消用 Notify；
                  无参数时整批 simple_query（USE、临时表留在会话里），有参数时 sp_executesql
@@ -15,18 +15,18 @@ crates/dblens-driver-sqlserver/       新驱动（tiberius 0.13）
   src/error.rs   错误号、批内行号换算成位置
 vendor/tiberius/                      tiberius 0.13.0 的补丁（见 vendor/PATCHES.md）：
                                       QueryItem::Done / Info（影响行数和 PRINT 消息不丢）、取消后丢弃到 attention 确认为止
-crates/dblens-dialect/
+crates/datluma-dialect/
   src/variant.rs ident.rs literal.rs  SqlServer 家族：方括号、@P1 占位符、N'' 字符串、0x 二进制、OFFSET FETCH
   src/split.rs   GO 分批（单独一行、可带次数和行尾注释；字符串、方括号、嵌套注释里的不算；次数上限 1000）
   src/ddl.rs types.rs design/catalog.rs migrate/*  DDL 生成、类型映射；表设计器和迁移的入口报"暂不支持"
   sql/sqlserver.sql  元数据模板（含 catalogs）；sql/ops/sqlserver.sql 运维查询
-crates/dblens-service/
+crates/datluma-service/
   src/profile.rs   in_catalog、scope（连接 id + 库名）
   src/metadata.rs  元数据池和缓存按 scope 区分；catalogs()
   src/policy.rs    classify_batch（危险语句）
   src/service.rs   feature_profile：M6b 的功能对 SQL Server 报 sqlserver.later
   src/session.rs   执行计划的收尾语句（SET SHOWPLAN_ALL OFF）
-crates/dblens-api/src/routes.rs  元数据接口加 ?catalog=，GET /profiles/{id}/catalogs
+crates/datluma-api/src/routes.rs  元数据接口加 ?catalog=，GET /profiles/{id}/catalogs
 web/grammars/tsql/                    grammars-v4 的 T-SQL 语法（固定提交，MIT）
 web/scripts/gen-tsql.mjs              生成解析器到 src/features/sql/tsql/gen/（不提交）
 web/src/features/sql/tsql/parser.ts   GO 分批、语法检查、补全（三段名、别名）
@@ -40,7 +40,7 @@ web/src/features/connections/         认证方式、实例名、信任服务器
 - 按库取元数据不用模板函数 `{{ catalog() }}` 拼三段名，而是元数据连接池按库区分，连接时指定库（`in_catalog`）；
   模板里只写 `sys.tables` 这类当前库的视图，库名不进入 SQL 文本。
 - TLS 只有三档：关闭（`EncryptionLevel::Off`，登录报文仍加密）、必须（`Required`，不校验证书）、校验证书
-  （`Required`，打开"信任服务器证书"时不校验，否则用指定的 CA）。DBLens 的 TLS 选项本来就没有"优先"。
+  （`Required`，打开"信任服务器证书"时不校验，否则用指定的 CA）。DATLUMA 的 TLS 选项本来就没有"优先"。
 - Windows 认证（指定账号和当前用户）只在 Windows 上可用：tiberius 在其他平台走 sspi-rs，其依赖 sha1 只有预发布版，
   不符合依赖原则。其他平台选了会报 `sqlserver.windows_auth_only`。表单在所有平台都显示这两项并加提示。
 - 过程式代码等解析不了的批，按关键字扫描时只看 DROP、TRUNCATE、DELETE、UPDATE 和 SQL Server 特有的几个，不含 MERGE
@@ -62,7 +62,7 @@ web/src/features/connections/         认证方式、实例名、信任服务器
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过。
   - 方言层：`GO` 分批（字符串、注释、方括号里的 GO，`GO n`、次数上限、行尾注释、行号）、标识符和字面量、类型往返、DDL、危险语句分类、元数据模板快照。
   - 驱动：错误行号换算成位置（含中文消息）。
 - 实库（串行）：

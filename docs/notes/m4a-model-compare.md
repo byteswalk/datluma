@@ -5,18 +5,18 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/compare/
+crates/datluma-dialect/src/compare/
   mod.rs        CompareRenames、CompareOptions、SchemaDiff；compare_schemas（表的配对、推测改名、逐表 diff_table）
   normalize.rs  比对前整理两边：本 schema 的外键引用、改名后的表名、注释、列顺序、系统生成的名字、同义的类型和默认值、外键的默认动作
   apply.rs      apply_changes：把变更应用到表结构（写回模型）
   sync.rs       sync_rebuild_tables、sync_script：同步脚本（删外键 → 删表 → 改名 → 逐表修改或重建 → 建表 → 加外键）
-crates/dblens-service/src/model/
+crates/datluma-service/src/model/
   file.rs       model.yaml、表文件的读写（serde-saphyr）、文件名转义、指纹、先写临时文件再改名
   store.rs      ModelStore：打开的模型、表文件缓存（按修改时间和长度重读）、表的保存/改名/删除、改名记录、写回
   ops.rs        最近打开的模型、新建、反向生成任务（TaskKind::Reverse）、设计器的预览和保存
-crates/dblens-service/src/compare.rs  读取两边、比对、同步预览、同步执行（TaskKind::Sync）或写回模型
-crates/dblens-service/src/design.rs   执行器改为按段执行（Part：一条语句或一张表的重建），M3 与同步共用
-crates/dblens-api/src/models.rs       /models、/compare
+crates/datluma-service/src/compare.rs  读取两边、比对、同步预览、同步执行（TaskKind::Sync）或写回模型
+crates/datluma-service/src/design.rs   执行器改为按段执行（Part：一条语句或一张表的重建），M3 与同步共用
+crates/datluma-api/src/models.rs       /models、/compare
 web/src/features/model/    模型面板、打开/新建/反向生成对话框
 web/src/features/compare/  比对标签、同步对话框、勾选与依赖提示等纯逻辑
 web/src/features/design/source.ts  设计器选外键引用的数据来源（连接或模型）
@@ -37,7 +37,7 @@ web/src/features/design/source.ts  设计器选外键引用的数据来源（连
 
 ## 与设计文档不一致的地方
 
-- `dblens-server` 只监听本机地址时 `local_files` 为真：除了能使用模型，导出也可以直接写到页面给出的路径（与桌面程序相同）。
+- `datluma-server` 只监听本机地址时 `local_files` 为真：除了能使用模型，导出也可以直接写到页面给出的路径（与桌面程序相同）。
 - MySQL 家族不查询 `lower_case_table_names`：名字是否区分大小写由比对选项"名字不区分大小写"决定（默认区分）。
 - 新建模型时不选版本（按最新版本）；从库反向生成的模型带库的版本。
 - 模型的改名记录在两种情况下删去已应用的项：同步到库（源是模型）的任务成功后；写回模型时（按写回的改名）。
@@ -50,7 +50,7 @@ web/src/features/design/source.ts  设计器选外键引用的数据来源（连
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（683 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（683 个）。
   - dialect：表的配对与推测改名、各选项与等价写法、各家族系统生成的名字、`apply_changes` 与 `diff_table` 互逆、同步脚本的顺序和重建（PG、MySQL 快照）。
   - service：模型目录读写（文件名转义、未知字段保留、坏文件、格式较新时只读、指纹冲突、改名记录与外键引用的更新、写回前核对指纹）；
     设计器保存；反向生成失败时不留下目录；模型对模型比对并写回；预览后目标被改时拒绝同步；执行器多段执行时失败后列出没有执行的语句。

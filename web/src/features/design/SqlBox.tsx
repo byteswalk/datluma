@@ -15,7 +15,7 @@ export default function SqlBox({ sql, driver, height }: { sql: string; driver: D
       <Editor
         language={driver ? editorLanguage(driver) : 'sql'}
         value={sql}
-        theme={`dblens-${theme}`}
+        theme={`datluma-${theme}`}
         options={{
           useShadowDOM: false,
           readOnly: true,

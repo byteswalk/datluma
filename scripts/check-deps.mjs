@@ -35,7 +35,7 @@ function pick(versions) {
 }
 
 async function getJson(url) {
-  const resp = await fetch(url, { headers: { 'User-Agent': 'dblens-check-deps (github.com/byteswalk/dblens)' } })
+  const resp = await fetch(url, { headers: { 'User-Agent': 'datluma-check-deps (github.com/byteswalk/datluma)' } })
   if (!resp.ok) throw new Error(`${url}: HTTP ${resp.status}`)
   return resp.json()
 }

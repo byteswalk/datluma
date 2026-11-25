@@ -20,7 +20,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级（有意固定版本的记入 `scripts/check-deps.mjs` 的 `HOLD`）。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条（`src` 中的中文字面量只能出现在 `#[cfg(test)]` 之后）；文档中的固定文字放在 `document/labels.json`；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -29,8 +29,8 @@
 - 内置模板 html、markdown 各一份（两种文档共用，按 `kind` 分支），不是四份。
 - 模板的固定文字放在 `document/labels.json`（键 `doc.*`），不放进后端词条（词条检查要求每个键被 `msg!` 用到）。
 - 生成列的表达式写在"默认值"一列，标记为"生成列"。
-- docx 的目录包括标题 1、2（每张表一项），标题 1 前分页；补上的样式编号加 `DBLens` 前缀。
-- `document` 模块在 `dblens_service` 中公开（`dblens_service::document::…`）。
+- docx 的目录包括标题 1、2（每张表一项），标题 1 前分页；补上的样式编号加 `DATLUMA` 前缀。
+- `document` 模块在 `datluma_service` 中公开（`datluma_service::document::…`）。
 
 ## 执行说明
 
@@ -41,14 +41,14 @@
 ## 文件结构
 
 ```text
-crates/dblens-service/src/document/{mod.rs, content.rs, labels.rs, labels.json, template.rs, templates/{document.html, document.md}, docx.rs, docx/*.xml, xlsx.rs, job.rs, snapshots/}（新增）
-crates/dblens-service/src/{lib.rs, task.rs, model/{mod.rs, ops.rs}}, Cargo.toml, tests/live.rs
-crates/dblens-api/src/{documents.rs（新增）, lib.rs}, tests/models.rs
-crates/dblens-core/locales/app.json; Cargo.toml, Cargo.lock
+crates/datluma-service/src/document/{mod.rs, content.rs, labels.rs, labels.json, template.rs, templates/{document.html, document.md}, docx.rs, docx/*.xml, xlsx.rs, job.rs, snapshots/}（新增）
+crates/datluma-service/src/{lib.rs, task.rs, model/{mod.rs, ops.rs}}, Cargo.toml, tests/live.rs
+crates/datluma-api/src/{documents.rs（新增）, lib.rs}, tests/models.rs
+crates/datluma-core/locales/app.json; Cargo.toml, Cargo.lock
 web/src/features/document/{options.ts, options.test.ts, dialog.ts, ExportDocDialog.tsx, render.tsx, track.tsx}（新增）
 web/src/features/er/{flow.ts, limits.ts}（新增）, {ErView.tsx, export.ts}
 web/src/{shared/api.ts, app/Shell.tsx, features/model/ModelsPanel.tsx, features/tree/ObjectTree.tsx, locales/{zh-CN,en}/{document.json（新增）, er.json, model.json, tree.json}, locales/index.ts}
-docs/notes/{m4c-document-export.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m4c-document-export.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -77,7 +77,7 @@ Expected：输出中没有"查询失败"（写计划时 84 个直接依赖都不
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -99,27 +99,27 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 ### Task 2: 服务层：文档内容的组织
 
-- `dblens-service/src/document/content.rs`（新）：`DocKind::{Dictionary, Design}`、`DocInfo`、`DocContent { kind, info, stats, schemas, diagrams, relations, unreadable, view_definitions }` 及各部分（`DocSchema`、`DocTable`、`DocColumn`、`DocIndex`、`DocConstraint`、`DocKey`、`DocTrigger`、`DocReference`、`DocRelation`、`DocView`、`DocDiagram`、`DocUnreadable`、`DocStats`）；输入 `SourceSchema { name, tables: Vec<SourceTable>, views, errors }`、`SourceTable { table, logical_keys }`；`build(BuildOptions, sources, diagrams)`：表按名字排序，锚点按文档顺序 `t1`、`t2`……（视图 `v1`……）；外键、逻辑外键链接到文档中的表；被引用；设计文档的表间关系和视图；统计；`png_size`。
+- `datluma-service/src/document/content.rs`（新）：`DocKind::{Dictionary, Design}`、`DocInfo`、`DocContent { kind, info, stats, schemas, diagrams, relations, unreadable, view_definitions }` 及各部分（`DocSchema`、`DocTable`、`DocColumn`、`DocIndex`、`DocConstraint`、`DocKey`、`DocTrigger`、`DocReference`、`DocRelation`、`DocView`、`DocDiagram`、`DocUnreadable`、`DocStats`）；输入 `SourceSchema { name, tables: Vec<SourceTable>, views, errors }`、`SourceTable { table, logical_keys }`；`build(BuildOptions, sources, diagrams)`：表按名字排序，锚点按文档顺序 `t1`、`t2`……（视图 `v1`……）；外键、逻辑外键链接到文档中的表；被引用；设计文档的表间关系和视图；统计；`png_size`。
 - `document/mod.rs`（新）；`lib.rs` 加 `pub mod document`（不从 crate 根重新导出）。
 - 测试中的样例（两个 schema：客户、订单、订单明细、跨 schema 的地区；复合外键、逻辑外键、视图、读不出的表）是 `pub(crate)` 的，后面的任务复用。
 
 **Files:**
-- Create: `crates/dblens-service/src/document/content.rs`
-- Create: `crates/dblens-service/src/document/mod.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
+- Create: `crates/datluma-service/src/document/content.rs`
+- Create: `crates/datluma-service/src/document/mod.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
 
 **Interfaces:**
-- Consumes：M4a 的 `FileError`，M4b 的 `LogicalKey`；`dblens_core::schema::{Table, View, Column, ForeignKey}`。
-- Produces（`dblens_service::document`）：上面的类型；`build(opts: BuildOptions, sources: Vec<SourceSchema>, diagrams: Vec<DocDiagram>) -> DocContent`、`png_size(bytes) -> Option<(u32, u32)>`；测试用的 `content::tests::{col, fk, st, sample, opts}`。
+- Consumes：M4a 的 `FileError`，M4b 的 `LogicalKey`；`datluma_core::schema::{Table, View, Column, ForeignKey}`。
+- Produces（`datluma_service::document`）：上面的类型；`build(opts: BuildOptions, sources: Vec<SourceSchema>, diagrams: Vec<DocDiagram>) -> DocContent`、`png_size(bytes) -> Option<(u32, u32)>`；测试用的 `content::tests::{col, fk, st, sample, opts}`。
 
-- [ ] **Step 1: 新建 `crates/dblens-service/src/document/content.rs`**
+- [ ] **Step 1: 新建 `crates/datluma-service/src/document/content.rs`**
 
 ```rust
 //! 文档的内容（M4c 设计文档第 4 节）：从模型或库的结构整理出来，四种格式都从它写出，模板拿到的也是它。
 
 use std::collections::BTreeMap;
 
-use dblens_core::schema::{Column, ForeignKey, Table, View};
+use datluma_core::schema::{Column, ForeignKey, Table, View};
 use serde::{Deserialize, Serialize};
 
 use crate::model::{FileError, LogicalKey};
@@ -617,8 +617,8 @@ pub fn png_size(bytes: &[u8]) -> Option<(u32, u32)> {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use dblens_core::schema::{CheckConstraint, Index, IndexColumn, PrimaryKey, Trigger, UniqueConstraint};
-    use dblens_core::{ColumnType, LogicalType};
+    use datluma_core::schema::{CheckConstraint, Index, IndexColumn, PrimaryKey, Trigger, UniqueConstraint};
+    use datluma_core::{ColumnType, LogicalType};
 
     use super::*;
 
@@ -825,7 +825,7 @@ pub(crate) mod tests {
 }
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-service/src/document/mod.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-service/src/document/mod.rs`**
 
 ```rust
 //! 文档导出（M4c 设计文档）：数据字典和设计文档，docx / html / markdown / xlsx。
@@ -839,11 +839,11 @@ pub use content::{
 };
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -3,6 +3,8 @@
  mod changes;
  mod compare;
@@ -851,7 +851,7 @@ pub use content::{
 +/// 文档导出（M4c）。
 +pub mod document;
  mod export;
- /// 测试用的假驱动，供本 crate 和 `dblens-api` 的测试使用（feature `testing`）。
+ /// 测试用的假驱动，供本 crate 和 `datluma-api` 的测试使用（feature `testing`）。
  #[cfg(any(test, feature = "testing"))]
 ```
 
@@ -861,7 +861,7 @@ pub use content::{
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 3 个）。
@@ -869,7 +869,7 @@ Expected: 全部测试通过（service 新增 3 个）。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service/src/document/content.rs crates/dblens-service/src/document/mod.rs crates/dblens-service/src/lib.rs
+git add crates/datluma-service/src/document/content.rs crates/datluma-service/src/document/mod.rs crates/datluma-service/src/lib.rs
 git commit -m "feat(document): 文档内容的组织" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -886,27 +886,27 @@ git commit -m "feat(document): 文档内容的组织" -m "Co-Authored-By: Claude
 快照文件（`snapshots/`）随本任务给出；改了生成逻辑时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/Cargo.toml`
-- Create: `crates/dblens-service/src/document/labels.json`
-- Create: `crates/dblens-service/src/document/labels.rs`
-- Modify: `crates/dblens-service/src/document/mod.rs`
-- Create: `crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__design_html_zh.snap`
-- Create: `crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__design_md_en.snap`
-- Create: `crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__dictionary_md_zh.snap`
-- Create: `crates/dblens-service/src/document/template.rs`
-- Create: `crates/dblens-service/src/document/templates/document.html`
-- Create: `crates/dblens-service/src/document/templates/document.md`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/Cargo.toml`
+- Create: `crates/datluma-service/src/document/labels.json`
+- Create: `crates/datluma-service/src/document/labels.rs`
+- Modify: `crates/datluma-service/src/document/mod.rs`
+- Create: `crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__design_html_zh.snap`
+- Create: `crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__design_md_en.snap`
+- Create: `crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__dictionary_md_zh.snap`
+- Create: `crates/datluma-service/src/document/template.rs`
+- Create: `crates/datluma-service/src/document/templates/document.html`
+- Create: `crates/datluma-service/src/document/templates/document.md`
 
 **Interfaces:**
 - Consumes：任务 2 的 `DocContent`、`build` 和测试样例。
 - Produces：`TextFormat`、`check(format, source) -> Result<()>`、`render(content, format, template: Option<&str>, lang, image_dir) -> Result<String>`、`label(lang, key) -> String`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -61,6 +61,8 @@
    "dm.no_diagnostics": {"zh-CN": "调用 DPI 失败，且无法读取错误信息", "en": "A DPI call failed and its error information could not be read"},
    "dm.nul_in_string": {"zh-CN": "字符串中不能包含 \\0 字符", "en": "Strings cannot contain the \\0 character"},
@@ -918,11 +918,11 @@ git commit -m "feat(document): 文档内容的组织" -m "Co-Authored-By: Claude
    "driver.lob_read_failed": {"zh-CN": "读取 LOB 失败：%{error}", "en": "Failed to read LOB: %{error}"},
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/Cargo.toml`**
+- [ ] **Step 2: 修改 `crates/datluma-service/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-service/Cargo.toml
-+++ b/crates/dblens-service/Cargo.toml
+--- a/crates/datluma-service/Cargo.toml
++++ b/crates/datluma-service/Cargo.toml
 @@ -33,6 +33,7 @@ directories.workspace = true
  encoding_rs.workspace = true
  encoding_rs_io.workspace = true
@@ -933,7 +933,7 @@ git commit -m "feat(document): 文档内容的组织" -m "Co-Authored-By: Claude
  serde.workspace = true
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-service/src/document/labels.json`**
+- [ ] **Step 3: 新建 `crates/datluma-service/src/document/labels.json`**
 
 ```json
 {
@@ -1204,7 +1204,7 @@ git commit -m "feat(document): 文档内容的组织" -m "Co-Authored-By: Claude
 }
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-service/src/document/labels.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-service/src/document/labels.rs`**
 
 ```rust
 //! 文档中的固定文字（`labels.json`）：模板用 `t('键')` 取，docx、xlsx 的写法用 `label`。
@@ -1213,7 +1213,7 @@ git commit -m "feat(document): 文档内容的组织" -m "Co-Authored-By: Claude
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use dblens_core::Lang;
+use datluma_core::Lang;
 
 type Labels = HashMap<String, HashMap<String, String>>;
 
@@ -1233,11 +1233,11 @@ pub(crate) fn keys() -> Vec<String> {
 }
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/document/mod.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/document/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/mod.rs
-+++ b/crates/dblens-service/src/document/mod.rs
+--- a/crates/datluma-service/src/document/mod.rs
++++ b/crates/datluma-service/src/document/mod.rs
 @@ -1,9 +1,13 @@
  //! 文档导出（M4c 设计文档）：数据字典和设计文档，docx / html / markdown / xlsx。
  
@@ -1254,11 +1254,11 @@ pub(crate) fn keys() -> Vec<String> {
 +pub use template::{TextFormat, check, render};
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__design_html_zh.snap`**
+- [ ] **Step 6: 新建 `crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__design_html_zh.snap`**
 
 ```text
 ---
-source: crates/dblens-service/src/document/template.rs
+source: crates/datluma-service/src/document/template.rs
 expression: html
 ---
 <!doctype html>
@@ -1266,7 +1266,7 @@ expression: html
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="DBLens">
+<meta name="generator" content="DATLUMA">
 <title>&lt;商城&gt; &amp; 订单</title>
 <style>
 body { font: 14px/1.6 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f1f23; margin: 0 auto; max-width: 1100px; padding: 24px 32px; }
@@ -1497,11 +1497,11 @@ a { color: #1f5fbf; text-decoration: none; }
 </html>
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__design_md_en.snap`**
+- [ ] **Step 7: 新建 `crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__design_md_en.snap`**
 
 ````text
 ---
-source: crates/dblens-service/src/document/template.rs
+source: crates/datluma-service/src/document/template.rs
 expression: "render(&c, TextFormat::Markdown, None, Lang::En, \"shop_images\").unwrap()"
 ---
 # 商城
@@ -1686,11 +1686,11 @@ SELECT id FROM orders
 | shop | broken | tables/shop/broken.yaml | line 3: bad |
 ````
 
-- [ ] **Step 8: 新建 `crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__dictionary_md_zh.snap`**
+- [ ] **Step 8: 新建 `crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__dictionary_md_zh.snap`**
 
 ```text
 ---
-source: crates/dblens-service/src/document/template.rs
+source: crates/datluma-service/src/document/template.rs
 expression: "render(&c, TextFormat::Markdown, None, Lang::ZhCn, \"x\").unwrap()"
 ---
 # 商城
@@ -1832,14 +1832,14 @@ expression: "render(&c, TextFormat::Markdown, None, Lang::ZhCn, \"x\").unwrap()"
 | shop | broken | tables/shop/broken.yaml | line 3: bad |
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-service/src/document/template.rs`**
+- [ ] **Step 9: 新建 `crates/datluma-service/src/document/template.rs`**
 
 ```rust
 //! html、markdown 的模板（M4c 设计文档 5.1 节）：minijinja，内置一套，可换成用户的模板文件。
 //! 模板只能使用传入的内容：没有加载器，`include`、`import` 找不到其他模板。
 
 use base64::Engine;
-use dblens_core::{Error, Lang, Result, msg};
+use datluma_core::{Error, Lang, Result, msg};
 use minijinja::syntax::SyntaxConfig;
 use minijinja::value::{Serde, Value};
 use minijinja::{AutoEscape, Environment};
@@ -2042,10 +2042,10 @@ mod tests {
 }
 ```
 
-- [ ] **Step 10: 新建 `crates/dblens-service/src/document/templates/document.html`**
+- [ ] **Step 10: 新建 `crates/datluma-service/src/document/templates/document.html`**
 
 ```
-{#- DBLens 文档的 html 模板。上下文见 M4c 设计文档第 4 节（DocContent）；
+{#- DATLUMA 文档的 html 模板。上下文见 M4c 设计文档第 4 节（DocContent）；
     t('键') 取固定文字，|v 把空值写成空。输出自动做 HTML 转义（图片的 data URL 由程序生成，用 |safe）。 -#}
 {% macro keys_table(keys) %}
 <table>
@@ -2062,7 +2062,7 @@ mod tests {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="DBLens">
+<meta name="generator" content="DATLUMA">
 <title>{{ info.title }}</title>
 <style>
 body { font: 14px/1.6 -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f1f23; margin: 0 auto; max-width: 1100px; padding: 24px 32px; }
@@ -2274,10 +2274,10 @@ a { color: #1f5fbf; text-decoration: none; }
 </html>
 ```
 
-- [ ] **Step 11: 新建 `crates/dblens-service/src/document/templates/document.md`**
+- [ ] **Step 11: 新建 `crates/datluma-service/src/document/templates/document.md`**
 
 ````markdown
-{#- DBLens 文档的 markdown 模板。上下文见 M4c 设计文档第 4 节（DocContent）；
+{#- DATLUMA 文档的 markdown 模板。上下文见 M4c 设计文档第 4 节（DocContent）；
     t('键') 取固定文字，|v 把空值写成空，|cell 转义表格单元格。 -#}
 # {{ info.title }}
 
@@ -2470,7 +2470,7 @@ a { color: #1f5fbf; text-decoration: none; }
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 4 个，快照 3 个）。
@@ -2478,7 +2478,7 @@ Expected: 全部测试通过（service 新增 4 个，快照 3 个）。
 - [ ] **Step 13: 提交**
 
 ```bash
-git add Cargo.lock crates/dblens-core/locales/app.json crates/dblens-service/Cargo.toml crates/dblens-service/src/document/labels.json crates/dblens-service/src/document/labels.rs crates/dblens-service/src/document/mod.rs crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__design_html_zh.snap crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__design_md_en.snap crates/dblens-service/src/document/snapshots/dblens_service__document__template__tests__dictionary_md_zh.snap crates/dblens-service/src/document/template.rs crates/dblens-service/src/document/templates/document.html crates/dblens-service/src/document/templates/document.md
+git add Cargo.lock crates/datluma-core/locales/app.json crates/datluma-service/Cargo.toml crates/datluma-service/src/document/labels.json crates/datluma-service/src/document/labels.rs crates/datluma-service/src/document/mod.rs crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__design_html_zh.snap crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__design_md_en.snap crates/datluma-service/src/document/snapshots/datluma_service__document__template__tests__dictionary_md_zh.snap crates/datluma-service/src/document/template.rs crates/datluma-service/src/document/templates/document.html crates/datluma-service/src/document/templates/document.md
 git commit -m "feat(document): html、markdown 模板" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2487,7 +2487,7 @@ git commit -m "feat(document): html、markdown 模板" -m "Co-Authored-By: Claud
 ### Task 4: 服务层：docx
 
 - `document/docx/*.xml`（新）：内置样式来源的部件（A4 纵向、中文正文"等线"、标题、题注、目录、表格、代码、链接样式），`builtin_reference()` 运行时打包成 .docx。
-- `document/docx.rs`（新）：读取样式来源（必须有 `word/document.xml`、`styles.xml`、`_rels/document.xml.rels`、`[Content_Types].xml`），按 Word 内部名（小写）找样式编号，缺的从内置样式补上（编号加 `DBLens` 前缀）；正文每个块元素一行；标题、书签和链接、表格（表头跨页重复、行不拆开、按比例的列宽）、图片（2 倍像素，按版心缩放）、代码块、目录字段；保留样式来源最后的节属性；`settings.xml` 加打开时更新字段；补图片的关系和内容类型；去掉控制字符。
+- `document/docx.rs`（新）：读取样式来源（必须有 `word/document.xml`、`styles.xml`、`_rels/document.xml.rels`、`[Content_Types].xml`），按 Word 内部名（小写）找样式编号，缺的从内置样式补上（编号加 `DATLUMA` 前缀）；正文每个块元素一行；标题、书签和链接、表格（表头跨页重复、行不拆开、按比例的列宽）、图片（2 倍像素，按版心缩放）、代码块、目录字段；保留样式来源最后的节属性；`settings.xml` 加打开时更新字段；补图片的关系和内容类型；去掉控制字符。
 - 依赖：工作区加 `quick-xml = "0.42.0"`、`zip = { version = "9.0.5", default-features = false, features = ["deflate-flate2"] }`，service 引用两者；`Cargo.lock` 中用 `cargo update -p zip --precise 9.0.5` 锁定（9.1.x 写计划时发布不满 7 天）。
 - `labels.json` 加 `doc.toc_hint`；标签测试也扫描 `docx.rs`（测试之前的部分，带引号的键）。
 - 后端词条加 `document.bad_reference`。
@@ -2496,20 +2496,20 @@ git commit -m "feat(document): html、markdown 模板" -m "Co-Authored-By: Claud
 
 **Files:**
 - Modify: `Cargo.toml`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-service/Cargo.toml`
-- Create: `crates/dblens-service/src/document/docx.rs`
-- Create: `crates/dblens-service/src/document/docx/content_types.xml`
-- Create: `crates/dblens-service/src/document/docx/core.xml`
-- Create: `crates/dblens-service/src/document/docx/document.xml`
-- Create: `crates/dblens-service/src/document/docx/document_rels.xml`
-- Create: `crates/dblens-service/src/document/docx/rels.xml`
-- Create: `crates/dblens-service/src/document/docx/settings.xml`
-- Create: `crates/dblens-service/src/document/docx/styles.xml`
-- Modify: `crates/dblens-service/src/document/labels.json`
-- Modify: `crates/dblens-service/src/document/mod.rs`
-- Create: `crates/dblens-service/src/document/snapshots/dblens_service__document__docx__tests__docx_design_zh.snap`
-- Modify: `crates/dblens-service/src/document/template.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-service/Cargo.toml`
+- Create: `crates/datluma-service/src/document/docx.rs`
+- Create: `crates/datluma-service/src/document/docx/content_types.xml`
+- Create: `crates/datluma-service/src/document/docx/core.xml`
+- Create: `crates/datluma-service/src/document/docx/document.xml`
+- Create: `crates/datluma-service/src/document/docx/document_rels.xml`
+- Create: `crates/datluma-service/src/document/docx/rels.xml`
+- Create: `crates/datluma-service/src/document/docx/settings.xml`
+- Create: `crates/datluma-service/src/document/docx/styles.xml`
+- Modify: `crates/datluma-service/src/document/labels.json`
+- Modify: `crates/datluma-service/src/document/mod.rs`
+- Create: `crates/datluma-service/src/document/snapshots/datluma_service__document__docx__tests__docx_design_zh.snap`
+- Modify: `crates/datluma-service/src/document/template.rs`
 
 **Interfaces:**
 - Consumes：任务 2、3。
@@ -2538,11 +2538,11 @@ git commit -m "feat(document): html、markdown 模板" -m "Co-Authored-By: Claud
  [patch.crates-io]
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 2: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -61,6 +61,7 @@
    "dm.no_diagnostics": {"zh-CN": "调用 DPI 失败，且无法读取错误信息", "en": "A DPI call failed and its error information could not be read"},
    "dm.nul_in_string": {"zh-CN": "字符串中不能包含 \\0 字符", "en": "Strings cannot contain the \\0 character"},
@@ -2553,11 +2553,11 @@ git commit -m "feat(document): html、markdown 模板" -m "Co-Authored-By: Claud
    "driver.connect_timeout": {"zh-CN": "连接超时（%{seconds} 秒）", "en": "Connection timed out (%{seconds} s)"},
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/Cargo.toml`**
+- [ ] **Step 3: 修改 `crates/datluma-service/Cargo.toml`**
 
 ```diff
---- a/crates/dblens-service/Cargo.toml
-+++ b/crates/dblens-service/Cargo.toml
+--- a/crates/datluma-service/Cargo.toml
++++ b/crates/datluma-service/Cargo.toml
 @@ -34,6 +34,7 @@ encoding_rs.workspace = true
  encoding_rs_io.workspace = true
  keyring.workspace = true
@@ -2576,7 +2576,7 @@ git commit -m "feat(document): html、markdown 模板" -m "Co-Authored-By: Claud
  csv.workspace = true
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-service/src/document/docx.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-service/src/document/docx.rs`**
 
 ```rust
 //! docx（M4c 设计文档 5.2 节）：程序生成正文，放进"样式来源"文档（类似 pandoc 的 reference-doc）。
@@ -2586,7 +2586,7 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::io::{Cursor, Read, Write};
 
-use dblens_core::{Error, Lang, Result, msg};
+use datluma_core::{Error, Lang, Result, msg};
 use quick_xml::escape::escape;
 use quick_xml::events::Event;
 use zip::write::SimpleFileOptions;
@@ -2617,8 +2617,8 @@ const STYLE_NAMES: [&str; 12] = [
     "toc heading",
     "toc 1",
     "toc 2",
-    "dblens table text",
-    "dblens code",
+    "datluma table text",
+    "datluma code",
     "hyperlink",
     "table grid",
 ];
@@ -2767,7 +2767,7 @@ fn builtin_style(name: &str) -> Option<&'static str> {
     })
 }
 
-/// 补上样式来源中缺的样式：编号加上 `DBLens` 前缀，以免与已有的编号冲突。返回改后的 styles.xml 和名字 → 编号。
+/// 补上样式来源中缺的样式：编号加上 `DATLUMA` 前缀，以免与已有的编号冲突。返回改后的 styles.xml 和名字 → 编号。
 fn complete_styles(styles: &str) -> (String, HashMap<String, String>) {
     let mut ids = style_ids(styles);
     let mut added = String::new();
@@ -2779,7 +2779,7 @@ fn complete_styles(styles: &str) -> (String, HashMap<String, String>) {
         let id_at = body.find("w:styleId=\"").map(|i| i + "w:styleId=\"".len()).unwrap_or(0);
         let old_id = body[id_at..].split('"').next().unwrap_or_default();
         let new_id =
-            if old_id.starts_with("DBLens") { old_id.to_string() } else { format!("DBLens{old_id}") };
+            if old_id.starts_with("DATLUMA") { old_id.to_string() } else { format!("DATLUMA{old_id}") };
         let fixed = body.replace(&format!("w:styleId=\"{old_id}\""), &format!("w:styleId=\"{new_id}\""));
         // 基于的样式在样式来源中也可能缺：一律基于正文
         let fixed =
@@ -2874,7 +2874,7 @@ impl Body<'_> {
     fn table(&mut self, headers: &[String], widths: &[u64], rows: Vec<Vec<Cell>>) {
         let total: u64 = widths.iter().sum::<u64>().max(1);
         let cols: Vec<u64> = widths.iter().map(|w| self.width * w / total).collect();
-        let text_style = self.style("dblens table text").to_string();
+        let text_style = self.style("datluma table text").to_string();
         let grid = self.style("table grid").to_string();
         let _ = write!(
             self.xml,
@@ -2915,8 +2915,8 @@ impl Body<'_> {
 
     fn image(&mut self, png: &[u8], width: u32, height: u32, title: &str) {
         let n = self.images.len() + 1;
-        let rel = format!("rIdDBLensImage{n}");
-        let file = format!("dblens_image{n}.png");
+        let rel = format!("rIdDATLUMAImage{n}");
+        let file = format!("datluma_image{n}.png");
         let mut cx = (f64::from(width) * EMU_PER_PX) as u64;
         let mut cy = (f64::from(height) * EMU_PER_PX) as u64;
         let max_w = self.width * EMU_PER_TWIP;
@@ -2939,7 +2939,7 @@ impl Body<'_> {
     }
 
     fn code(&mut self, text: &str) {
-        let style = self.style("dblens code").to_string();
+        let style = self.style("datluma code").to_string();
         for line in clean(text).replace("\r\n", "\n").split('\n') {
             let _ = writeln!(
                 self.xml,
@@ -3339,7 +3339,7 @@ pub fn write(content: &DocContent, reference: Option<&[u8]>, lang: Lang) -> Resu
         }
         None => {
             r.set("word/settings.xml", update_fields(include_str!("docx/settings.xml")).into_bytes());
-            new_rels.push(("rIdDBLensSettings".into(), REL_SETTINGS, "settings.xml".into()));
+            new_rels.push(("rIdDATLUMASettings".into(), REL_SETTINGS, "settings.xml".into()));
             if let Some(i) = types.rfind("</Types>") {
                 types.insert_str(i, "<Override PartName=\"/word/settings.xml\" ContentType=\"application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml\"/>");
             }
@@ -3421,9 +3421,9 @@ mod tests {
         let doc = &parts["word/document.xml"];
         insta::assert_snapshot!("docx_design_zh", doc);
         // 图片：关系、内容类型、媒体文件
-        assert!(parts["word/_rels/document.xml.rels"].contains("Id=\"rIdDBLensImage1\""));
+        assert!(parts["word/_rels/document.xml.rels"].contains("Id=\"rIdDATLUMAImage1\""));
         assert!(parts["[Content_Types].xml"].contains("Extension=\"png\""));
-        assert!(parts["word/media/dblens_image1.png"].ends_with("PNG"));
+        assert!(parts["word/media/datluma_image1.png"].ends_with("PNG"));
         // 4000 像素按 2 倍画，宽 4000 × 4762.5 EMU 超过版心（11906 − 2 × 1247 twip），按版心宽缩放
         assert!(doc.contains("<wp:extent cx=\"5976620\" cy=\"1494155\"/>"), "{doc}");
         assert!(parts["word/settings.xml"].contains("<w:updateFields w:val=\"true\"/>"));
@@ -3456,13 +3456,13 @@ mod tests {
         assert!(doc.contains("<w:pStyle w:val=\"1\"/>") && doc.contains("<w:pStyle w:val=\"a3\"/>"));
         assert!(!doc.contains("旧内容"), "原来的正文被替换");
         assert!(doc.contains("<w:headerReference w:type=\"default\" r:id=\"rId9\"/>"), "保留节属性");
-        assert!(doc.contains("<w:tblStyle w:val=\"DBLensTableGrid\"/>"));
+        assert!(doc.contains("<w:tblStyle w:val=\"DATLUMATableGrid\"/>"));
         assert!(doc.contains("xmlns:wp="), "补上图片的命名空间");
         // 版心宽 16838 − 2 × 1440 = 13958 twip
         assert!(doc.contains("<w:tblW w:w=\"13958\""));
         let s = &parts["word/styles.xml"];
-        assert!(s.contains("w:styleId=\"DBLensTableGrid\"") && s.contains("w:styleId=\"DBLensCode\""));
-        assert!(!s.contains("w:styleId=\"DBLensHeading1\""), "已有的样式不重复补");
+        assert!(s.contains("w:styleId=\"DATLUMATableGrid\"") && s.contains("w:styleId=\"DATLUMACode\""));
+        assert!(!s.contains("w:styleId=\"DATLUMAHeading1\""), "已有的样式不重复补");
     }
 
     #[test]
@@ -3482,49 +3482,49 @@ mod tests {
 }
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-service/src/document/docx/content_types.xml`**
+- [ ] **Step 5: 新建 `crates/datluma-service/src/document/docx/content_types.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-service/src/document/docx/core.xml`**
+- [ ] **Step 6: 新建 `crates/datluma-service/src/document/docx/core.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>DBLens</dc:creator></cp:coreProperties>
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:creator>DATLUMA</dc:creator></cp:coreProperties>
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-service/src/document/docx/document.xml`**
+- [ ] **Step 7: 新建 `crates/datluma-service/src/document/docx/document.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><w:body><w:p/><w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1247" w:bottom="1440" w:left="1247" w:header="851" w:footer="992" w:gutter="0"/><w:cols w:space="425"/></w:sectPr></w:body></w:document>
 ```
 
-- [ ] **Step 8: 新建 `crates/dblens-service/src/document/docx/document_rels.xml`**
+- [ ] **Step 8: 新建 `crates/datluma-service/src/document/docx/document_rels.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-service/src/document/docx/rels.xml`**
+- [ ] **Step 9: 新建 `crates/datluma-service/src/document/docx/rels.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>
 ```
 
-- [ ] **Step 10: 新建 `crates/dblens-service/src/document/docx/settings.xml`**
+- [ ] **Step 10: 新建 `crates/datluma-service/src/document/docx/settings.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:settings xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:defaultTabStop w:val="420"/><w:characterSpacingControl w:val="compressPunctuation"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>
 ```
 
-- [ ] **Step 11: 新建 `crates/dblens-service/src/document/docx/styles.xml`**
+- [ ] **Step 11: 新建 `crates/datluma-service/src/document/docx/styles.xml`**
 
 ```
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -3539,18 +3539,18 @@ mod tests {
 <w:style w:type="paragraph" w:styleId="TOCHeading"><w:name w:val="TOC Heading"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/><w:spacing w:before="240" w:after="120"/></w:pPr><w:rPr><w:b/><w:sz w:val="32"/><w:szCs w:val="32"/></w:rPr></w:style>
 <w:style w:type="paragraph" w:styleId="TOC1"><w:name w:val="toc 1"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:after="60"/></w:pPr></w:style>
 <w:style w:type="paragraph" w:styleId="TOC2"><w:name w:val="toc 2"/><w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:pPr><w:spacing w:after="40"/><w:ind w:left="420"/></w:pPr></w:style>
-<w:style w:type="paragraph" w:customStyle="1" w:styleId="DBLensTableText"><w:name w:val="DBLens Table Text"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr></w:style>
-<w:style w:type="paragraph" w:customStyle="1" w:styleId="DBLensCode"><w:name w:val="DBLens Code"/><w:basedOn w:val="Normal"/><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="F4F4F6"/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:customStyle="1" w:styleId="DATLUMATableText"><w:name w:val="DATLUMA Table Text"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:rPr><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:customStyle="1" w:styleId="DATLUMACode"><w:name w:val="DATLUMA Code"/><w:basedOn w:val="Normal"/><w:pPr><w:shd w:val="clear" w:color="auto" w:fill="F4F4F6"/><w:spacing w:after="0" w:line="240" w:lineRule="auto"/></w:pPr><w:rPr><w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/><w:sz w:val="18"/><w:szCs w:val="18"/></w:rPr></w:style>
 <w:style w:type="character" w:styleId="Hyperlink"><w:name w:val="Hyperlink"/><w:rPr><w:color w:val="1F5FBF"/></w:rPr></w:style>
 <w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="BFBFC6"/><w:left w:val="single" w:sz="4" w:space="0" w:color="BFBFC6"/><w:bottom w:val="single" w:sz="4" w:space="0" w:color="BFBFC6"/><w:right w:val="single" w:sz="4" w:space="0" w:color="BFBFC6"/><w:insideH w:val="single" w:sz="4" w:space="0" w:color="BFBFC6"/><w:insideV w:val="single" w:sz="4" w:space="0" w:color="BFBFC6"/></w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style>
 </w:styles>
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-service/src/document/labels.json`**
+- [ ] **Step 12: 修改 `crates/datluma-service/src/document/labels.json`**
 
 ```diff
---- a/crates/dblens-service/src/document/labels.json
-+++ b/crates/dblens-service/src/document/labels.json
+--- a/crates/datluma-service/src/document/labels.json
++++ b/crates/datluma-service/src/document/labels.json
 @@ -262,5 +262,9 @@
    "doc.no": {
      "zh-CN": "否",
@@ -3563,11 +3563,11 @@ mod tests {
  }
 ```
 
-- [ ] **Step 13: 修改 `crates/dblens-service/src/document/mod.rs`**
+- [ ] **Step 13: 修改 `crates/datluma-service/src/document/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/mod.rs
-+++ b/crates/dblens-service/src/document/mod.rs
+--- a/crates/datluma-service/src/document/mod.rs
++++ b/crates/datluma-service/src/document/mod.rs
 @@ -1,6 +1,7 @@
  //! 文档导出（M4c 设计文档）：数据字典和设计文档，docx / html / markdown / xlsx。
  
@@ -3585,11 +3585,11 @@ mod tests {
  pub use template::{TextFormat, check, render};
 ```
 
-- [ ] **Step 14: 新建 `crates/dblens-service/src/document/snapshots/dblens_service__document__docx__tests__docx_design_zh.snap`**
+- [ ] **Step 14: 新建 `crates/datluma-service/src/document/snapshots/datluma_service__document__docx__tests__docx_design_zh.snap`**
 
 ```text
 ---
-source: crates/dblens-service/src/document/docx.rs
+source: crates/datluma-service/src/document/docx.rs
 expression: doc
 ---
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -3606,159 +3606,159 @@ expression: doc
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">概述</w:t></w:r></w:p>
 <w:p><w:r><w:t xml:space="preserve">测试模型</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="7059"/><w:gridCol w:w="2353"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">统计</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">Schema 数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">表数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">4</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">列数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">13</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">外键数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">视图数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">统计</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">Schema 数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">表数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">4</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">列数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">13</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">外键数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="7059" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">视图数</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">ER 图</w:t></w:r></w:p>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t xml:space="preserve">shop</w:t></w:r></w:p>
-<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5976620" cy="1494155"/><wp:docPr id="1" name="shop"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="dblens_image1.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdDBLensImage1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5976620" cy="1494155"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
+<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="5976620" cy="1494155"/><wp:docPr id="1" name="shop"/><wp:cNvGraphicFramePr><a:graphicFrameLocks noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic><pic:nvPicPr><pic:cNvPr id="1" name="datluma_image1.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdDATLUMAImage1"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="5976620" cy="1494155"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">表间关系</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1981"/><w:gridCol w:w="1486"/><w:gridCol w:w="1981"/><w:gridCol w:w="1486"/><w:gridCol w:w="990"/><w:gridCol w:w="1486"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">从</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">到</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t4" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">crm.regions</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_region</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t2" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.items</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">lk_order</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id, cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id, code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_cust</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">从</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">到</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t4" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">crm.regions</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_region</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t2" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.items</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">lk_order</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id, cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1981" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id, code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="990" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1486" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_cust</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">表清单</w:t></w:r></w:p>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t xml:space="preserve">shop</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1045"/><w:gridCol w:w="3137"/><w:gridCol w:w="4183"/><w:gridCol w:w="1045"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列数</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">客户</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t2" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">items</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">5</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列数</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">客户</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t2" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">items</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">5</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:r><w:t xml:space="preserve">crm</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1045"/><w:gridCol w:w="3137"/><w:gridCol w:w="4183"/><w:gridCol w:w="1045"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列数</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t4" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">regions</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列数</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3137" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t4" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">regions</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">视图</w:t></w:r></w:p>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:bookmarkStart w:id="1" w:name="v1"/><w:r><w:t xml:space="preserve">shop.v_orders</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>
 <w:p><w:r><w:t xml:space="preserve">订单视图</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="941"/><w:gridCol w:w="2353"/><w:gridCol w:w="2353"/><w:gridCol w:w="3764"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="941" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="941" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="941" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="941" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">定义</w:t></w:r></w:p>
-<w:p><w:pPr><w:pStyle w:val="DBLensCode"/></w:pPr><w:r><w:t xml:space="preserve">SELECT id FROM orders</w:t></w:r></w:p>
+<w:p><w:pPr><w:pStyle w:val="DATLUMACode"/></w:pPr><w:r><w:t xml:space="preserve">SELECT id FROM orders</w:t></w:r></w:p>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">表明细</w:t></w:r></w:p>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:bookmarkStart w:id="2" w:name="t1"/><w:r><w:t xml:space="preserve">shop.customers</w:t></w:r><w:bookmarkEnd w:id="2"/></w:p>
 <w:p><w:r><w:t xml:space="preserve">客户</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="672"/><w:gridCol w:w="1680"/><w:gridCol w:w="1680"/><w:gridCol w:w="672"/><w:gridCol w:w="1344"/><w:gridCol w:w="1008"/><w:gridCol w:w="2353"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">主键, 自增</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(20)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">编号</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">主键, 自增</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(20)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">编号</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">索引</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="2896"/><w:gridCol w:w="3620"/><w:gridCol w:w="1448"/><w:gridCol w:w="1448"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3620" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">唯一</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">方法</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">ix_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3620" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">code DESC</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">BTREE</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3620" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">唯一</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">方法</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">ix_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3620" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">code DESC</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">BTREE</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">约束</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1448"/><w:gridCol w:w="2896"/><w:gridCol w:w="5068"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">内容</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">pk_customers</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">唯一</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">uq_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">code</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">内容</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">pk_customers</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">唯一</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">uq_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">code</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1660"/><w:gridCol w:w="1660"/><w:gridCol w:w="2214"/><w:gridCol w:w="1107"/><w:gridCol w:w="1107"/><w:gridCol w:w="1660"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">删除时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">更新时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_region</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t4" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">crm.regions</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> (id)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">CASCADE</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">删除时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">更新时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_region</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t4" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">crm.regions</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> (id)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">CASCADE</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">被引用</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="2509"/><w:gridCol w:w="1882"/><w:gridCol w:w="1882"/><w:gridCol w:w="1254"/><w:gridCol w:w="1882"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id, cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id, code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_cust</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id, cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id, code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_cust</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:bookmarkStart w:id="3" w:name="t2"/><w:r><w:t xml:space="preserve">shop.items</w:t></w:r><w:bookmarkEnd w:id="3"/></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="672"/><w:gridCol w:w="1680"/><w:gridCol w:w="1680"/><w:gridCol w:w="672"/><w:gridCol w:w="1344"/><w:gridCol w:w="1008"/><w:gridCol w:w="2353"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">sku</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(30)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">sku</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(30)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1660"/><w:gridCol w:w="1660"/><w:gridCol w:w="2214"/><w:gridCol w:w="1107"/><w:gridCol w:w="1107"/><w:gridCol w:w="1660"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">删除时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">更新时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">lk_order</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> (id)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">没有建外键</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">删除时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">更新时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">lk_order</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t3" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.orders</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> (id)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">没有建外键</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:bookmarkStart w:id="4" w:name="t3"/><w:r><w:t xml:space="preserve">shop.orders</w:t></w:r><w:bookmarkEnd w:id="4"/></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="672"/><w:gridCol w:w="1680"/><w:gridCol w:w="1680"/><w:gridCol w:w="672"/><w:gridCol w:w="1344"/><w:gridCol w:w="1008"/><w:gridCol w:w="2353"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(20)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">4</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">amount</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">decimal(10,2)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">0</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">5</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">double_amount</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">decimal(10,2)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">amount * 2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">生成列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">否</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">3</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(20)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">4</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">amount</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">decimal(10,2)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">0</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">5</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">double_amount</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">decimal(10,2)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">amount * 2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">生成列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">约束</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1448"/><w:gridCol w:w="2896"/><w:gridCol w:w="5068"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">内容</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">检查</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">ck_amount</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">amount &gt;= 0</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">内容</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">检查</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">ck_amount</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">amount &gt;= 0</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1660"/><w:gridCol w:w="1660"/><w:gridCol w:w="2214"/><w:gridCol w:w="1107"/><w:gridCol w:w="1107"/><w:gridCol w:w="1660"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">删除时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">更新时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_cust</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id, cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> (id, code)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">CASCADE</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">删除时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">更新时</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_cust</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">cust_id, cust_code</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2214" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve"> (id, code)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">CASCADE</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1107" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1660" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">触发器</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="3764"/><w:gridCol w:w="1882"/><w:gridCol w:w="3764"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">时机</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">事件</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">trg_orders</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">BEFORE</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">INSERT, UPDATE</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">时机</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">事件</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">trg_orders</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">BEFORE</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="3764" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">INSERT, UPDATE</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">被引用</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="2509"/><w:gridCol w:w="1882"/><w:gridCol w:w="1882"/><w:gridCol w:w="1254"/><w:gridCol w:w="1882"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t2" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.items</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">lk_order</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t2" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.items</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">order_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">逻辑外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">lk_order</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr><w:bookmarkStart w:id="5" w:name="t4"/><w:r><w:t xml:space="preserve">crm.regions</w:t></w:r><w:bookmarkEnd w:id="5"/></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="672"/><w:gridCol w:w="1680"/><w:gridCol w:w="1680"/><w:gridCol w:w="672"/><w:gridCol w:w="1344"/><w:gridCol w:w="1008"/><w:gridCol w:w="2353"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">name</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(50)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">序号</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类型</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">可空</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">默认值</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">标记</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">注释</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">1</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">int</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">2</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">name</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1680" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">varchar(50)</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="672" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">是</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1344" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1008" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2353" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">约束</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1448"/><w:gridCol w:w="2896"/><w:gridCol w:w="5068"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">内容</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">内容</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1448" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">主键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2896" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve"></w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="5068" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading3"/></w:pPr><w:r><w:t xml:space="preserve">被引用</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="2509"/><w:gridCol w:w="1882"/><w:gridCol w:w="1882"/><w:gridCol w:w="1254"/><w:gridCol w:w="1882"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_region</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">列</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">引用</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">类别</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">名称</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="2509" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:hyperlink w:anchor="t1" w:history="1"><w:r><w:rPr><w:rStyle w:val="Hyperlink"/></w:rPr><w:t xml:space="preserve">shop.customers</w:t></w:r></w:hyperlink></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">region_id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">id</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1254" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">外键</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1882" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">fk_region</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t xml:space="preserve">无法读取的表</w:t></w:r></w:p>
 <w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="9412" w:type="dxa"/><w:tblLayout w:type="fixed"/></w:tblPr><w:tblGrid><w:gridCol w:w="1045"/><w:gridCol w:w="1568"/><w:gridCol w:w="2614"/><w:gridCol w:w="4183"/></w:tblGrid>
-<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Schema</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1568" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2614" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">文件</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">原因</w:t></w:r></w:p></w:tc></w:tr>
-<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">shop</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1568" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">broken</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2614" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">tables/shop/broken.yaml</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DBLensTableText"/></w:pPr><w:r><w:t xml:space="preserve">line 3: bad</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:tblHeader/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">Schema</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1568" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">表名</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2614" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">文件</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/><w:shd w:val="clear" w:color="auto" w:fill="F2F2F4"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">原因</w:t></w:r></w:p></w:tc></w:tr>
+<w:tr><w:trPr><w:cantSplit/></w:trPr><w:tc><w:tcPr><w:tcW w:w="1045" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">shop</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="1568" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">broken</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="2614" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">tables/shop/broken.yaml</w:t></w:r></w:p></w:tc><w:tc><w:tcPr><w:tcW w:w="4183" w:type="dxa"/></w:tcPr><w:p><w:pPr><w:pStyle w:val="DATLUMATableText"/></w:pPr><w:r><w:t xml:space="preserve">line 3: bad</w:t></w:r></w:p></w:tc></w:tr>
 </w:tbl>
 <w:p/>
 <w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1440" w:right="1247" w:bottom="1440" w:left="1247" w:header="851" w:footer="992" w:gutter="0"/><w:cols w:space="425"/></w:sectPr>
@@ -3766,11 +3766,11 @@ expression: doc
 </w:document>
 ```
 
-- [ ] **Step 15: 修改 `crates/dblens-service/src/document/template.rs`**
+- [ ] **Step 15: 修改 `crates/datluma-service/src/document/template.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/template.rs
-+++ b/crates/dblens-service/src/document/template.rs
+--- a/crates/datluma-service/src/document/template.rs
++++ b/crates/datluma-service/src/document/template.rs
 @@ -179,10 +179,15 @@ mod tests {
  
      #[test]
@@ -3797,7 +3797,7 @@ expression: doc
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 写计划时另用 Word 打开生成的 docx（更新目录、导出 PDF、逐页转成图片核对标题、目录页码、图片、表格、链接）；执行时可选做同样的核对。
@@ -3807,7 +3807,7 @@ Expected: 全部测试通过（service 新增 3 个，快照 1 个）。
 - [ ] **Step 17: 提交**
 
 ```bash
-git add Cargo.lock Cargo.toml crates/dblens-core/locales/app.json crates/dblens-service/Cargo.toml crates/dblens-service/src/document/docx.rs crates/dblens-service/src/document/docx/content_types.xml crates/dblens-service/src/document/docx/core.xml crates/dblens-service/src/document/docx/document.xml crates/dblens-service/src/document/docx/document_rels.xml crates/dblens-service/src/document/docx/rels.xml crates/dblens-service/src/document/docx/settings.xml crates/dblens-service/src/document/docx/styles.xml crates/dblens-service/src/document/labels.json crates/dblens-service/src/document/mod.rs crates/dblens-service/src/document/snapshots/dblens_service__document__docx__tests__docx_design_zh.snap crates/dblens-service/src/document/template.rs
+git add Cargo.lock Cargo.toml crates/datluma-core/locales/app.json crates/datluma-service/Cargo.toml crates/datluma-service/src/document/docx.rs crates/datluma-service/src/document/docx/content_types.xml crates/datluma-service/src/document/docx/core.xml crates/datluma-service/src/document/docx/document.xml crates/datluma-service/src/document/docx/document_rels.xml crates/datluma-service/src/document/docx/rels.xml crates/datluma-service/src/document/docx/settings.xml crates/datluma-service/src/document/docx/styles.xml crates/datluma-service/src/document/labels.json crates/datluma-service/src/document/mod.rs crates/datluma-service/src/document/snapshots/datluma_service__document__docx__tests__docx_design_zh.snap crates/datluma-service/src/document/template.rs
 git commit -m "feat(document): docx（样式来源、目录、图片）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3819,20 +3819,20 @@ git commit -m "feat(document): docx（样式来源、目录、图片）" -m "Co-
 - `labels.json` 加 `doc.sheet.*`；标签测试也扫描 `xlsx.rs`。
 
 **Files:**
-- Modify: `crates/dblens-service/src/document/labels.json`
-- Modify: `crates/dblens-service/src/document/mod.rs`
-- Modify: `crates/dblens-service/src/document/template.rs`
-- Create: `crates/dblens-service/src/document/xlsx.rs`
+- Modify: `crates/datluma-service/src/document/labels.json`
+- Modify: `crates/datluma-service/src/document/mod.rs`
+- Modify: `crates/datluma-service/src/document/template.rs`
+- Create: `crates/datluma-service/src/document/xlsx.rs`
 
 **Interfaces:**
 - Consumes：任务 2、3。
 - Produces：`write_xlsx(content, lang) -> Result<(Vec<u8>, u64)>`（文件内容、截断的单元格数）。
 
-- [ ] **Step 1: 修改 `crates/dblens-service/src/document/labels.json`**
+- [ ] **Step 1: 修改 `crates/datluma-service/src/document/labels.json`**
 
 ```diff
---- a/crates/dblens-service/src/document/labels.json
-+++ b/crates/dblens-service/src/document/labels.json
+--- a/crates/datluma-service/src/document/labels.json
++++ b/crates/datluma-service/src/document/labels.json
 @@ -266,5 +266,17 @@
    "doc.toc_hint": {
      "zh-CN": "打开文档时按提示更新域，或右键这里选“更新域”，即可生成目录。",
@@ -3853,11 +3853,11 @@ git commit -m "feat(document): docx（样式来源、目录、图片）" -m "Co-
  }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/src/document/mod.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/src/document/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/mod.rs
-+++ b/crates/dblens-service/src/document/mod.rs
+--- a/crates/datluma-service/src/document/mod.rs
++++ b/crates/datluma-service/src/document/mod.rs
 @@ -4,6 +4,7 @@ mod content;
  mod docx;
  mod labels;
@@ -3873,11 +3873,11 @@ git commit -m "feat(document): docx（样式来源、目录、图片）" -m "Co-
 +pub use xlsx::write as write_xlsx;
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/document/template.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/document/template.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/template.rs
-+++ b/crates/dblens-service/src/document/template.rs
+--- a/crates/datluma-service/src/document/template.rs
++++ b/crates/datluma-service/src/document/template.rs
 @@ -181,8 +181,12 @@ mod tests {
      fn every_label_is_used_and_exists() {
          // 模板中的 'doc.…'，Rust 代码（测试之前的部分）中的 "doc.…"
@@ -3895,12 +3895,12 @@ git commit -m "feat(document): docx（样式来源、目录、图片）" -m "Co-
              .flat_map(|s| {
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-service/src/document/xlsx.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-service/src/document/xlsx.rs`**
 
 ```rust
 //! 数据字典的 xlsx（M4c 设计文档 4.3 节）：表清单、列、索引和约束三张工作表。
 
-use dblens_core::{Error, Lang, Result, msg};
+use datluma_core::{Error, Lang, Result, msg};
 use rust_xlsxwriter::{Format, Url, Workbook, Worksheet, XlsxError};
 
 use super::content::DocContent;
@@ -4211,7 +4211,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 1 个）。
@@ -4219,7 +4219,7 @@ Expected: 全部测试通过（service 新增 1 个）。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-service/src/document/labels.json crates/dblens-service/src/document/mod.rs crates/dblens-service/src/document/template.rs crates/dblens-service/src/document/xlsx.rs
+git add crates/datluma-service/src/document/labels.json crates/datluma-service/src/document/mod.rs crates/datluma-service/src/document/template.rs crates/datluma-service/src/document/xlsx.rs
 git commit -m "feat(document): 数据字典的 xlsx" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4229,31 +4229,31 @@ git commit -m "feat(document): 数据字典的 xlsx" -m "Co-Authored-By: Claude 
 
 - `document/job.rs`（新）：`DocFormat`、`DocSource::{Model, Database}`、`DiagramImage`、`DocumentRequest`、`DocumentProblem { field, error }`；`Service::check_document`（xlsx 只用于数据字典；浏览器模式不接受本机路径；模板语法；样式来源；输出目录）、`Service::start_document`（检查、读模板和样式来源、取走上传的图片、`TaskKind::Document` 任务：读结构 → 组织内容 → 写出；写到本机路径，或浏览器模式写到任务目录作为报告；markdown 的图片在旁边的 `<文件名>_images/`，浏览器模式打包 zip；xlsx 截断数记在 `warnings`）、`Service::export_document_template`。模型来源读默认图（带逻辑外键、读不出的表），库来源跳过元数据缓存、设计文档另读视图。
 - `task.rs`：`TaskKind::Document`。`model/ops.rs` 的测试辅助 `service`、`wait` 改为 `pub(crate)`（`model::tests`）。
-- `dblens-api/src/documents.rs`（新）：`POST /documents`（201 `{id}`）、`/documents/check`（`{problems}`）、`/documents/templates/export`（要求 `local_files`）。
+- `datluma-api/src/documents.rs`（新）：`POST /documents`（201 `{id}`）、`/documents/check`（`{problems}`）、`/documents/templates/export`（要求 `local_files`）。
 - `tests/live.rs` 的 `model_flow`：反向生成检查之后，对测试 schema 导出 markdown 数据字典，核对表和指向 `m4_customer` 的外键链接。
 - 后端词条加 `document.read_failed`、`document.bad_output`、`document.bad_image`、`document.xlsx_dictionary_only`。
 
 **Files:**
-- Create: `crates/dblens-api/src/documents.rs`
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/tests/models.rs`
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-service/src/document/job.rs`
-- Modify: `crates/dblens-service/src/document/mod.rs`
-- Modify: `crates/dblens-service/src/model/mod.rs`
-- Modify: `crates/dblens-service/src/model/ops.rs`
-- Modify: `crates/dblens-service/src/task.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Create: `crates/datluma-api/src/documents.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/tests/models.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-service/src/document/job.rs`
+- Modify: `crates/datluma-service/src/document/mod.rs`
+- Modify: `crates/datluma-service/src/model/mod.rs`
+- Modify: `crates/datluma-service/src/model/ops.rs`
+- Modify: `crates/datluma-service/src/task.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 2–5；M4b 的 `read_diagram`、`DEFAULT_DIAGRAM`；M2b 的上传和任务。
-- Produces（`dblens_service::document`）：`DocumentRequest`、`DocSource`、`DocFormat`、`DiagramImage`、`DocumentProblem`；`Service::{check_document(&req, allow_path) -> Vec<DocumentProblem>, start_document(req, allow_path) -> Result<String>, export_document_template(format, path) -> Result<()>}`；接口见上。
+- Produces（`datluma_service::document`）：`DocumentRequest`、`DocSource`、`DocFormat`、`DiagramImage`、`DocumentProblem`；`Service::{check_document(&req, allow_path) -> Vec<DocumentProblem>, start_document(req, allow_path) -> Result<String>, export_document_template(format, path) -> Result<()>}`；接口见上。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/models.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/models.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/models.rs
-+++ b/crates/dblens-api/tests/models.rs
+--- a/crates/datluma-api/tests/models.rs
++++ b/crates/datluma-api/tests/models.rs
 @@ -65,6 +65,20 @@ async fn models_need_local_files() {
      let (st, _) =
          call(&app, "POST", "/api/files/image", Some(json!({ "path": "/tmp/x.png", "data": "" }))).await;
@@ -4334,17 +4334,17 @@ git commit -m "feat(document): 数据字典的 xlsx" -m "Co-Authored-By: Claude 
 +}
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
-@@ -20,6 +20,7 @@ use dblens_dialect::design::{Renames, TableChange, diff_table};
- use dblens_dialect::meta::{MetaArgs, MetaKey};
- use dblens_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
- use dblens_driver::{ConnectParams, DriverId};
-+use dblens_service::document::{DocFormat, DocInfo, DocKind, DocSource, DocumentRequest};
- use dblens_service::{
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
+@@ -20,6 +20,7 @@ use datluma_dialect::design::{Renames, TableChange, diff_table};
+ use datluma_dialect::meta::{MetaArgs, MetaKey};
+ use datluma_dialect::{Compat, DdlKind, Direction, RowChange, Variant, WriteMode};
+ use datluma_driver::{ConnectParams, DriverId};
++use datluma_service::document::{DocFormat, DocInfo, DocKind, DocSource, DocumentRequest};
+ use datluma_service::{
      ChangeSet, ColumnMapping, CompareRequest, CompareResult, CompareSideRef, DEFAULT_BATCH, DEFAULT_DIAGRAM,
      DataOrder, DefaultPolicy, DesignRequest, DriverRegistry, Environment, ExecRequest, ExportFormat,
 @@ -1633,6 +1634,26 @@ async fn model_flow(env: &str) {
@@ -4376,7 +4376,7 @@ git commit -m "feat(document): 数据字典的 xlsx" -m "Co-Authored-By: Claude 
          DriverId::Postgres => Some("m4_b"),
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-api/src/documents.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-api/src/documents.rs`**
 
 ```rust
 //! 文档导出的接口（M4c 设计文档 6.2 节）。本机路径（模板、样式来源、输出位置）只有 `local_files` 时接受；
@@ -4387,7 +4387,7 @@ use std::path::PathBuf;
 use axum::Json;
 use axum::extract::State;
 use axum::http::StatusCode;
-use dblens_service::document::{DocumentRequest, TextFormat};
+use datluma_service::document::{DocumentRequest, TextFormat};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -4426,11 +4426,11 @@ pub async fn export_template(
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -4,6 +4,7 @@
  mod auth;
  mod design;
@@ -4451,11 +4451,11 @@ pub async fn export_template(
          .route("/exports/{id}/file", get(exports::file))
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 5: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -61,9 +61,13 @@
    "dm.no_diagnostics": {"zh-CN": "调用 DPI 失败，且无法读取错误信息", "en": "A DPI call failed and its error information could not be read"},
    "dm.nul_in_string": {"zh-CN": "字符串中不能包含 \\0 字符", "en": "Strings cannot contain the \\0 character"},
@@ -4472,7 +4472,7 @@ pub async fn export_template(
    "driver.lob_read_failed": {"zh-CN": "读取 LOB 失败：%{error}", "en": "Failed to read LOB: %{error}"},
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-service/src/document/job.rs`**
+- [ ] **Step 6: 新建 `crates/datluma-service/src/document/job.rs`**
 
 ```rust
 //! 文档导出的后台任务（M4c 设计文档 6.1 节）：读结构、组织内容、按格式写出，写到选定的路径或任务目录。
@@ -4481,8 +4481,8 @@ use std::io::{Cursor, Write};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use dblens_core::{Error, Result, current_lang, msg};
-use dblens_dialect::meta::{MetaArgs, MetaKey};
+use datluma_core::{Error, Result, current_lang, msg};
+use datluma_dialect::meta::{MetaArgs, MetaKey};
 use serde::{Deserialize, Serialize};
 use zip::write::SimpleFileOptions;
 use zip::{CompressionMethod, ZipWriter};
@@ -4602,7 +4602,7 @@ fn file_name(name: &str) -> String {
 
 /// 写文件：先写临时文件再改名。
 fn write_atomic(path: &Path, data: &[u8]) -> Result<()> {
-    let tmp = path.with_extension("dblens-tmp");
+    let tmp = path.with_extension("datluma-tmp");
     let fail = |e: std::io::Error| Error::internal(msg!("document.write_failed", error = e));
     std::fs::write(&tmp, data).map_err(fail)?;
     std::fs::rename(&tmp, path).map_err(|e| {
@@ -4945,8 +4945,8 @@ mod tests {
     fn model(s: &Service, dir: &Path) -> String {
         use crate::document::content::tests::col;
         use crate::model::{LogicalKey, ModelDatabase};
-        use dblens_core::schema::Table;
-        use dblens_dialect::{Compat, Variant};
+        use datluma_core::schema::Table;
+        use datluma_dialect::{Compat, Variant};
         let db = ModelDatabase { variant: Variant::Postgres, compat: Compat::Native, version: None };
         let tables = vec![
             Table {
@@ -5044,11 +5044,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-service/src/document/mod.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-service/src/document/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/mod.rs
-+++ b/crates/dblens-service/src/document/mod.rs
+--- a/crates/datluma-service/src/document/mod.rs
++++ b/crates/datluma-service/src/document/mod.rs
 @@ -2,6 +2,7 @@
  
  mod content;
@@ -5067,11 +5067,11 @@ mod tests {
  pub use xlsx::write as write_xlsx;
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-service/src/model/mod.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-service/src/model/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/mod.rs
-+++ b/crates/dblens-service/src/model/mod.rs
+--- a/crates/datluma-service/src/model/mod.rs
++++ b/crates/datluma-service/src/model/mod.rs
 @@ -10,5 +10,7 @@ pub use diagram::{
      DiagramWarning, Position,
  };
@@ -5082,11 +5082,11 @@ mod tests {
  pub use store::{FileError, ModelStore, ModelSummary, ModelTableView, ModelWrite, SchemaTables, TableEntry};
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-service/src/model/ops.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-service/src/model/ops.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/ops.rs
-+++ b/crates/dblens-service/src/model/ops.rs
+--- a/crates/datluma-service/src/model/ops.rs
++++ b/crates/datluma-service/src/model/ops.rs
 @@ -208,7 +208,7 @@ impl Service {
  }
  
@@ -5095,7 +5095,7 @@ mod tests {
 +pub(crate) mod tests {
      use std::time::Duration;
  
-     use dblens_core::schema::{Column, PrimaryKey};
+     use datluma_core::schema::{Column, PrimaryKey};
 @@ -225,7 +225,7 @@ mod tests {
      use crate::store::Store;
      use crate::task::{TaskState, TaskStatus};
@@ -5116,11 +5116,11 @@ mod tests {
              if st.state != TaskState::Running {
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-service/src/task.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-service/src/task.rs`**
 
 ```diff
---- a/crates/dblens-service/src/task.rs
-+++ b/crates/dblens-service/src/task.rs
+--- a/crates/datluma-service/src/task.rs
++++ b/crates/datluma-service/src/task.rs
 @@ -30,6 +30,8 @@ pub enum TaskKind {
      Reverse,
      /// 比对后同步到库（M4a）。
@@ -5138,10 +5138,10 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`，以及国产库第一批的 `DBLENS_TEST_TIDB_URL`、`DBLENS_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DBLENS_TEST_OPENGAUSS_URL`、`DBLENS_TEST_OPENGAUSS_A_URL`（库 `dblens_test_a`）、`DBLENS_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `dblens_test_sha`）、`DBLENS_TEST_KINGBASE_URL`（54321）、`DBLENS_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/dblens-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑模型的测试：`cargo test … -p dblens-service --test live model -- --test-threads=1`。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出原有 5 个库的 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`，以及国产库第一批的 `DATLUMA_TEST_TIDB_URL`、`DATLUMA_TEST_OCEANBASE_URL`（用户名写成 `admin%40test`）、`DATLUMA_TEST_OPENGAUSS_URL`、`DATLUMA_TEST_OPENGAUSS_A_URL`（库 `datluma_test_a`）、`DATLUMA_TEST_OPENGAUSS_SHA_URL`（账号 `admin_sha`，库 `datluma_test_sha`）、`DATLUMA_TEST_KINGBASE_URL`（54321）、`DATLUMA_TEST_KINGBASE_PG_URL`（54322）。新目标的密码在测试虚拟机 root 的 `/root/datluma-test/creds.env`，用 `ssh … 'sudo cat …'` 读进当前 shell 的变量，不写进任何文件。只跑模型的测试：`cargo test … -p datluma-service --test live model -- --test-threads=1`。
 - 人大金仓的开发版授权最多 10 个连接：它的测试要串行运行（`--test-threads=1`）。
 - 达梦的测试与其他测试同时运行时偶发"网络通讯失败"，失败时用 `dameng_model` 单独重跑。
 
@@ -5150,7 +5150,7 @@ Expected: 全部测试通过（service 新增 4 个，api 新增 1 个、禁止�
 - [ ] **Step 12: 提交**
 
 ```bash
-git add crates/dblens-api/src/documents.rs crates/dblens-api/src/lib.rs crates/dblens-api/tests/models.rs crates/dblens-core/locales/app.json crates/dblens-service/src/document/job.rs crates/dblens-service/src/document/mod.rs crates/dblens-service/src/model/mod.rs crates/dblens-service/src/model/ops.rs crates/dblens-service/src/task.rs crates/dblens-service/tests/live.rs
+git add crates/datluma-api/src/documents.rs crates/datluma-api/src/lib.rs crates/datluma-api/tests/models.rs crates/datluma-core/locales/app.json crates/datluma-service/src/document/job.rs crates/datluma-service/src/document/mod.rs crates/datluma-service/src/model/mod.rs crates/datluma-service/src/model/ops.rs crates/datluma-service/src/task.rs crates/datluma-service/tests/live.rs
 git commit -m "feat(document): 文档导出的后台任务与接口" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5488,7 +5488,7 @@ function Dialog({ target }: { target: DocTarget }) {
   const saveBuiltin = async () => {
     if (!desktop || (o.format !== 'html' && o.format !== 'markdown')) return
     const ext = extensionOf(o.format)
-    const path = await desktop.saveDialog(`dblens-template.${ext}`, [{ name: ext.toUpperCase(), extensions: [ext] }])
+    const path = await desktop.saveDialog(`datluma-template.${ext}`, [{ name: ext.toUpperCase(), extensions: [ext] }])
     if (!path) return
     try {
       await api.exportDocTemplate(o.format, path)
@@ -6571,7 +6571,7 @@ export const LARGE = 300
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -6584,7 +6584,7 @@ Expected: 全部通过（前端新增 4 个测试）。
 
 - [ ] **Step 25: 浏览器实测**
 
-浏览器实测（设计文档第 8 节）：用 `dblens-server --listen 127.0.0.1:<端口>` 启动浏览器模式（下载由页面中的链接触发）。
+浏览器实测（设计文档第 8 节）：用 `datluma-server --listen 127.0.0.1:<端口>` 启动浏览器模式（下载由页面中的链接触发）。
 1. 模型面板模型右键"导出文档…"：切到设计文档时 xlsx 消失、出现"ER 图"；选 HTML 导出，打开下载的文件核对：概述统计、ER 图（浅色白底、列级连线、复合外键"2 列"、逻辑外键虚线）、表间关系、表明细中的链接。
 2. 同一模型导出 docx 数据字典、markdown 设计文档（下载 zip，含 `<标题>.md` 和 `<标题>_images/`）。
 3. 对象树 schema 右键"导出文档…"，导出 xlsx 数据字典，用 Excel 打开核对三张工作表和表名链接。
@@ -6610,7 +6610,7 @@ git commit -m "feat(web): 导出文档对话框、ER 图图片、任务进度" -
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m4c-document-export.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
 
@@ -6652,7 +6652,7 @@ git commit -m "feat(web): 导出文档对话框、ER 图图片、任务进度" -
 ## 结构
 
 ```text
-crates/dblens-service/src/document/
+crates/datluma-service/src/document/
   content.rs   文档内容 DocContent：从模型或库的结构（SourceSchema）组织表清单、明细、被引用、表间关系、统计、视图；PNG 尺寸
   labels.rs    文档中的固定文字（labels.json，中英文）：模板用 t('键')，docx、xlsx 用 label
   template.rs  html、markdown 模板（minijinja）：内置模板、过滤器 v / cell、检查语法、渲染
@@ -6661,7 +6661,7 @@ crates/dblens-service/src/document/
   docx/        内置样式来源的各个部件（运行时打包成 .docx）
   xlsx.rs      数据字典的 xlsx：表清单、列、索引和约束三张工作表
   job.rs       DocumentRequest、开始前检查、后台任务（TaskKind::Document）、写到本机路径或任务目录、markdown 图片目录或 zip、另存内置模板
-crates/dblens-api/src/documents.rs   POST /documents、/documents/check、/documents/templates/export
+crates/datluma-api/src/documents.rs   POST /documents、/documents/check、/documents/templates/export
 web/src/features/document/
   options.ts          种类与格式的联动、按来源记住的选项、组成请求、文件名、图片的像素倍数
   ExportDocDialog.tsx 导出文档对话框
@@ -6680,15 +6680,15 @@ web/src/features/er/limits.ts  库图只显示表名的阈值
 - 模板的固定文字放在 `document/labels.json`（键 `doc.*`），不放进后端词条：词条检查要求每个键都被 `msg!` 用到，模板中的键由模板引用；
   测试检查内置模板和 docx、xlsx 代码中用到的键都存在、`labels.json` 中没有用不到的键。
 - 生成列的表达式写在"默认值"一列，标记为"生成列"。
-- docx 的图片按 2 倍像素画，按 1/192 英寸一个像素换算尺寸，再按版心缩放；样式来源中缺的样式补上时编号加 `DBLens` 前缀，基于的样式去掉（避免依赖缺的样式）。
+- docx 的图片按 2 倍像素画，按 1/192 英寸一个像素换算尺寸，再按版心缩放；样式来源中缺的样式补上时编号加 `DATLUMA` 前缀，基于的样式去掉（避免依赖缺的样式）。
 - docx 的目录包括标题 1、2（每张表一项）；标题 1 前分页。
 - 依赖：`zip` 9.0.5（`default-features = false`，只开 `deflate-flate2`；写计划时 9.1.x 发布不满 7 天，用 `cargo update --precise` 锁定）、`quick-xml` 0.42.0；
   service 的 `minijinja` 开 `serde` 特性。
-- `document` 模块在 `dblens_service` 中公开（`dblens_service::document::…`），不从 crate 根重新导出。
+- `document` 模块在 `datluma_service` 中公开（`datluma_service::document::…`），不从 crate 根重新导出。
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（704 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（704 个）。
   - service：内容组织（复合外键、跨 schema 的链接、逻辑外键、被引用、读不出的表、按表筛选、视图定义开关）；
     markdown、html 的快照（中英文）、HTML 转义和内嵌图片、自定义模板的过滤器、语法错误的行号、模板不能 include 文件；
     docx 的正文快照、图片的关系和内容类型和尺寸、打开时更新字段、全部 XML 部件格式正确、中文版 Word 样式编号的样式来源、缺的样式补上、横向纸张的版心宽度、
@@ -6702,11 +6702,11 @@ web/src/features/er/limits.ts  库图只显示表名的阈值
 - 未验证：桌面程序的保存、选择文件对话框，"在文件夹中显示"；docx 套用用户自己的样式来源后在 WPS 中的效果。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -332,7 +332,8 @@ trait Policy: Send + Sync {
  - 国产库第一批已完成：TiDB、OceanBase 社区版（MySQL 模式）、openGauss（A、PG 兼容模式，含 SHA256 认证）、人大金仓（Oracle、PG 模式）（设计 `docs/superpowers/specs/2026-10-27-domestic-batch1-design.md`，详细计划 `docs/superpowers/plans/2026-10-27-domestic-batch1.md`，说明 `docs/notes/domestic-batch1.md`）。第二批（PolarDB、TDSQL、GaussDB，只有云服务）、第三批（GBase 8s、OceanBase 的 Oracle 模式）尚未开始；GoldenDB 没有可用的测试环境。
  - 2026-10-27 M4 拆成三份（用户确认）：M4a 模型与比对（模型文件、反向生成、比对与同步）；M4b ER 图；M4c 数据字典和设计文档导出。
@@ -6728,6 +6728,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m4c-document-export.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m0-4b-api.md docs/notes/m4c-document-export.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M4c 文档导出的说明、接口和进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

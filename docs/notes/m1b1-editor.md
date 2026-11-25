@@ -11,9 +11,9 @@ M1b 拆成两份：
 ## 结构
 
 ```text
-crates/dblens-dialect/src/session.rs   执行计划语句、读取和切换当前 schema 的语句
-crates/dblens-service/src/session.rs   ExecRequest：光标所在语句、出错继续、执行计划；当前 schema
-crates/dblens-api/src/ws.rs            exec 消息的新字段；偏移在 UTF-16 与字节之间换算
+crates/datluma-dialect/src/session.rs   执行计划语句、读取和切换当前 schema 的语句
+crates/datluma-service/src/session.rs   ExecRequest：光标所在语句、出错继续、执行计划；当前 schema
+crates/datluma-api/src/ws.rs            exec 消息的新字段；偏移在 UTF-16 与字节之间换算
 各驱动                                  SQL 错误的出错位置（见下）
 web/src/
   shared/exec.ts                 协议：新字段、确认信息记在整个状态上
@@ -72,7 +72,7 @@ Glide 的 peer 依赖只声明到 React 18，pnpm 安装时提示 peer 不匹配
 
 ## 出错位置
 
-`Error::Sql::position` 是语句内的字符偏移，从 1 开始。各库的来源都实测过（`SELECT '数洞', FROM t` 在 5 个库上都指向 `FROM`）：
+`Error::Sql::position` 是语句内的字符偏移，从 1 开始。各库的来源都实测过（`SELECT '数览', FROM t` 在 5 个库上都指向 `FROM`）：
 
 | 库 | 来源 |
 |---|---|
@@ -122,7 +122,7 @@ Glide 的 peer 依赖只声明到 React 18，pnpm 安装时提示 peer 不匹配
     - 执行计划显示 `DBMS_XPLAN` 的输出。
   - 刷新页面后标签页和其中的 SQL 恢复。
 - **桌面版**：
-  - 标题栏菜单有"SQL"，标题为"查询3 · ora — DBLens 数洞"。
+  - 标题栏菜单有"SQL"，标题为"查询3 · ora — DATLUMA 数览"。
   - 测试环境的标签顶部黄线，生产标签标红；PL/SQL 高亮正常。
   - 执行后双击单元格打开查看对话框，状态栏显示行数和耗时。
 

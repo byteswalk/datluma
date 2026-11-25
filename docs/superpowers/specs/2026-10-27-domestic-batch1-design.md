@@ -1,6 +1,6 @@
 # 国产库适配第一批 设计
 
-日期：2026-10-27。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-dblens-design.md` 第 3 节（里程碑）与进度记录（2026-10-27 用户决定：国产库适配作为 M3 之后的单独里程碑，分三批）。
+日期：2026-10-27。上级设计：总设计文档 `docs/superpowers/specs/2026-10-22-datluma-design.md` 第 3 节（里程碑）与进度记录（2026-10-27 用户决定：国产库适配作为 M3 之后的单独里程碑，分三批）。
 
 ## 1. 目标与范围
 
@@ -152,7 +152,7 @@ OceanBase：
 
 ### 6.3 验收
 
-元数据实库测试（`dblens-dialect/tests/meta_live.rs`）在所有目标上通过。确实不支持的对象按目标跳过，并写明原因（例如 TiDB 没有触发器）。
+元数据实库测试（`datluma-dialect/tests/meta_live.rs`）在所有目标上通过。确实不支持的对象按目标跳过，并写明原因（例如 TiDB 没有触发器）。
 
 ## 7. 查询相关
 
@@ -233,15 +233,15 @@ TiDB 的 "Unsupported type" 先定位到具体语句：用例语法问题就改�
 
 | 目标 | 端口 | 部署 | 环境变量 |
 |---|---|---|---|
-| TiDB v8.5.8 | 4000 | 官方二进制，单个 tidb-server（unistore），systemd `tidb` | `DBLENS_TEST_TIDB_URL` |
-| OceanBase CE 4.4.2.1 | 2881 | 容器 `oceanbase`（quay.io，mini 模式），租户 `test` | `DBLENS_TEST_OCEANBASE_URL` |
-| openGauss 7.0.0-RC1，PG 模式库 | 5433 | 容器 `opengauss`，库 `dblens_test` | `DBLENS_TEST_OPENGAUSS_URL` |
-| openGauss，A 模式库 | 5433 | 同上，库 `dblens_test_a` | `DBLENS_TEST_OPENGAUSS_A_URL` |
-| openGauss，纯 SHA256 账号 | 5433 | 同上，账号 `admin_sha` | `DBLENS_TEST_OPENGAUSS_SHA_URL` |
-| 人大金仓 V9R2C16，Oracle 模式 | 54321 | DEB 包，systemd `kingbased`，开发版授权（365 天） | `DBLENS_TEST_KINGBASE_URL` |
-| 人大金仓，PG 模式 | 54322 | 第二个实例，systemd `kingbased-pg` | `DBLENS_TEST_KINGBASE_PG_URL` |
+| TiDB v8.5.8 | 4000 | 官方二进制，单个 tidb-server（unistore），systemd `tidb` | `DATLUMA_TEST_TIDB_URL` |
+| OceanBase CE 4.4.2.1 | 2881 | 容器 `oceanbase`（quay.io，mini 模式），租户 `test` | `DATLUMA_TEST_OCEANBASE_URL` |
+| openGauss 7.0.0-RC1，PG 模式库 | 5433 | 容器 `opengauss`，库 `datluma_test` | `DATLUMA_TEST_OPENGAUSS_URL` |
+| openGauss，A 模式库 | 5433 | 同上，库 `datluma_test_a` | `DATLUMA_TEST_OPENGAUSS_A_URL` |
+| openGauss，纯 SHA256 账号 | 5433 | 同上，账号 `admin_sha` | `DATLUMA_TEST_OPENGAUSS_SHA_URL` |
+| 人大金仓 V9R2C16，Oracle 模式 | 54321 | DEB 包，systemd `kingbased`，开发版授权（365 天） | `DATLUMA_TEST_KINGBASE_URL` |
+| 人大金仓，PG 模式 | 54322 | 第二个实例，systemd `kingbased-pg` | `DATLUMA_TEST_KINGBASE_PG_URL` |
 
-每个目标有 `admin` 用户和 `dblens_test` 库。密码在虚拟机上随机生成，只保存在虚拟机的 root 文件中，不进仓库；运行测试时以环境变量临时传入。
+每个目标有 `admin` 用户和 `datluma_test` 库。密码在虚拟机上随机生成，只保存在虚拟机的 root 文件中，不进仓库；运行测试时以环境变量临时传入。
 
 ### 9.2 测试组织
 

@@ -5,17 +5,17 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/
+crates/datluma-dialect/src/
   split.rs     StreamSplitter：分块拆分（split_statements 一次喂入全文），语句带起始行号
   import.rs    导入的写入语句（多行 INSERT、Oracle 的 INSERT ALL、按主键更新）、DELETE 全表、建表语句
-crates/dblens-service/src/
+crates/datluma-service/src/
   import/file.rs     读取文件：CSV（自动判断编码和分隔符）、Excel（calamine）；open_text 也给 SQL 文件用
   import/values.rs   推断新建表的列类型；按目标列的类型转换值
   import/job.rs      导入任务：Service::preview_import / import_ddl / start_import
   sqlfile.rs         执行 SQL 文件的任务：Service::start_sql_file（扫描、确认、执行、日志）
   task.rs            TaskManager：任务的状态、取消、等待确认、报告文件、过期清理；上传的文件
-crates/dblens-api/src/tasks.rs         /uploads、/imports/preview、/imports、/profiles/{id}/imports/ddl、/sql-files、/tasks/...
-crates/dblens-desktop/src/shell.rs     open_dialog（系统"打开"对话框）
+crates/datluma-api/src/tasks.rs         /uploads、/imports/preview、/imports、/profiles/{id}/imports/ddl、/sql-files、/tasks/...
+crates/datluma-desktop/src/shell.rs     open_dialog（系统"打开"对话框）
 web/src/features/import/
   logic.ts           格式、列的自动映射、新建表的列和类型、预览单元格的校验
   FileField.tsx      选文件：桌面版用本机路径，浏览器模式上传（XHR，显示进度）
@@ -72,7 +72,7 @@ web/src/features/import/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过。
   - 实库测试（5 个库）：导入到已有表（追加 2500 行含中文、NULL、精确小数和日期；按主键更新；清空后导入；整体事务中主键重复全部回滚；分批跳过两行并核对报告）；导入到新表（建表、写入；整体事务失败时删除新表）；SQL 文件（MySQL 的 DELIMITER 存储过程、PG 的 `$$` 函数、Oracle 和达梦的 PL/SQL 块加 `/`；出错时继续和停止）。
   - 达梦的测试与其他测试同时连库时偶发连接失败，单独运行通过（与 M1c1、M1c3 记录的相同）。
 - 前端：tsc、Vitest、打包通过。

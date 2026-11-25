@@ -11,10 +11,10 @@ VM .106 上的 Docker 容器，镜像是华为云 SWR 同步的 Docker Hub 官�
 | 12.20 | `pg12` | 5412 | 镜像标签 `12`；12 的最后一版 12.22 镜像站没有 |
 | 14.19 | `pg14` | 5414 | |
 
-- 账号 `admin`（超级用户，同 18），库 `dblens_test`，密码同 18 的 `PG_ADMIN`。密码在建库时从挂载的文件读，建完清空（目录 `/var/lib/dblens-pg-init/<容器>` 要留着供重启时挂载）。
+- 账号 `admin`（超级用户，同 18），库 `datluma_test`，密码同 18 的 `PG_ADMIN`。密码在建库时从挂载的文件读，建完清空（目录 `/var/lib/datluma-pg-init/<容器>` 要留着供重启时挂载）。
 - 开了 SSL（数据目录里的自签名证书），和 18 一样；API 测试默认要求加密连接。
 - 预加载并装了 `pg_stat_statements`，用来测运维页的慢 SQL（18 上没装）。
-- 本机连接串 `DBLENS_TEST_PG12_URL`、`DBLENS_TEST_PG14_URL`，跑测试时赋给 `DBLENS_TEST_PG_URL`。
+- 本机连接串 `DATLUMA_TEST_PG12_URL`、`DATLUMA_TEST_PG14_URL`，跑测试时赋给 `DATLUMA_TEST_PG_URL`。
 
 ## 改了什么
 

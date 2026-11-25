@@ -1,6 +1,6 @@
 {
   "closeAsk": {
-    "title": "关闭 DBLENS",
+    "title": "关闭 DATLUMA",
     "content": "最小化到托盘时程序在后台运行，点托盘图标可以恢复窗口。这次的选择会被记住，以后可在 设置 → 常规 中修改。",
     "tray": "最小化到托盘",
     "quit": "退出程序"
@@ -15,9 +15,9 @@
     "reload": "重新加载"
   },
   "boot": {
-    "serverUnreachable": "无法连接 DBLENS 服务",
+    "serverUnreachable": "无法连接 DATLUMA 服务",
     "missingToken": "缺少访问令牌",
-    "missingTokenHint": "请使用 dblens-server 启动时打印的链接打开本页（链接末尾带 #token=…）。"
+    "missingTokenHint": "请使用 datluma-server 启动时打印的链接打开本页（链接末尾带 #token=…）。"
   },
   "settings": {
     "title": "设置",
@@ -122,7 +122,7 @@
       "title": "帮助",
       "checkUpdate": "检查更新…",
       "autoCheck": "启动时自动检查更新",
-      "about": "关于 DBLENS"
+      "about": "关于 DATLUMA"
     }
   },
   "exec": {

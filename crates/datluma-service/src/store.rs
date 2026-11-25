@@ -1,0 +1,245 @@
+//! 本地数据：用户数据目录下的一个 SQLite 文件（设计文档 4.3 节）。表结构用 `PRAGMA user_version` 记录版本，
+//! 启动时依次执行尚未执行的迁移。
+
+use std::collections::BTreeMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Mutex, MutexGuard};
+
+use datluma_core::{Error, Result, msg};
+use rusqlite::{Connection, OptionalExtension, params};
+
+/// 第 N 个元素把表结构从版本 N 升到 N+1。只能追加，不能修改已发布的迁移。
+pub(crate) const MIGRATIONS: &[&str] = &[
+    // 版本 1：设置、连接配置、本地加密保存的密码
+    "CREATE TABLE settings (
+        key   TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+    );
+    CREATE TABLE profiles (
+        id                   TEXT PRIMARY KEY,
+        name                 TEXT NOT NULL,
+        driver               TEXT NOT NULL,
+        host                 TEXT NOT NULL,
+        port                 INTEGER NOT NULL,
+        user                 TEXT NOT NULL,
+        database             TEXT,
+        options              TEXT NOT NULL,
+        environment          TEXT NOT NULL,
+        color                TEXT,
+        connect_timeout_secs INTEGER NOT NULL,
+        created_at           TEXT NOT NULL,
+        updated_at           TEXT NOT NULL
+    );
+    CREATE TABLE vault (
+        id           INTEGER PRIMARY KEY CHECK (id = 1),
+        salt         BLOB NOT NULL,
+        check_nonce  BLOB NOT NULL,
+        check_cipher BLOB NOT NULL
+    );
+    CREATE TABLE secrets (
+        profile_id TEXT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+        nonce      BLOB NOT NULL,
+        cipher     BLOB NOT NULL
+    );",
+    // 版本 2：连接配置记住上次连接成功时识别出的数据库变体（界面据此显示图标）
+    "ALTER TABLE profiles ADD COLUMN variant TEXT;",
+    // 版本 3：执行历史、收藏（M1c1）
+    "CREATE TABLE history (
+        id           INTEGER PRIMARY KEY,
+        at           INTEGER NOT NULL,
+        profile_id   TEXT NOT NULL,
+        profile_name TEXT NOT NULL,
+        driver       TEXT NOT NULL,
+        variant      TEXT,
+        schema       TEXT,
+        sql          TEXT NOT NULL,
+        elapsed_ms   INTEGER,
+        rows         INTEGER,
+        error        TEXT
+    );
+    CREATE INDEX history_at ON history(at);
+    CREATE INDEX history_profile ON history(profile_id, at);
+    CREATE TABLE favorites (
+        id         TEXT PRIMARY KEY,
+        parent_id  TEXT REFERENCES favorites(id) ON DELETE CASCADE,
+        kind       TEXT NOT NULL,
+        name       TEXT NOT NULL,
+        sql        TEXT,
+        note       TEXT,
+        driver     TEXT,
+        variant    TEXT,
+        position   INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE INDEX favorites_parent ON favorites(parent_id, position);",
+    // 版本 4：新建连接时选的产品（国产库第一批），没有时按驱动显示
+    "ALTER TABLE profiles ADD COLUMN product TEXT;",
+    // 版本 5：规范检查（M7a）。规范库和检查记录。
+    // 内置规范的 body 存用户差异（Overrides），自定义规范的 body 存完整规范。
+    "CREATE TABLE lint_rulesets (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        builtin    INTEGER NOT NULL,
+        body       TEXT NOT NULL,
+        updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE lint_runs (
+        id           TEXT PRIMARY KEY,
+        created_at   INTEGER NOT NULL,
+        target       TEXT NOT NULL,
+        ruleset_name TEXT NOT NULL,
+        body         TEXT NOT NULL
+    );
+    CREATE INDEX lint_runs_at ON lint_runs(created_at);",
+    // 版本 6：不属于连接的密码，如 AI 提供方的 API key（密码库模式用；钥匙串模式存在系统钥匙串）
+    "CREATE TABLE app_secrets (
+        name   TEXT PRIMARY KEY,
+        nonce  BLOB NOT NULL,
+        cipher BLOB NOT NULL
+    );",
+    // 版本 7：“未设”环境改成“本机”，只给本机地址用；原来未设、主机又不是本机的连接改成开发
+    "UPDATE profiles SET environment = 'dev'
+      WHERE environment NOT IN ('dev', 'test', 'prod') AND driver <> 'sqlite'
+        AND NOT (LOWER(TRIM(host)) IN ('localhost', '::1', '[::1]') OR TRIM(host) LIKE '127.%');",
+];
+
+pub(crate) fn db_err(e: rusqlite::Error) -> Error {
+    Error::internal(msg!("store.db_error", error = e))
+}
+
+/// 默认的数据目录：Windows 为 `%APPDATA%\DATLUMA`，macOS 为 `~/Library/Application Support/DATLUMA`，
+/// Linux 为 `~/.local/share/DATLUMA`。
+pub fn default_data_dir() -> Result<PathBuf> {
+    directories::BaseDirs::new()
+        .map(|d| d.data_dir().join("DATLUMA"))
+        .ok_or_else(|| Error::internal(msg!("store.no_data_dir")))
+}
+
+pub struct Store {
+    conn: Mutex<Connection>,
+}
+
+impl Store {
+    /// 打开（必要时创建）数据目录下的 `datluma.db`，并执行迁移。
+    pub fn open(data_dir: &Path) -> Result<Self> {
+        std::fs::create_dir_all(data_dir).map_err(|e| {
+            Error::internal(msg!("store.create_dir_failed", dir = data_dir.display(), error = e))
+        })?;
+        Self::init(Connection::open(data_dir.join("datluma.db")).map_err(db_err)?)
+    }
+
+    /// 内存数据库，供测试使用。
+    pub fn open_in_memory() -> Result<Self> {
+        Self::init(Connection::open_in_memory().map_err(db_err)?)
+    }
+
+    fn init(mut conn: Connection) -> Result<Self> {
+        conn.pragma_update(None, "foreign_keys", true).map_err(db_err)?;
+        let version: i64 = conn.pragma_query_value(None, "user_version", |r| r.get(0)).map_err(db_err)?;
+        let version = usize::try_from(version).unwrap_or(usize::MAX);
+        if version > MIGRATIONS.len() {
+            return Err(Error::internal(msg!(
+                "store.too_new",
+                version = version,
+                supported = MIGRATIONS.len()
+            )));
+        }
+        for (i, sql) in MIGRATIONS.iter().enumerate().skip(version) {
+            let tx = conn.transaction().map_err(db_err)?;
+            tx.execute_batch(sql).map_err(db_err)?;
+            tx.pragma_update(None, "user_version", i as i64 + 1).map_err(db_err)?;
+            tx.commit().map_err(db_err)?;
+        }
+        Ok(Self { conn: Mutex::new(conn) })
+    }
+
+    /// 在数据库连接上执行一段操作。操作都很快，直接持锁执行。
+    pub(crate) fn with<T>(&self, f: impl FnOnce(&mut Connection) -> rusqlite::Result<T>) -> Result<T> {
+        let mut conn = self.lock()?;
+        f(&mut conn).map_err(db_err)
+    }
+
+    /// 取得数据库连接，供需要在一个事务中做校验和多步修改的操作使用。
+    pub(crate) fn lock(&self) -> Result<MutexGuard<'_, Connection>> {
+        self.conn.lock().map_err(|_| Error::internal(msg!("internal.lock_poisoned", lock = "store")))
+    }
+
+    pub fn setting(&self, key: &str) -> Result<Option<String>> {
+        self.with(|c| {
+            c.query_row("SELECT value FROM settings WHERE key = ?1", params![key], |r| r.get(0)).optional()
+        })
+    }
+
+    /// 全部设置，按键排序。
+    pub fn settings(&self) -> Result<BTreeMap<String, String>> {
+        self.with(|c| {
+            let mut stmt = c.prepare("SELECT key, value FROM settings ORDER BY key")?;
+            let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+            rows.collect()
+        })
+    }
+
+    /// 写入设置；`None` 删除该项。
+    pub fn set_setting(&self, key: &str, value: Option<&str>) -> Result<()> {
+        self.with(|c| {
+            match value {
+                Some(v) => c.execute(
+                    "INSERT INTO settings (key, value) VALUES (?1, ?2)
+                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                    params![key, v],
+                )?,
+                None => c.execute("DELETE FROM settings WHERE key = ?1", params![key])?,
+            };
+            Ok(())
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn settings_round_trip() {
+        let s = Store::open_in_memory().unwrap();
+        assert_eq!(s.setting("a").unwrap(), None);
+        s.set_setting("a", Some("1")).unwrap();
+        s.set_setting("a", Some("2")).unwrap();
+        assert_eq!(s.setting("a").unwrap().as_deref(), Some("2"));
+        s.set_setting("b", Some("x")).unwrap();
+        let all = s.settings().unwrap();
+        assert_eq!(all.into_iter().collect::<Vec<_>>(), [("a".into(), "2".into()), ("b".into(), "x".into())]);
+        s.set_setting("a", None).unwrap();
+        assert_eq!(s.setting("a").unwrap(), None);
+    }
+
+    #[test]
+    fn migrations_run_once_and_survive_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let s = Store::open(dir.path()).unwrap();
+            s.set_setting("k", Some("v")).unwrap();
+        }
+        let s = Store::open(dir.path()).unwrap();
+        assert_eq!(s.setting("k").unwrap().as_deref(), Some("v"));
+        let version: i64 = s.with(|c| c.pragma_query_value(None, "user_version", |r| r.get(0))).unwrap();
+        assert_eq!(version, MIGRATIONS.len() as i64);
+    }
+
+    #[test]
+    fn newer_database_is_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let c = Connection::open(dir.path().join("datluma.db")).unwrap();
+            c.pragma_update(None, "user_version", 99).unwrap();
+        }
+        let err = Store::open(dir.path()).err().unwrap().to_msg().render(datluma_core::Lang::ZhCn);
+        assert!(err.contains("升级"), "{err}");
+    }
+
+    #[test]
+    fn default_data_dir_ends_with_app_name() {
+        assert!(default_data_dir().unwrap().ends_with("DATLUMA"));
+    }
+}

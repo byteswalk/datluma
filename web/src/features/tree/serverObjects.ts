@@ -1,5 +1,5 @@
 // 对象树上的"服务器对象"（用户、角色、表空间）和新建 / 删除库、模式：哪些库有哪些，菜单怎么叫。纯逻辑，单独测试。
-// 规则和后端 dblens-dialect 的 namespace.rs、namespace 服务的表空间查询一致；后端还会再校验一次。
+// 规则和后端 datluma-dialect 的 namespace.rs、namespace 服务的表空间查询一致；后端还会再校验一次。
 
 import type { DriverId, NamespaceCaps, Tablespace } from '../../shared/api'
 

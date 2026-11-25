@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 在 DBLens 里只读地查看各数据库的用户、角色、直接授权、继承后的实际权限，并能从对象反查谁能访问。
+**Goal:** 在 DATLUMA 里只读地查看各数据库的用户、角色、直接授权、继承后的实际权限，并能从对象反查谁能访问。
 
-**Architecture:** `dblens-dialect` 新增 `privilege` 模块：按方言的 SQL 模板输出统一列名，纯函数解析成模型并计算实际权限。`dblens-service` 经 `MetadataService::run` 跳过缓存取数，主查询报 SQL 错误时退到 `@limited` 段并标记范围不完整。`dblens-api` 提供三个 GET 接口，前端新增一种标签页。
+**Architecture:** `datluma-dialect` 新增 `privilege` 模块：按方言的 SQL 模板输出统一列名，纯函数解析成模型并计算实际权限。`datluma-service` 经 `MetadataService::run` 跳过缓存取数，主查询报 SQL 错误时退到 `@limited` 段并标记范围不完整。`datluma-api` 提供三个 GET 接口，前端新增一种标签页。
 
 **Tech Stack:** Rust（minijinja 模板、serde、axum）、React + antd + TanStack Query、vitest。
 
@@ -27,7 +27,7 @@
 
 ## 执行环境
 
-- 新建分支 `feat/m9a-privileges` 和工作树 `E:\VibeCoding\16数据库管理工具\dblens-m9a`，`CARGO_TARGET_DIR` 用独立目录 `E:\VibeCoding\16数据库管理工具\target-m9a`，不与其他克隆共用。
+- 新建分支 `feat/m9a-privileges` 和工作树 `E:\VibeCoding\16数据库管理工具\datluma-m9a`，`CARGO_TARGET_DIR` 用独立目录 `E:\VibeCoding\16数据库管理工具\target-m9a`，不与其他克隆共用。
 - `CARGO_INCREMENTAL=0`。在仓库里运行 cargo 时带 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 放在 `clippy` 之后）。
 - 前端用 `D:\Environments\nvm4w\nodejs` 下的 pnpm 11。
 - M8a 还在分支上，GBase 8s 不在本计划内。两边都改 `Workspace.tsx` 以外的文件很少，合并顺序不限。
@@ -61,7 +61,7 @@
 - [ ] **Step 1: 建工作树并运行依赖检查**
 
 ```bash
-git worktree add -b feat/m9a-privileges ../dblens-m9a main
+git worktree add -b feat/m9a-privileges ../datluma-m9a main
 NODE_USE_ENV_PROXY=1 node scripts/check-deps.mjs
 ```
 
@@ -92,18 +92,18 @@ git commit -m "chore: M9a 开始前升级依赖"
 ### Task 1：模型、模板加载和行解析
 
 **Files:**
-- Create: `crates/dblens-dialect/sql/privilege/{mysql,mariadb,tidb,oceanbase,postgres,opengauss,oracle,dameng,sqlserver}.sql`（从 `docs/superpowers/plans/2026-10-30-m9a-privileges-materials/sql/` 原样复制）
-- Create: `crates/dblens-dialect/src/privilege/mod.rs`
-- Create: `crates/dblens-dialect/src/privilege/rows.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Modify: `crates/dblens-dialect/src/meta/mod.rs`
+- Create: `crates/datluma-dialect/sql/privilege/{mysql,mariadb,tidb,oceanbase,postgres,opengauss,oracle,dameng,sqlserver}.sql`（从 `docs/superpowers/plans/2026-10-30-m9a-privileges-materials/sql/` 原样复制）
+- Create: `crates/datluma-dialect/src/privilege/mod.rs`
+- Create: `crates/datluma-dialect/src/privilege/rows.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Modify: `crates/datluma-dialect/src/meta/mod.rs`
 
 **Interfaces:**
-- Produces: `dblens_dialect::privilege::{Principal, PrincipalKind, PrincipalLevel, Membership, PrivilegeGrant, GrantScope, GrantEffect, GrantTarget, PrivSection, PrivTier, principals, memberships, grants, caps, Caps}`；`Dialect::privilege_query(section, tier, &MetaArgs) -> Result<Option<MetaQuery>>`；`Dialect::public_grantees() -> &'static [&'static str]`；`MetaKey::{PrivCaps, PrivPrincipals, PrivMemberships, PrivGrantsOf, PrivGrantsOn}`。
+- Produces: `datluma_dialect::privilege::{Principal, PrincipalKind, PrincipalLevel, Membership, PrivilegeGrant, GrantScope, GrantEffect, GrantTarget, PrivSection, PrivTier, principals, memberships, grants, caps, Caps}`；`Dialect::privilege_query(section, tier, &MetaArgs) -> Result<Option<MetaQuery>>`；`Dialect::public_grantees() -> &'static [&'static str]`；`MetaKey::{PrivCaps, PrivPrincipals, PrivMemberships, PrivGrantsOf, PrivGrantsOn}`。
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-dialect/src/privilege/mod.rs` 末尾：
+`crates/datluma-dialect/src/privilege/mod.rs` 末尾：
 
 ```rust
 #[cfg(test)]
@@ -164,7 +164,7 @@ mod tests {
         assert!(q.sql.contains("inherit_option"));
         let q = d.privilege_query(PrivSection::GrantsOf, PrivTier::Full, &args()).unwrap().unwrap();
         assert!(q.sql.contains("$1"));
-        assert_eq!(q.params, vec![dblens_core::Value::String("u".into())]);
+        assert_eq!(q.params, vec![datluma_core::Value::String("u".into())]);
     }
 
     #[test]
@@ -179,12 +179,12 @@ mod tests {
 }
 ```
 
-`crates/dblens-dialect/src/privilege/rows.rs` 末尾：
+`crates/datluma-dialect/src/privilege/rows.rs` 末尾：
 
 ```rust
 #[cfg(test)]
 mod tests {
-    use dblens_core::Value;
+    use datluma_core::Value;
 
     use super::super::*;
     use crate::meta::MetaRows;
@@ -243,12 +243,12 @@ mod tests {
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `cargo test -p dblens-dialect privilege --offline`
+Run: `cargo test -p datluma-dialect privilege --offline`
 Expected: 编译失败，`privilege` 模块不存在。
 
 - [ ] **Step 3: 增加 MetaKey**
 
-在 `crates/dblens-dialect/src/meta/mod.rs` 的 `MetaKey` 枚举末尾（`ViewDefinitionBasic,` 之后）加：
+在 `crates/datluma-dialect/src/meta/mod.rs` 的 `MetaKey` 枚举末尾（`ViewDefinitionBasic,` 之后）加：
 
 ```rust
     // 以下是账号与权限（M9a），模板在 sql/privilege/，由 `Dialect::privilege_query` 生成。不在 `ALL` 中。
@@ -271,7 +271,7 @@ Expected: 编译失败，`privilege` 模块不存在。
 
 - [ ] **Step 4: 写 `privilege/mod.rs`**
 
-复制素材 SQL 到 `crates/dblens-dialect/sql/privilege/`，然后写：
+复制素材 SQL 到 `crates/datluma-dialect/sql/privilege/`，然后写：
 
 ```rust
 //! 数据库账号与权限（M9 设计文档）。模板在 `sql/privilege/<方言>.sql`，按 `-- [段]` 分段，段名带 `@limited` 的
@@ -291,7 +291,7 @@ mod rows;
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use dblens_core::Result;
+use datluma_core::Result;
 use serde::{Deserialize, Serialize};
 
 pub use effective::{
@@ -507,14 +507,14 @@ impl Dialect {
 }
 ```
 
-在 `crates/dblens-dialect/src/lib.rs` 加 `pub mod privilege;`（按字母序放在 `mod ops;` 之后）。
+在 `crates/datluma-dialect/src/lib.rs` 加 `pub mod privilege;`（按字母序放在 `mod ops;` 之后）。
 
 - [ ] **Step 5: 写 `privilege/rows.rs`**
 
 ```rust
 //! 把模板的结果行解析成模型。
 
-use dblens_core::{Error, Result, Value, msg};
+use datluma_core::{Error, Result, Value, msg};
 
 use super::{
     GrantEffect, GrantScope, GrantTarget, Membership, Principal, PrincipalKind, PrincipalLevel, PrivilegeGrant,
@@ -650,7 +650,7 @@ pub fn caps(rows: Option<&MetaRows>) -> Caps {
 
 确认 `meta/mod.rs` 的 `pub use rows::{MetaRow, MetaRows};` 已导出 `MetaRow`（已导出）。
 
-在 `crates/dblens-core/locales/app.json` 里按键的字母序加：
+在 `crates/datluma-core/locales/app.json` 里按键的字母序加：
 
 ```json
   "privilege.bad_value": {
@@ -740,13 +740,13 @@ pub fn who_can_access(
 
 - [ ] **Step 7: 确认测试通过**
 
-Run: `cargo test -p dblens-dialect privilege --offline`
+Run: `cargo test -p datluma-dialect privilege --offline`
 Expected: Step 1 的 9 个测试全部 PASS。
 
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-dialect crates/dblens-core/locales/app.json
+git add crates/datluma-dialect crates/datluma-core/locales/app.json
 git commit -m "feat(dialect): M9a 账号权限模型、模板和解析"
 ```
 
@@ -755,7 +755,7 @@ git commit -m "feat(dialect): M9a 账号权限模型、模板和解析"
 ### Task 2：实际权限计算
 
 **Files:**
-- Modify: `crates/dblens-dialect/src/privilege/effective.rs`
+- Modify: `crates/datluma-dialect/src/privilege/effective.rs`
 
 **Interfaces:**
 - Consumes: Task 1 的模型和占位类型。
@@ -911,7 +911,7 @@ mod tests {
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `cargo test -p dblens-dialect effective --offline`
+Run: `cargo test -p datluma-dialect effective --offline`
 Expected: 多个测试 FAIL（占位函数返回空）。
 
 - [ ] **Step 3: 实现**
@@ -1063,13 +1063,13 @@ use super::{GrantEffect, GrantScope, Membership, Principal, PrivilegeGrant};
 
 - [ ] **Step 4: 确认测试通过**
 
-Run: `cargo test -p dblens-dialect privilege --offline`
+Run: `cargo test -p datluma-dialect privilege --offline`
 Expected: 全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-dialect/src/privilege/effective.rs
+git add crates/datluma-dialect/src/privilege/effective.rs
 git commit -m "feat(dialect): M9a 实际权限和对象反查计算"
 ```
 
@@ -1078,22 +1078,22 @@ git commit -m "feat(dialect): M9a 实际权限和对象反查计算"
 ### Task 3：服务层
 
 **Files:**
-- Create: `crates/dblens-service/src/privilege.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-core/locales/app.json`
+- Create: `crates/datluma-service/src/privilege.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-core/locales/app.json`
 
 **Interfaces:**
-- Consumes: Task 1、2 的 `dblens_dialect::privilege::*`；`MetadataService::run`、`MetadataCache::forget`、`Service::scoped_profile`。
+- Consumes: Task 1、2 的 `datluma_dialect::privilege::*`；`MetadataService::run`、`MetadataCache::forget`、`Service::scoped_profile`。
 - Produces: `Service::privilege_overview(id, catalog) -> Result<PrivilegeOverview>`、`Service::principal_privileges(id, catalog, principal) -> Result<PrincipalPrivileges>`、`Service::object_access(id, catalog, schema, object) -> Result<ObjectAccessReport>`；类型 `Coverage`。
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-service/src/privilege.rs` 末尾：
+`crates/datluma-service/src/privilege.rs` 末尾：
 
 ```rust
 #[cfg(test)]
 mod tests {
-    use dblens_core::msg;
+    use datluma_core::msg;
 
     use super::*;
 
@@ -1130,7 +1130,7 @@ mod tests {
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `cargo test -p dblens-service privilege --offline`
+Run: `cargo test -p datluma-service privilege --offline`
 Expected: 编译失败，模块不存在。
 
 - [ ] **Step 3: 实现**
@@ -1142,20 +1142,20 @@ Expected: 编译失败，模块不存在。
 
 use std::sync::Arc;
 
-use dblens_core::{Error, Msg, Result, msg};
-use dblens_dialect::meta::{MetaArgs, MetaRows};
-use dblens_dialect::privilege::{
+use datluma_core::{Error, Msg, Result, msg};
+use datluma_dialect::meta::{MetaArgs, MetaRows};
+use datluma_dialect::privilege::{
     self, EffectiveContext, EffectivePrivilege, Membership, ObjectAccess, Principal, PrivSection, PrivTier,
     PrivilegeGrant,
 };
-use dblens_dialect::{Dialect, Family};
+use datluma_dialect::{Dialect, Family};
 use serde::Serialize;
 
 use crate::profile::Profile;
 use crate::service::Service;
 
 #[cfg(test)]
-use dblens_dialect::privilege::{PrincipalKind, PrincipalLevel};
+use datluma_dialect::privilege::{PrincipalKind, PrincipalLevel};
 
 /// 读到的范围是否完整。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -1348,9 +1348,9 @@ impl Service {
 }
 ```
 
-`crates/dblens-service/src/lib.rs` 加 `mod privilege;`（放在 `mod policy;` 之后）和 `pub use privilege::{Coverage, ObjectAccessReport, PrincipalPrivileges, PrivilegeOverview};`。
+`crates/datluma-service/src/lib.rs` 加 `mod privilege;`（放在 `mod policy;` 之后）和 `pub use privilege::{Coverage, ObjectAccessReport, PrincipalPrivileges, PrivilegeOverview};`。
 
-`crates/dblens-core/locales/app.json` 按 `{ "zh-CN": …, "en": … }` 的格式、键的字母序加：
+`crates/datluma-core/locales/app.json` 按 `{ "zh-CN": …, "en": … }` 的格式、键的字母序加：
 
 | 键 | 中文 | 英文 |
 |---|---|---|
@@ -1363,16 +1363,16 @@ impl Service {
 
 - [ ] **Step 4: 确认测试通过**
 
-Run: `cargo test -p dblens-service privilege --offline`
+Run: `cargo test -p datluma-service privilege --offline`
 Expected: 2 个测试 PASS。
 
-Run: `cargo clippy -p dblens-service -p dblens-dialect --offline -- -D warnings`
+Run: `cargo clippy -p datluma-service -p datluma-dialect --offline -- -D warnings`
 Expected: 无警告。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service crates/dblens-core/locales/app.json
+git add crates/datluma-service crates/datluma-core/locales/app.json
 git commit -m "feat(service): M9a 账号权限读取和范围标记"
 ```
 
@@ -1381,9 +1381,9 @@ git commit -m "feat(service): M9a 账号权限读取和范围标记"
 ### Task 4：接口
 
 **Files:**
-- Create: `crates/dblens-api/src/privileges.rs`
-- Modify: `crates/dblens-api/src/lib.rs`
-- Test: `crates/dblens-api/tests/api.rs`
+- Create: `crates/datluma-api/src/privileges.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Test: `crates/datluma-api/tests/api.rs`
 
 **Interfaces:**
 - Consumes: Task 3 的 `Service` 方法。
@@ -1391,7 +1391,7 @@ git commit -m "feat(service): M9a 账号权限读取和范围标记"
 
 - [ ] **Step 1: 写失败的测试**
 
-在 `crates/dblens-api/tests/api.rs` 的 `ops_follow_language` 后面加：
+在 `crates/datluma-api/tests/api.rs` 的 `ops_follow_language` 后面加：
 
 ```rust
 #[tokio::test]
@@ -1412,7 +1412,7 @@ async fn privileges_check_parameters() {
 
 - [ ] **Step 2: 确认测试失败**
 
-Run: `cargo test -p dblens-api privileges --offline`
+Run: `cargo test -p datluma-api privileges --offline`
 Expected: FAIL，路由不存在时返回 404 而不是 400。
 
 - [ ] **Step 3: 实现**
@@ -1422,7 +1422,7 @@ Expected: FAIL，路由不存在时返回 404 而不是 400。
 
 use axum::Json;
 use axum::extract::{Path, Query, State};
-use dblens_service::{ObjectAccessReport, PrincipalPrivileges, PrivilegeOverview};
+use datluma_service::{ObjectAccessReport, PrincipalPrivileges, PrivilegeOverview};
 use serde::Deserialize;
 
 use crate::AppState;
@@ -1471,7 +1471,7 @@ pub async fn object(
 }
 ```
 
-`crates/dblens-api/src/lib.rs`：在 `mod models;` 后加 `mod privileges;`；在 `/profiles/{id}/ops` 路由后加：
+`crates/datluma-api/src/lib.rs`：在 `mod models;` 后加 `mod privileges;`；在 `/profiles/{id}/ops` 路由后加：
 
 ```rust
         .route("/profiles/{id}/privileges", get(privileges::overview))
@@ -1481,13 +1481,13 @@ pub async fn object(
 
 - [ ] **Step 4: 确认测试通过**
 
-Run: `cargo test -p dblens-api --offline`
+Run: `cargo test -p datluma-api --offline`
 Expected: 全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-api
+git add crates/datluma-api
 git commit -m "feat(api): M9a 账号权限接口"
 ```
 
@@ -1496,34 +1496,34 @@ git commit -m "feat(api): M9a 账号权限接口"
 ### Task 5：实连验证和达梦模板
 
 **Files:**
-- Create: `crates/dblens-service/tests/privilege_live.rs`
-- Modify: `crates/dblens-dialect/sql/privilege/*.sql`（实测发现问题时）
+- Create: `crates/datluma-service/tests/privilege_live.rs`
+- Modify: `crates/datluma-dialect/sql/privilege/*.sql`（实测发现问题时）
 
 **Interfaces:**
 - Consumes: Task 3 的 `Service` 方法。
 
-运行前向用户要 `DBLENS_TEST_*_URL` 里的密码，只放环境变量，不写入仓库。
+运行前向用户要 `DATLUMA_TEST_*_URL` 里的密码，只放环境变量，不写入仓库。
 
 - [ ] **Step 1: 写测试**
 
 ```rust
 //! 账号与权限的实库测试：环境变量见 `live.rs`，没设置时直接通过。要串行运行（`--test-threads=1`）。
 //!
-//! 夹具：表 dblens_priv_t；角色 dblens_priv_r2 有该表的 SELECT，dblens_priv_r1 是 r2 的成员，
-//! 用户 dblens_priv_u 是 r1 的成员；用户 dblens_priv_low 什么权限都没有。结束时删除，开始时也先删一次。
+//! 夹具：表 datluma_priv_t；角色 datluma_priv_r2 有该表的 SELECT，datluma_priv_r1 是 r2 的成员，
+//! 用户 datluma_priv_u 是 r1 的成员；用户 datluma_priv_low 什么权限都没有。结束时删除，开始时也先删一次。
 
 use std::path::Path;
 use std::sync::Arc;
 
-use dblens_dialect::privilege::{EffectiveState, GrantEffect};
-use dblens_driver::{ConnectParams, DriverId};
-use dblens_service::{
+use datluma_dialect::privilege::{EffectiveState, GrantEffect};
+use datluma_driver::{ConnectParams, DriverId};
+use datluma_service::{
     Coverage, DefaultPolicy, DriverRegistry, Environment, ProfileInput, SecretBackend, Secrets, Service, SessionEvent,
     Store,
 };
 
 const LIB_OPTIONS: [&str; 2] = ["oracle_client_lib_dir", "dpi_lib_dir"];
-const LOW_PASSWORD: &str = "Dblens_Priv_9x!";
+const LOW_PASSWORD: &str = "Datluma_Priv_9x!";
 
 struct Fixture {
     create: &'static [&'static str],
@@ -1538,137 +1538,137 @@ struct Fixture {
 
 const MYSQL: Fixture = Fixture {
     create: &[
-        "CREATE TABLE dblens_priv_t (id INT PRIMARY KEY)",
-        "CREATE ROLE 'dblens_priv_r1', 'dblens_priv_r2'",
-        "GRANT SELECT ON dblens_test.dblens_priv_t TO 'dblens_priv_r2'",
-        "GRANT 'dblens_priv_r2' TO 'dblens_priv_r1'",
-        "CREATE USER 'dblens_priv_u'@'%' IDENTIFIED BY 'Dblens_Priv_9x!'",
-        "CREATE USER 'dblens_priv_low'@'%' IDENTIFIED BY 'Dblens_Priv_9x!'",
-        "GRANT 'dblens_priv_r1' TO 'dblens_priv_u'@'%'",
+        "CREATE TABLE datluma_priv_t (id INT PRIMARY KEY)",
+        "CREATE ROLE 'datluma_priv_r1', 'datluma_priv_r2'",
+        "GRANT SELECT ON datluma_test.datluma_priv_t TO 'datluma_priv_r2'",
+        "GRANT 'datluma_priv_r2' TO 'datluma_priv_r1'",
+        "CREATE USER 'datluma_priv_u'@'%' IDENTIFIED BY 'Datluma_Priv_9x!'",
+        "CREATE USER 'datluma_priv_low'@'%' IDENTIFIED BY 'Datluma_Priv_9x!'",
+        "GRANT 'datluma_priv_r1' TO 'datluma_priv_u'@'%'",
     ],
     drop: &[
-        "DROP USER IF EXISTS 'dblens_priv_u'@'%'",
-        "DROP USER IF EXISTS 'dblens_priv_low'@'%'",
-        "DROP ROLE IF EXISTS 'dblens_priv_r1'",
-        "DROP ROLE IF EXISTS 'dblens_priv_r2'",
-        "DROP TABLE IF EXISTS dblens_priv_t",
+        "DROP USER IF EXISTS 'datluma_priv_u'@'%'",
+        "DROP USER IF EXISTS 'datluma_priv_low'@'%'",
+        "DROP ROLE IF EXISTS 'datluma_priv_r1'",
+        "DROP ROLE IF EXISTS 'datluma_priv_r2'",
+        "DROP TABLE IF EXISTS datluma_priv_t",
     ],
-    user: "'dblens_priv_u'@'%'",
-    low_login: "dblens_priv_low",
-    schema: "dblens_test",
-    table: "dblens_priv_t",
+    user: "'datluma_priv_u'@'%'",
+    low_login: "datluma_priv_low",
+    schema: "datluma_test",
+    table: "datluma_priv_t",
 };
 
 const MARIADB: Fixture = Fixture {
     create: &[
-        "CREATE TABLE dblens_priv_t (id INT PRIMARY KEY)",
-        "CREATE ROLE dblens_priv_r1",
-        "CREATE ROLE dblens_priv_r2",
-        "GRANT SELECT ON dblens_test.dblens_priv_t TO dblens_priv_r2",
-        "GRANT dblens_priv_r2 TO dblens_priv_r1",
-        "CREATE USER 'dblens_priv_u'@'%' IDENTIFIED BY 'Dblens_Priv_9x!'",
-        "CREATE USER 'dblens_priv_low'@'%' IDENTIFIED BY 'Dblens_Priv_9x!'",
-        "GRANT dblens_priv_r1 TO 'dblens_priv_u'@'%'",
+        "CREATE TABLE datluma_priv_t (id INT PRIMARY KEY)",
+        "CREATE ROLE datluma_priv_r1",
+        "CREATE ROLE datluma_priv_r2",
+        "GRANT SELECT ON datluma_test.datluma_priv_t TO datluma_priv_r2",
+        "GRANT datluma_priv_r2 TO datluma_priv_r1",
+        "CREATE USER 'datluma_priv_u'@'%' IDENTIFIED BY 'Datluma_Priv_9x!'",
+        "CREATE USER 'datluma_priv_low'@'%' IDENTIFIED BY 'Datluma_Priv_9x!'",
+        "GRANT datluma_priv_r1 TO 'datluma_priv_u'@'%'",
     ],
     drop: &[
-        "DROP USER IF EXISTS 'dblens_priv_u'@'%'",
-        "DROP USER IF EXISTS 'dblens_priv_low'@'%'",
-        "DROP ROLE IF EXISTS dblens_priv_r1",
-        "DROP ROLE IF EXISTS dblens_priv_r2",
-        "DROP TABLE IF EXISTS dblens_priv_t",
+        "DROP USER IF EXISTS 'datluma_priv_u'@'%'",
+        "DROP USER IF EXISTS 'datluma_priv_low'@'%'",
+        "DROP ROLE IF EXISTS datluma_priv_r1",
+        "DROP ROLE IF EXISTS datluma_priv_r2",
+        "DROP TABLE IF EXISTS datluma_priv_t",
     ],
-    user: "'dblens_priv_u'@'%'",
-    low_login: "dblens_priv_low",
-    schema: "dblens_test",
-    table: "dblens_priv_t",
+    user: "'datluma_priv_u'@'%'",
+    low_login: "datluma_priv_low",
+    schema: "datluma_test",
+    table: "datluma_priv_t",
 };
 
 const POSTGRES: Fixture = Fixture {
     create: &[
-        "CREATE TABLE dblens_priv_t (id INT PRIMARY KEY)",
-        "CREATE ROLE dblens_priv_r2",
-        "CREATE ROLE dblens_priv_r1",
-        "GRANT SELECT ON dblens_priv_t TO dblens_priv_r2",
-        "GRANT dblens_priv_r2 TO dblens_priv_r1",
-        "CREATE ROLE dblens_priv_u LOGIN PASSWORD 'Dblens_Priv_9x!'",
-        "CREATE ROLE dblens_priv_low LOGIN PASSWORD 'Dblens_Priv_9x!'",
-        "GRANT dblens_priv_r1 TO dblens_priv_u",
+        "CREATE TABLE datluma_priv_t (id INT PRIMARY KEY)",
+        "CREATE ROLE datluma_priv_r2",
+        "CREATE ROLE datluma_priv_r1",
+        "GRANT SELECT ON datluma_priv_t TO datluma_priv_r2",
+        "GRANT datluma_priv_r2 TO datluma_priv_r1",
+        "CREATE ROLE datluma_priv_u LOGIN PASSWORD 'Datluma_Priv_9x!'",
+        "CREATE ROLE datluma_priv_low LOGIN PASSWORD 'Datluma_Priv_9x!'",
+        "GRANT datluma_priv_r1 TO datluma_priv_u",
     ],
     drop: &[
-        "DROP TABLE IF EXISTS dblens_priv_t",
-        "DROP ROLE IF EXISTS dblens_priv_u",
-        "DROP ROLE IF EXISTS dblens_priv_low",
-        "DROP ROLE IF EXISTS dblens_priv_r1",
-        "DROP ROLE IF EXISTS dblens_priv_r2",
+        "DROP TABLE IF EXISTS datluma_priv_t",
+        "DROP ROLE IF EXISTS datluma_priv_u",
+        "DROP ROLE IF EXISTS datluma_priv_low",
+        "DROP ROLE IF EXISTS datluma_priv_r1",
+        "DROP ROLE IF EXISTS datluma_priv_r2",
     ],
-    user: "dblens_priv_u",
-    low_login: "dblens_priv_low",
+    user: "datluma_priv_u",
+    low_login: "datluma_priv_low",
     schema: "public",
-    table: "dblens_priv_t",
+    table: "datluma_priv_t",
 };
 
 const ORACLE: Fixture = Fixture {
     create: &[
-        "CREATE TABLE dblens_priv_t (id NUMBER PRIMARY KEY)",
-        "CREATE ROLE dblens_priv_r2",
-        "CREATE ROLE dblens_priv_r1",
-        "GRANT SELECT ON dblens_priv_t TO dblens_priv_r2",
-        "GRANT dblens_priv_r2 TO dblens_priv_r1",
-        "CREATE USER dblens_priv_u IDENTIFIED BY \"Dblens_Priv_9x!\"",
-        "CREATE USER dblens_priv_low IDENTIFIED BY \"Dblens_Priv_9x!\"",
-        "GRANT CREATE SESSION TO dblens_priv_low",
-        "GRANT dblens_priv_r1 TO dblens_priv_u",
+        "CREATE TABLE datluma_priv_t (id NUMBER PRIMARY KEY)",
+        "CREATE ROLE datluma_priv_r2",
+        "CREATE ROLE datluma_priv_r1",
+        "GRANT SELECT ON datluma_priv_t TO datluma_priv_r2",
+        "GRANT datluma_priv_r2 TO datluma_priv_r1",
+        "CREATE USER datluma_priv_u IDENTIFIED BY \"Datluma_Priv_9x!\"",
+        "CREATE USER datluma_priv_low IDENTIFIED BY \"Datluma_Priv_9x!\"",
+        "GRANT CREATE SESSION TO datluma_priv_low",
+        "GRANT datluma_priv_r1 TO datluma_priv_u",
     ],
     drop: &[
-        "DROP USER dblens_priv_u",
-        "DROP USER dblens_priv_low",
-        "DROP ROLE dblens_priv_r1",
-        "DROP ROLE dblens_priv_r2",
-        "DROP TABLE dblens_priv_t PURGE",
+        "DROP USER datluma_priv_u",
+        "DROP USER datluma_priv_low",
+        "DROP ROLE datluma_priv_r1",
+        "DROP ROLE datluma_priv_r2",
+        "DROP TABLE datluma_priv_t PURGE",
     ],
-    user: "DBLENS_PRIV_U",
-    low_login: "DBLENS_PRIV_LOW",
-    schema: "DBLENS_TEST",
-    table: "DBLENS_PRIV_T",
+    user: "DATLUMA_PRIV_U",
+    low_login: "DATLUMA_PRIV_LOW",
+    schema: "DATLUMA_TEST",
+    table: "DATLUMA_PRIV_T",
 };
 
 const DAMENG: Fixture = Fixture {
     drop: &[
-        "DROP USER DBLENS_PRIV_U CASCADE",
-        "DROP USER DBLENS_PRIV_LOW CASCADE",
-        "DROP ROLE DBLENS_PRIV_R1",
-        "DROP ROLE DBLENS_PRIV_R2",
-        "DROP TABLE DBLENS_PRIV_T",
+        "DROP USER DATLUMA_PRIV_U CASCADE",
+        "DROP USER DATLUMA_PRIV_LOW CASCADE",
+        "DROP ROLE DATLUMA_PRIV_R1",
+        "DROP ROLE DATLUMA_PRIV_R2",
+        "DROP TABLE DATLUMA_PRIV_T",
     ],
     ..ORACLE
 };
 
 const SQLSERVER: Fixture = Fixture {
     create: &[
-        "CREATE TABLE dbo.dblens_priv_t (id INT PRIMARY KEY)",
-        "CREATE ROLE dblens_priv_r2",
-        "CREATE ROLE dblens_priv_r1",
-        "GRANT SELECT ON dbo.dblens_priv_t TO dblens_priv_r2",
-        "ALTER ROLE dblens_priv_r2 ADD MEMBER dblens_priv_r1",
-        "CREATE LOGIN dblens_priv_u WITH PASSWORD = 'Dblens_Priv_9x!'",
-        "CREATE LOGIN dblens_priv_low WITH PASSWORD = 'Dblens_Priv_9x!'",
-        "CREATE USER dblens_priv_u FOR LOGIN dblens_priv_u",
-        "CREATE USER dblens_priv_low FOR LOGIN dblens_priv_low",
-        "ALTER ROLE dblens_priv_r1 ADD MEMBER dblens_priv_u",
+        "CREATE TABLE dbo.datluma_priv_t (id INT PRIMARY KEY)",
+        "CREATE ROLE datluma_priv_r2",
+        "CREATE ROLE datluma_priv_r1",
+        "GRANT SELECT ON dbo.datluma_priv_t TO datluma_priv_r2",
+        "ALTER ROLE datluma_priv_r2 ADD MEMBER datluma_priv_r1",
+        "CREATE LOGIN datluma_priv_u WITH PASSWORD = 'Datluma_Priv_9x!'",
+        "CREATE LOGIN datluma_priv_low WITH PASSWORD = 'Datluma_Priv_9x!'",
+        "CREATE USER datluma_priv_u FOR LOGIN datluma_priv_u",
+        "CREATE USER datluma_priv_low FOR LOGIN datluma_priv_low",
+        "ALTER ROLE datluma_priv_r1 ADD MEMBER datluma_priv_u",
     ],
     drop: &[
-        "DROP USER IF EXISTS dblens_priv_u",
-        "DROP USER IF EXISTS dblens_priv_low",
-        "IF SUSER_ID('dblens_priv_u') IS NOT NULL DROP LOGIN dblens_priv_u",
-        "IF SUSER_ID('dblens_priv_low') IS NOT NULL DROP LOGIN dblens_priv_low",
-        "DROP ROLE IF EXISTS dblens_priv_r1",
-        "DROP ROLE IF EXISTS dblens_priv_r2",
-        "DROP TABLE IF EXISTS dbo.dblens_priv_t",
+        "DROP USER IF EXISTS datluma_priv_u",
+        "DROP USER IF EXISTS datluma_priv_low",
+        "IF SUSER_ID('datluma_priv_u') IS NOT NULL DROP LOGIN datluma_priv_u",
+        "IF SUSER_ID('datluma_priv_low') IS NOT NULL DROP LOGIN datluma_priv_low",
+        "DROP ROLE IF EXISTS datluma_priv_r1",
+        "DROP ROLE IF EXISTS datluma_priv_r2",
+        "DROP TABLE IF EXISTS dbo.datluma_priv_t",
     ],
-    user: "server:dblens_priv_u",
-    low_login: "dblens_priv_low",
+    user: "server:datluma_priv_u",
+    low_login: "datluma_priv_low",
     schema: "dbo",
-    table: "dblens_priv_t",
+    table: "datluma_priv_t",
 };
 
 fn has_implicit(driver: DriverId) -> bool {
@@ -1775,83 +1775,83 @@ async fn flow(env: &str, fx: Fixture) {
 
 #[tokio::test]
 async fn mysql() {
-    flow("DBLENS_TEST_MYSQL_URL", MYSQL).await;
+    flow("DATLUMA_TEST_MYSQL_URL", MYSQL).await;
 }
 
 #[tokio::test]
 async fn mariadb() {
-    flow("DBLENS_TEST_MARIADB_URL", MARIADB).await;
+    flow("DATLUMA_TEST_MARIADB_URL", MARIADB).await;
 }
 
 #[tokio::test]
 async fn tidb() {
-    flow("DBLENS_TEST_TIDB_URL", MYSQL).await;
+    flow("DATLUMA_TEST_TIDB_URL", MYSQL).await;
 }
 
 #[tokio::test]
 async fn oceanbase() {
-    flow("DBLENS_TEST_OCEANBASE_URL", MYSQL).await;
+    flow("DATLUMA_TEST_OCEANBASE_URL", MYSQL).await;
 }
 
 #[tokio::test]
 async fn postgres() {
-    flow("DBLENS_TEST_PG_URL", POSTGRES).await;
+    flow("DATLUMA_TEST_PG_URL", POSTGRES).await;
 }
 
 #[tokio::test]
 async fn opengauss() {
-    flow("DBLENS_TEST_OPENGAUSS_URL", POSTGRES).await;
+    flow("DATLUMA_TEST_OPENGAUSS_URL", POSTGRES).await;
 }
 
 #[tokio::test]
 async fn opengauss_a() {
-    flow("DBLENS_TEST_OPENGAUSS_A_URL", POSTGRES).await;
+    flow("DATLUMA_TEST_OPENGAUSS_A_URL", POSTGRES).await;
 }
 
 #[tokio::test]
 async fn kingbase() {
-    flow("DBLENS_TEST_KINGBASE_URL", POSTGRES).await;
+    flow("DATLUMA_TEST_KINGBASE_URL", POSTGRES).await;
 }
 
 #[tokio::test]
 async fn kingbase_pg() {
-    flow("DBLENS_TEST_KINGBASE_PG_URL", POSTGRES).await;
+    flow("DATLUMA_TEST_KINGBASE_PG_URL", POSTGRES).await;
 }
 
 #[tokio::test]
 async fn oracle() {
-    flow("DBLENS_TEST_ORACLE_URL", ORACLE).await;
+    flow("DATLUMA_TEST_ORACLE_URL", ORACLE).await;
 }
 
 #[tokio::test]
 async fn dameng() {
-    flow("DBLENS_TEST_DM_URL", DAMENG).await;
+    flow("DATLUMA_TEST_DM_URL", DAMENG).await;
 }
 
 #[tokio::test]
 async fn sqlserver() {
-    flow("DBLENS_TEST_SQLSERVER_URL", SQLSERVER).await;
+    flow("DATLUMA_TEST_SQLSERVER_URL", SQLSERVER).await;
 }
 ```
 
-MySQL 系里 `dblens_priv_r2` 这类没有成员的角色，靠模板的“锁定且无密码”判断为角色。
+MySQL 系里 `datluma_priv_r2` 这类没有成员的角色，靠模板的“锁定且无密码”判断为角色。
 
 openGauss 基于 PG 9.2，`NULL AS host` 的列类型可能是 `unknown`，驱动读不出时把模板里的这类列改成 `CAST(NULL AS text)`（`memberships` 用的是 `postgres.sql`，改动放进 `opengauss.sql` 的覆盖段）。
 
 - [ ] **Step 2: 先修达梦模板**
 
-用户提供 DM 连接串后，只设 `DBLENS_TEST_DM_URL`，运行：
+用户提供 DM 连接串后，只设 `DATLUMA_TEST_DM_URL`，运行：
 
 ```bash
-cargo test -p dblens-service --test privilege_live dameng --offline -- --test-threads=1 --nocapture
+cargo test -p datluma-service --test privilege_live dameng --offline -- --test-threads=1 --nocapture
 ```
 
-Expected: 通过；不通过时按报错修正 `crates/dblens-dialect/sql/privilege/dameng.sql`（字段名、`DBA_ROLES` 列名、`ALL_TAB_PRIVS` 列名、内置账号名单），同步素材目录里的同名文件。
+Expected: 通过；不通过时按报错修正 `crates/datluma-dialect/sql/privilege/dameng.sql`（字段名、`DBA_ROLES` 列名、`ALL_TAB_PRIVS` 列名、内置账号名单），同步素材目录里的同名文件。
 
 - [ ] **Step 3: 跑全部实连**
 
 ```bash
-cargo test -p dblens-service --test privilege_live --offline -- --test-threads=1 --nocapture
+cargo test -p datluma-service --test privilege_live --offline -- --test-threads=1 --nocapture
 ```
 
 Expected: 12 个测试 PASS，打印每种库低权限连接的 `Coverage`。
@@ -1869,14 +1869,14 @@ Expected: 12 个测试 PASS，打印每种库低权限连接的 `Coverage`。
 
 - [ ] **Step 4: SQL Server 2025**
 
-把 `DBLENS_TEST_SQLSERVER_URL` 指向 VM .103（需要用户开机，密码在该机的 `C:\ProgramData\dblens-test\creds.txt`），重跑 `sqlserver`。
+把 `DATLUMA_TEST_SQLSERVER_URL` 指向 VM .103（需要用户开机，密码在该机的 `C:\ProgramData\datluma-test\creds.txt`），重跑 `sqlserver`。
 
 Expected: PASS。该 VM 未开机时在实现说明里记下“2025 未实测”，不阻塞合并。
 
 - [ ] **Step 5: 确认没有遗留夹具**
 
 ```bash
-cargo test -p dblens-service --test privilege_live --offline -- --test-threads=1
+cargo test -p datluma-service --test privilege_live --offline -- --test-threads=1
 ```
 
 Expected: 第二次运行同样通过（开始时的清理和结束时的清理都生效）。
@@ -1884,7 +1884,7 @@ Expected: 第二次运行同样通过（开始时的清理和结束时的清理�
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-service/tests/privilege_live.rs crates/dblens-dialect/sql/privilege docs/superpowers/plans/2026-10-30-m9a-privileges-materials
+git add crates/datluma-service/tests/privilege_live.rs crates/datluma-dialect/sql/privilege docs/superpowers/plans/2026-10-30-m9a-privileges-materials
 git commit -m "test(service): M9a 账号权限实库测试，修正各库模板"
 ```
 
@@ -2626,7 +2626,7 @@ Expected: 全部通过，含 `locales.test.ts`。
 
 - [ ] **Step 6: 用真实鼠标验证**
 
-启动桌面程序或 `dblens-server` 连 VM 测试库。用真实鼠标操作并截图，不用合成事件：
+启动桌面程序或 `datluma-server` 连 VM 测试库。用真实鼠标操作并截图，不用合成事件：
 
 1. 右键 MySQL 连接 → “用户与权限”：出现标签页，列表默认不含内置账号；
 2. 勾选“显示内置”、切换用户/角色、输入搜索，列表随之变化；

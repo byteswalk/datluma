@@ -1,4 +1,4 @@
-// 设置里单独的 MCP 标签页：把 DBLENS 作为工具接给本机的智能体（Claude Code、Codex、Cursor 等）。
+// 设置里单独的 MCP 标签页：把 DATLUMA 作为工具接给本机的智能体（Claude Code、Codex、Cursor 等）。
 // 和 AI 设置无关：不启用 AI 也能用。只暴露连接高级选项里打开了“允许 MCP 访问”的连接，查询只允许一条只读语句。
 
 import { App, Button, Form } from 'antd'
@@ -9,9 +9,9 @@ import { desktop } from '../../shared/shell'
 
 export function mcpConfig(exe: string | null | undefined, isDesktop: boolean): string {
   const server = isDesktop
-    ? { command: exe || 'DBLENS.exe', args: ['--mcp'] }
-    : { command: 'dblens-server', args: ['mcp'] }
-  return JSON.stringify({ mcpServers: { dblens: server } }, null, 2)
+    ? { command: exe || 'DATLUMA.exe', args: ['--mcp'] }
+    : { command: 'datluma-server', args: ['mcp'] }
+  return JSON.stringify({ mcpServers: { datluma: server } }, null, 2)
 }
 
 export default function McpSnippet() {

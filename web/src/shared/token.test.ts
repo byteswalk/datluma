@@ -5,7 +5,7 @@ import { TOKEN_IN_HASH, TOKEN_KEY, type TokenHost, bootstrapToken } from './toke
 function host(hash: string, stored: Record<string, string> = {}, injected?: string) {
   const calls: string[] = []
   const h: TokenHost = {
-    __DBLENS__: injected ? { token: injected } : undefined,
+    __DATLUMA__: injected ? { token: injected } : undefined,
     location: { hash, pathname: '/query', search: '?a=1' },
     history: { replaceState: (_d, _u, url) => calls.push(url) },
     sessionStorage: {

@@ -361,7 +361,7 @@ impl AuthenticationSaslBody {
         SaslMechanisms(&self.0)
     }
 
-    /// The raw body (DBLens patch): openGauss sends its SHA256 request with the same code as SASL.
+    /// The raw body (DATLUMA patch): openGauss sends its SHA256 request with the same code as SASL.
     #[inline]
     pub fn data(&self) -> &[u8] {
         &self.0

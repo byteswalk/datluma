@@ -26,8 +26,8 @@ describe('单元格查看', () => {
   it('十六进制视图：二进制按 base64 解码，文本按 UTF-8', () => {
     expect(Array.from(cellBytes({ t: 'bytes', v: btoa('\x00\xffA') }))).toEqual([0, 255, 65])
     expect(Array.from(cellBytes({ t: 'string', v: '数' }))).toEqual([0xe6, 0x95, 0xb0])
-    const dump = hexDump(new TextEncoder().encode('Hello, DBLens 数洞!'))
-    expect(dump.split('\n')[0]).toBe('00000000  48 65 6c 6c 6f 2c 20 44 42 4c 65 6e 73 20 e6 95  |Hello, DBLens ..|')
+    const dump = hexDump(new TextEncoder().encode('Hello, DATLUMA 数览!'))
+    expect(dump.split('\n')[0]).toBe('00000000  48 65 6c 6c 6f 2c 20 44 41 54 4c 55 4d 41 20 e6  |Hello, DATLUMA .|')
     expect(dump.split('\n')).toHaveLength(2)
     expect(hexDump(new Uint8Array(40), 16).split('\n').at(-1)).toBe('…（共 40 字节，只显示前 16 字节）')
   })

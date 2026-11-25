@@ -4,7 +4,7 @@
 
 **Goal:** 表设计器：新建表和修改已有表（列、主键、唯一约束、索引、外键、检查约束、注释，分区只读），后端比对出变更列表并按方言生成 DDL，库不支持的改动生成重建表的脚本，预览确认后作为任务执行。
 
-**Architecture:** 前端编辑一份草稿表（每一行记下原名），发送完整的草稿和"新名 → 原名"的映射；`dblens-dialect` 校验草稿、比对出变更列表（与方言无关，M4 复用）、按方言生成 DDL 或重建脚本；`dblens-service` 读原表（不走缓存）、预览（含执行策略的结论、指纹冲突）、在单独的连接上作为任务执行；前端是独立的设计器标签，子标签分区，保存前弹出确认框。
+**Architecture:** 前端编辑一份草稿表（每一行记下原名），发送完整的草稿和"新名 → 原名"的映射；`datluma-dialect` 校验草稿、比对出变更列表（与方言无关，M4 复用）、按方言生成 DDL 或重建脚本；`datluma-service` 读原表（不走缓存）、预览（含执行策略的结论、指纹冲突）、在单独的连接上作为任务执行；前端是独立的设计器标签，子标签分区，保存前弹出确认框。
 
 **Tech Stack:** Rust（axum、tokio、minijinja、insta）；React 19 + TypeScript、antd 6、zustand、@tanstack/react-query 5、Monaco、Vitest。
 
@@ -18,7 +18,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级。本里程碑不新增依赖。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -42,16 +42,16 @@
 ## 文件结构
 
 ```text
-crates/dblens-dialect/src/design/{mod.rs, diff.rs, catalog.rs, sql.rs, mysql.rs, postgres.rs, oracle.rs, rebuild.rs}; snapshots/   变更模型、比对、DDL、重建（新增）
-crates/dblens-dialect/src/{lib.rs, meta/mod.rs, meta/assemble.rs}; sql/*.sql; tests/{meta_snapshots.rs, snapshots/}   新的元数据查询
-crates/dblens-core/locales/app.json                                  后端词条
-crates/dblens-service/src/{design.rs, task.rs, metadata.rs, fake.rs, lib.rs}; tests/live.rs   读表、预览、执行任务（新增 design.rs）
-crates/dblens-api/src/{design.rs, lib.rs}; tests/api.rs               接口（新增 design.rs）
+crates/datluma-dialect/src/design/{mod.rs, diff.rs, catalog.rs, sql.rs, mysql.rs, postgres.rs, oracle.rs, rebuild.rs}; snapshots/   变更模型、比对、DDL、重建（新增）
+crates/datluma-dialect/src/{lib.rs, meta/mod.rs, meta/assemble.rs}; sql/*.sql; tests/{meta_snapshots.rs, snapshots/}   新的元数据查询
+crates/datluma-core/locales/app.json                                  后端词条
+crates/datluma-service/src/{design.rs, task.rs, metadata.rs, fake.rs, lib.rs}; tests/live.rs   读表、预览、执行任务（新增 design.rs）
+crates/datluma-api/src/{design.rs, lib.rs}; tests/api.rs               接口（新增 design.rs）
 web/src/shared/api.ts                                                接口客户端
 web/src/features/design/                                             设计器（新增）
 web/src/features/{editor/{tabs.ts, Workspace.tsx, actions.tsx}, tree/ObjectTree.tsx, data/DataView.tsx}; app/{menus.ts, TitleBar.tsx, shell.css}   标签与入口
 web/src/locales/{zh-CN,en}/{design.json, app.json, tree.json, editor.json}, locales/index.ts   词条
-docs/notes/{m3-table-designer.md, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m3-table-designer.md, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -80,7 +80,7 @@ Expected：输出中没有"查询失败"。2026-10-27 写计划时：共 80 个�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -102,7 +102,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 ### Task 2: 方言：变更模型、校验与比对
 
-新增 `dblens-dialect/src/design/`（`lib.rs` 中 `pub mod design`），不做 IO：
+新增 `datluma-dialect/src/design/`（`lib.rs` 中 `pub mod design`），不做 IO：
 - `Renames { columns, indexes }`：草稿中改了名的列和索引，"新名 → 原名"；约束只改名也按先删后建，不需要映射。
 - `TableChange`：`CreateTable`、`SetTableComment`、`AddColumn { column, after }`、`DropColumn`、`RenameColumn { from, to }`、`AlterColumn { from, to }`（`from` 的名字已换成新名）、`MoveColumn { column, after }`、主键 / 唯一 / 检查 / 外键 / 索引的 `Drop*` / `Add*`、`RenameIndex`。任务 4 给 `RenameColumn` 加 `column`、`RenameIndex` 改为带 `index`（旧版 MySQL 要用完整定义）。
 - `validate(&Table) -> Vec<DesignIssue>`：空名、重名（列、索引、约束各自）、空类型、引用不存在的列或重复的列、外键两边列数、空的检查表达式；错误带 `section`、行号、字段。索引列含括号或空格的视为表达式，不检查。
@@ -112,24 +112,24 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 后端词条加 `design.*`（12 个）。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-dialect/src/design/diff.rs`
-- Create: `crates/dblens-dialect/src/design/mod.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-dialect/src/design/diff.rs`
+- Create: `crates/datluma-dialect/src/design/mod.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
 
 **Interfaces:**
-- Produces（`dblens_dialect::design`）：
+- Produces（`datluma_dialect::design`）：
   - `Renames { columns: BTreeMap<String, String>, indexes: BTreeMap<String, String> }`（Deserialize，字段可省略）；
   - `TableChange`（Serialize，`#[serde(tag = "kind", rename_all = "snake_case")]`）；`Diff { changes: Vec<TableChange>, appended: bool }`；
   - `IssueSection::{Table, Columns, PrimaryKey, Indexes, ForeignKeys, Uniques, Checks}`；`DesignIssue { section, row: Option<usize>, field: Option<&'static str>, message: Msg }`；
   - `validate(&Table) -> Vec<DesignIssue>`、`diff_table(Option<&Table>, &Table, &Renames) -> Result<Diff>`、`Dialect::prepare_draft(&self, &mut Table) -> Vec<Msg>`；
   - crate 内：`diff::{is_expression, same_column, text, same_type}`（任务 4 起用到 `text`、`same_type`）。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -19,6 +19,18 @@
    "changes.unknown_column": {"zh-CN": "列 %{column} 不存在", "en": "Column %{column} does not exist"},
    "ddl.truncated": {"zh-CN": "DDL 超过 64 KB，以上只是开头部分", "en": "The DDL exceeds 64 KB; only the beginning is shown above"},
@@ -151,17 +151,17 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
    "desktop.no_main_window": {"zh-CN": "主窗口不存在", "en": "The main window does not exist"},
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-dialect/src/design/diff.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-dialect/src/design/diff.rs`**
 
 ```rust
 //! 草稿的校验与比对（M3 设计文档第 3 节）。与方言无关：哪些变更库不支持由方言另行判断。
 
 use std::collections::{BTreeSet, HashMap};
 
-use dblens_core::schema::{
+use datluma_core::schema::{
     CheckConstraint, Column, ForeignKey, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint,
 };
-use dblens_core::{Error, Result, msg};
+use datluma_core::{Error, Result, msg};
 
 use super::{DesignIssue, Diff, IssueSection as S, Renames, TableChange as C};
 
@@ -529,7 +529,7 @@ pub fn diff_table(original: Option<&Table>, draft: &Table, renames: &Renames) ->
 
 #[cfg(test)]
 mod tests {
-    use dblens_core::{ColumnType, LogicalType};
+    use datluma_core::{ColumnType, LogicalType};
 
     use super::*;
 
@@ -793,7 +793,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-dialect/src/design/mod.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-dialect/src/design/mod.rs`**
 
 ```rust
 //! 表设计器（M3 设计文档第 3–5 节）：前端编辑一份草稿表，这里校验草稿、与原表比对出变更列表，
@@ -803,8 +803,8 @@ mod diff;
 
 use std::collections::BTreeMap;
 
-use dblens_core::schema::{CheckConstraint, Column, ForeignKey, Index, PrimaryKey, Table, UniqueConstraint};
-use dblens_core::{Msg, msg};
+use datluma_core::schema::{CheckConstraint, Column, ForeignKey, Index, PrimaryKey, Table, UniqueConstraint};
+use datluma_core::{Msg, msg};
 use serde::{Deserialize, Serialize};
 
 use crate::Dialect;
@@ -952,8 +952,8 @@ impl Dialect {
 
 #[cfg(test)]
 mod tests {
-    use dblens_core::schema::PrimaryKey;
-    use dblens_core::{ColumnType, LogicalType};
+    use datluma_core::schema::PrimaryKey;
+    use datluma_core::{ColumnType, LogicalType};
 
     use super::*;
     use crate::Variant;
@@ -987,11 +987,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -3,6 +3,7 @@
  mod browse;
  mod changes;
@@ -1008,7 +1008,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 10 个）。
@@ -1016,7 +1016,7 @@ Expected: 全部测试通过（dialect 新增 10 个）。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/src/design/diff.rs crates/dblens-dialect/src/design/mod.rs crates/dblens-dialect/src/lib.rs
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/src/design/diff.rs crates/datluma-dialect/src/design/mod.rs crates/datluma-dialect/src/lib.rs
 git commit -m "feat(dialect): 表设计器的变更模型、校验与比对" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1032,14 +1032,14 @@ git commit -m "feat(dialect): 表设计器的变更模型、校验与比对" -m 
 - 类型目录：每个家族的常用原生类型，参数形式为无 / 长度（也用于时间类型的小数秒）/ 精度加小数位；Oracle 的 CHAR、VARCHAR2 和达梦的 CHAR、VARCHAR、VARCHAR2 可选 BYTE / CHAR 长度单位。
 
 **Files:**
-- Create: `crates/dblens-dialect/src/design/catalog.rs`
-- Modify: `crates/dblens-dialect/src/design/mod.rs`
+- Create: `crates/datluma-dialect/src/design/catalog.rs`
+- Modify: `crates/datluma-dialect/src/design/mod.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `design` 模块。
-- Produces（`dblens_dialect::design`）：`TypeParams::{None, Length, PrecisionScale}`（snake_case）、`TypeEntry { name, params, char_unit }`、`DesignCaps { reorder, checks, descending_index, on_delete, on_update, index_methods, types }`（Serialize）、`Dialect::design_caps(&self) -> DesignCaps`。
+- Produces（`datluma_dialect::design`）：`TypeParams::{None, Length, PrecisionScale}`（snake_case）、`TypeEntry { name, params, char_unit }`、`DesignCaps { reorder, checks, descending_index, on_delete, on_update, index_methods, types }`（Serialize）、`Dialect::design_caps(&self) -> DesignCaps`。
 
-- [ ] **Step 1: 新建 `crates/dblens-dialect/src/design/catalog.rs`**
+- [ ] **Step 1: 新建 `crates/datluma-dialect/src/design/catalog.rs`**
 
 ```rust
 //! 设计器用的类型目录和方言能力（M3 设计文档 3.6、4.1 节）：前端据此给出类型下拉、启用长度和小数位、
@@ -1259,7 +1259,7 @@ mod tests {
 
     #[test]
     fn every_catalog_type_parses_to_a_known_logical_type() {
-        use dblens_core::LogicalType;
+        use datluma_core::LogicalType;
         for v in [Variant::MySql, Variant::Postgres, Variant::Oracle, Variant::Dameng] {
             let d = Dialect::new(v);
             for t in d.design_caps().types {
@@ -1279,11 +1279,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/src/design/mod.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/src/design/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/mod.rs
-+++ b/crates/dblens-dialect/src/design/mod.rs
+--- a/crates/datluma-dialect/src/design/mod.rs
++++ b/crates/datluma-dialect/src/design/mod.rs
 @@ -1,6 +1,7 @@
  //! 表设计器（M3 设计文档第 3–5 节）：前端编辑一份草稿表，这里校验草稿、与原表比对出变更列表，
  //! 再按方言生成 DDL；库不支持的改动改用重建表的脚本。不做任何 IO。
@@ -1308,7 +1308,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 2 个）。
@@ -1316,7 +1316,7 @@ Expected: 全部测试通过（dialect 新增 2 个）。
 - [ ] **Step 4: 提交**
 
 ```bash
-git add crates/dblens-dialect/src/design/catalog.rs crates/dblens-dialect/src/design/mod.rs
+git add crates/datluma-dialect/src/design/catalog.rs crates/datluma-dialect/src/design/mod.rs
 git commit -m "feat(dialect): 设计器的类型目录与方言能力" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1338,38 +1338,38 @@ git commit -m "feat(dialect): 设计器的类型目录与方言能力" -m "Co-Au
 快照文件（`src/design/snapshots/`、`tests/snapshots/`）随本任务给出；改了生成规则时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-dialect/src/design/diff.rs`
-- Modify: `crates/dblens-dialect/src/design/mod.rs`
-- Create: `crates/dblens-dialect/src/design/mysql.rs`
-- Create: `crates/dblens-dialect/src/design/oracle.rs`
-- Create: `crates/dblens-dialect/src/design/postgres.rs`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql56_everything.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql56_move.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_alter.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_create.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_everything.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_move.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_alter.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_create.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_everything.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_alter.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_create.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_everything.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_alter.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_create.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_everything.snap`
-- Create: `crates/dblens-dialect/src/design/sql.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-dialect/src/design/diff.rs`
+- Modify: `crates/datluma-dialect/src/design/mod.rs`
+- Create: `crates/datluma-dialect/src/design/mysql.rs`
+- Create: `crates/datluma-dialect/src/design/oracle.rs`
+- Create: `crates/datluma-dialect/src/design/postgres.rs`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql56_everything.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql56_move.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_alter.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_create.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_everything.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_move.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_alter.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_create.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_everything.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_alter.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_create.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_everything.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_alter.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_create.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_everything.snap`
+- Create: `crates/datluma-dialect/src/design/sql.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `Diff`、`TableChange`；任务 3 的 `design_caps`。
-- Produces（`dblens_dialect::design`）：`DesignStatement { changes: Vec<usize>, sql: String }`（Serialize）；`Dialect::design_unsupported(&self, &Diff) -> Vec<Msg>`、`design_sql(&self, schema: &str, table: &str, &Diff) -> Result<Vec<DesignStatement>>`、`design_transactional(&self) -> bool`；crate 内：`idents`、`constraint_name`、`required_name`、`fk_clause`、`check_clause`、`index_items`、`default_clause`。
+- Produces（`datluma_dialect::design`）：`DesignStatement { changes: Vec<usize>, sql: String }`（Serialize）；`Dialect::design_unsupported(&self, &Diff) -> Vec<Msg>`、`design_sql(&self, schema: &str, table: &str, &Diff) -> Result<Vec<DesignStatement>>`、`design_transactional(&self) -> bool`；crate 内：`idents`、`constraint_name`、`required_name`、`fk_clause`、`check_clause`、`index_items`、`default_clause`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -31,6 +31,11 @@
    "design.ref_table_empty": {"zh-CN": "请选择引用的表", "en": "Select the referenced table"},
    "design.type_empty": {"zh-CN": "类型不能为空", "en": "Type is required"},
@@ -1384,11 +1384,11 @@ git commit -m "feat(dialect): 设计器的类型目录与方言能力" -m "Co-Au
    "desktop.no_main_window": {"zh-CN": "主窗口不存在", "en": "The main window does not exist"},
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/src/design/diff.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/src/design/diff.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/diff.rs
-+++ b/crates/dblens-dialect/src/design/diff.rs
+--- a/crates/datluma-dialect/src/design/diff.rs
++++ b/crates/datluma-dialect/src/design/diff.rs
 @@ -105,12 +105,12 @@ pub fn validate(draft: &Table) -> Vec<DesignIssue> {
  }
  
@@ -1450,11 +1450,11 @@ git commit -m "feat(dialect): 设计器的类型目录与方言能力" -m "Co-Au
          draft.indexes[0].columns[0].descending = true;
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/src/design/mod.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/src/design/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/mod.rs
-+++ b/crates/dblens-dialect/src/design/mod.rs
+--- a/crates/datluma-dialect/src/design/mod.rs
++++ b/crates/datluma-dialect/src/design/mod.rs
 @@ -3,6 +3,10 @@
  
  mod catalog;
@@ -1500,7 +1500,7 @@ git commit -m "feat(dialect): 设计器的类型目录与方言能力" -m "Co-Au
  
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/src/design/mysql.rs`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/src/design/mysql.rs`**
 
 ```rust
 //! MySQL 家族（MySQL、MariaDB、TiDB、OceanBase、PolarDB）的设计器 DDL（M3 设计文档 4.2 节）。
@@ -1509,8 +1509,8 @@ git commit -m "feat(dialect): 设计器的类型目录与方言能力" -m "Co-Au
 
 use std::collections::HashMap;
 
-use dblens_core::Result;
-use dblens_core::schema::{Column, Index, Table};
+use datluma_core::Result;
+use datluma_core::schema::{Column, Index, Table};
 
 use super::TableChange as C;
 use super::diff::text;
@@ -1776,15 +1776,15 @@ mod tests {
 }
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/src/design/oracle.rs`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/src/design/oracle.rs`**
 
 ```rust
 //! Oracle 与达梦的设计器 DDL（M3 设计文档 4.4、4.5 节）。DDL 自动提交，每项改动一条或几条语句。
 //! 两者大体相同；差别：新列 Oracle 写 `ADD (…)`、达梦写 `ADD COLUMN`；自增 Oracle 用标识列、达梦用 `IDENTITY(1, 1)`；
 //! 修改列 Oracle 用一条只写变化部分的 `MODIFY (…)`，达梦的类型用 `MODIFY`、默认值和可空用 `ALTER COLUMN`。
 
-use dblens_core::Result;
-use dblens_core::schema::{Column, Index, Table};
+use datluma_core::Result;
+use datluma_core::schema::{Column, Index, Table};
 
 use super::TableChange as C;
 use super::diff::{same_type, text};
@@ -2029,14 +2029,14 @@ mod tests {
 }
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-dialect/src/design/postgres.rs`**
+- [ ] **Step 6: 新建 `crates/datluma-dialect/src/design/postgres.rs`**
 
 ```rust
 //! PG 家族（PostgreSQL、金仓、openGauss、GaussDB、瀚高）的设计器 DDL（M3 设计文档 4.3 节）。
 //! 每项改动一条或几条语句，整体放在一个事务中执行。
 
-use dblens_core::Result;
-use dblens_core::schema::{Column, Index, Table};
+use datluma_core::Result;
+use datluma_core::schema::{Column, Index, Table};
 
 use super::TableChange as C;
 use super::diff::{same_type, text};
@@ -2270,11 +2270,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql56_everything.snap`**
+- [ ] **Step 7: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql56_everything.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/mysql.rs
+source: crates/datluma-dialect/src/design/mysql.rs
 expression: "render(&old.design_sql(\"shop\", \"orders\",\n&everything(&orig, \"VARCHAR(50)\")).unwrap())"
 ---
 [0] ALTER TABLE shop.orders DROP FOREIGN KEY fk_parent
@@ -2291,33 +2291,33 @@ expression: "render(&old.design_sql(\"shop\", \"orders\",\n&everything(&orig, \"
 [12] ALTER TABLE shop.orders COMMENT = '订单表'
 ```
 
-- [ ] **Step 8: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql56_move.snap`**
+- [ ] **Step 8: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql56_move.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/mysql.rs
+source: crates/datluma-dialect/src/design/mysql.rs
 expression: "render(&old.design_sql(\"shop\", \"orders\", &move_first(&orig)).unwrap())"
 ---
 [0] ALTER TABLE shop.orders MODIFY COLUMN amount DECIMAL(10,2) NULL DEFAULT 0 COMMENT '金额' FIRST
 [1] ALTER TABLE shop.orders DROP INDEX ix_amount, ADD INDEX ix_amount2 (amount DESC)
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_alter.snap`**
+- [ ] **Step 9: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_alter.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/mysql.rs
+source: crates/datluma-dialect/src/design/mysql.rs
 expression: "render(&d.design_sql(\"shop\", \"orders\",\n&alter_only(&orig, \"DECIMAL(12,2)\")).unwrap())"
 ---
 [0] ALTER TABLE shop.orders MODIFY COLUMN code VARCHAR(20) NULL DEFAULT 'x' COMMENT '编号'
 [1] ALTER TABLE shop.orders MODIFY COLUMN amount DECIMAL(12,2) NOT NULL
 ```
 
-- [ ] **Step 10: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_create.snap`**
+- [ ] **Step 10: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_create.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/mysql.rs
+source: crates/datluma-dialect/src/design/mysql.rs
 expression: "render(&d.design_sql(\"shop\", \"\", &diff).unwrap())"
 ---
 [0] CREATE TABLE shop.orders (
@@ -2332,11 +2332,11 @@ expression: "render(&d.design_sql(\"shop\", \"\", &diff).unwrap())"
 ) COMMENT = '订单'
 ```
 
-- [ ] **Step 11: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_everything.snap`**
+- [ ] **Step 11: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_everything.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/mysql.rs
+source: crates/datluma-dialect/src/design/mysql.rs
 expression: "render(&d.design_sql(\"shop\", \"orders\",\n&everything(&orig, \"VARCHAR(50)\")).unwrap())"
 ---
 [0] ALTER TABLE shop.orders DROP FOREIGN KEY fk_parent
@@ -2353,22 +2353,22 @@ expression: "render(&d.design_sql(\"shop\", \"orders\",\n&everything(&orig, \"VA
 [12] ALTER TABLE shop.orders COMMENT = '订单表'
 ```
 
-- [ ] **Step 12: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_move.snap`**
+- [ ] **Step 12: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_move.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/mysql.rs
+source: crates/datluma-dialect/src/design/mysql.rs
 expression: "render(&d.design_sql(\"shop\", \"orders\", &move_first(&orig)).unwrap())"
 ---
 [0] ALTER TABLE shop.orders MODIFY COLUMN amount DECIMAL(10,2) NULL DEFAULT 0 COMMENT '金额' FIRST
 [1] ALTER TABLE shop.orders RENAME INDEX ix_amount TO ix_amount2
 ```
 
-- [ ] **Step 13: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_alter.snap`**
+- [ ] **Step 13: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_alter.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/oracle.rs
+source: crates/datluma-dialect/src/design/oracle.rs
 expression: "render(&d.design_sql(\"HR\", \"orders\",\n&alter_only(&t, \"DECIMAL(12,2)\")).unwrap())"
 ---
 [0] ALTER TABLE HR."orders" ALTER COLUMN "code" SET DEFAULT 'x'
@@ -2379,11 +2379,11 @@ expression: "render(&d.design_sql(\"HR\", \"orders\",\n&alter_only(&t, \"DECIMAL
 [1] COMMENT ON COLUMN HR."orders"."amount" IS ''
 ```
 
-- [ ] **Step 14: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_create.snap`**
+- [ ] **Step 14: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_create.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/oracle.rs
+source: crates/datluma-dialect/src/design/oracle.rs
 expression: "render(&d.design_sql(\"HR\", \"\", &diff).unwrap())"
 ---
 [0] CREATE TABLE HR."orders" (
@@ -2400,11 +2400,11 @@ expression: "render(&d.design_sql(\"HR\", \"\", &diff).unwrap())"
 [0] COMMENT ON COLUMN HR."orders"."amount" IS '金额'
 ```
 
-- [ ] **Step 15: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_everything.snap`**
+- [ ] **Step 15: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_everything.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/oracle.rs
+source: crates/datluma-dialect/src/design/oracle.rs
 expression: "render(&d.design_sql(\"HR\", \"orders\", &diff).unwrap())"
 ---
 [0] ALTER TABLE HR."orders" DROP CONSTRAINT "fk_parent"
@@ -2423,11 +2423,11 @@ expression: "render(&d.design_sql(\"HR\", \"orders\", &diff).unwrap())"
 [12] COMMENT ON TABLE HR."orders" IS '订单表'
 ```
 
-- [ ] **Step 16: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_alter.snap`**
+- [ ] **Step 16: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_alter.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/oracle.rs
+source: crates/datluma-dialect/src/design/oracle.rs
 expression: "render(&d.design_sql(\"HR\", \"orders\",\n&alter_only(&t, \"NUMBER(12,2)\")).unwrap())"
 ---
 [0] ALTER TABLE HR."orders" MODIFY ("code" DEFAULT 'x')
@@ -2436,11 +2436,11 @@ expression: "render(&d.design_sql(\"HR\", \"orders\",\n&alter_only(&t, \"NUMBER(
 [1] COMMENT ON COLUMN HR."orders"."amount" IS ''
 ```
 
-- [ ] **Step 17: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_create.snap`**
+- [ ] **Step 17: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_create.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/oracle.rs
+source: crates/datluma-dialect/src/design/oracle.rs
 expression: "render(&d.design_sql(\"HR\", \"\", &diff).unwrap())"
 ---
 [0] CREATE TABLE HR."orders" (
@@ -2457,11 +2457,11 @@ expression: "render(&d.design_sql(\"HR\", \"\", &diff).unwrap())"
 [0] COMMENT ON COLUMN HR."orders"."amount" IS '金额'
 ```
 
-- [ ] **Step 18: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_everything.snap`**
+- [ ] **Step 18: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_everything.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/oracle.rs
+source: crates/datluma-dialect/src/design/oracle.rs
 expression: "render(&d.design_sql(\"HR\", \"orders\", &diff).unwrap())"
 ---
 [0] ALTER TABLE HR."orders" DROP CONSTRAINT "fk_parent"
@@ -2479,11 +2479,11 @@ expression: "render(&d.design_sql(\"HR\", \"orders\", &diff).unwrap())"
 [12] COMMENT ON TABLE HR."orders" IS '订单表'
 ```
 
-- [ ] **Step 19: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_alter.snap`**
+- [ ] **Step 19: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_alter.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/postgres.rs
+source: crates/datluma-dialect/src/design/postgres.rs
 expression: "render(&d.design_sql(\"public\", \"orders\",\n&alter_only(&t, \"numeric(12,2)\")).unwrap())"
 ---
 [0] ALTER TABLE public.orders ALTER COLUMN code SET DEFAULT 'x'
@@ -2494,11 +2494,11 @@ expression: "render(&d.design_sql(\"public\", \"orders\",\n&alter_only(&t, \"num
 [1] COMMENT ON COLUMN public.orders.amount IS NULL
 ```
 
-- [ ] **Step 20: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_create.snap`**
+- [ ] **Step 20: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_create.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/postgres.rs
+source: crates/datluma-dialect/src/design/postgres.rs
 expression: "render(&d.design_sql(\"public\", \"\", &diff).unwrap())"
 ---
 [0] CREATE TABLE public.orders (
@@ -2515,11 +2515,11 @@ expression: "render(&d.design_sql(\"public\", \"\", &diff).unwrap())"
 [0] COMMENT ON COLUMN public.orders.amount IS '金额'
 ```
 
-- [ ] **Step 21: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_everything.snap`**
+- [ ] **Step 21: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_everything.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/postgres.rs
+source: crates/datluma-dialect/src/design/postgres.rs
 expression: "render(&d.design_sql(\"public\", \"orders\", &diff).unwrap())"
 ---
 [0] ALTER TABLE public.orders DROP CONSTRAINT fk_parent
@@ -2538,14 +2538,14 @@ expression: "render(&d.design_sql(\"public\", \"orders\", &diff).unwrap())"
 [12] COMMENT ON TABLE public.orders IS '订单表'
 ```
 
-- [ ] **Step 22: 新建 `crates/dblens-dialect/src/design/sql.rs`**
+- [ ] **Step 22: 新建 `crates/datluma-dialect/src/design/sql.rs`**
 
 ```rust
 //! 设计器的 DDL 生成（M3 设计文档第 4 节）：判断库不支持的改动，按方言把变更列表生成为语句。
 //! 每项变更生成一条或几条语句，语句带着它对应的变更序号，预览时可以对照。
 
-use dblens_core::schema::{CheckConstraint, Column, ForeignKey, Index};
-use dblens_core::{Error, Msg, Result, Value, msg};
+use datluma_core::schema::{CheckConstraint, Column, ForeignKey, Index};
+use datluma_core::{Error, Msg, Result, Value, msg};
 use serde::Serialize;
 
 use super::diff::{is_expression, text};
@@ -2685,10 +2685,10 @@ impl Dialect {
 #[cfg(test)]
 pub(crate) mod fixtures {
     //! 各方言生成测试共用的表。
-    use dblens_core::schema::{
+    use datluma_core::schema::{
         CheckConstraint, Column, ForeignKey, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint,
     };
-    use dblens_core::{ColumnType, LogicalType};
+    use datluma_core::{ColumnType, LogicalType};
 
     use crate::design::{Diff, Renames, diff_table};
 
@@ -2883,7 +2883,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 10 个，快照 15 个）。
@@ -2891,7 +2891,7 @@ Expected: 全部测试通过（dialect 新增 10 个，快照 15 个）。
 - [ ] **Step 24: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/src/design/diff.rs crates/dblens-dialect/src/design/mod.rs crates/dblens-dialect/src/design/mysql.rs crates/dblens-dialect/src/design/oracle.rs crates/dblens-dialect/src/design/postgres.rs crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql56_everything.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql56_move.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_alter.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_create.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_everything.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__mysql__tests__mysql_move.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_alter.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_create.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__dameng_everything.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_alter.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_create.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__oracle__tests__oracle_everything.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_alter.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_create.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__postgres__tests__pg_everything.snap crates/dblens-dialect/src/design/sql.rs
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/src/design/diff.rs crates/datluma-dialect/src/design/mod.rs crates/datluma-dialect/src/design/mysql.rs crates/datluma-dialect/src/design/oracle.rs crates/datluma-dialect/src/design/postgres.rs crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql56_everything.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql56_move.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_alter.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_create.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_everything.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__mysql__tests__mysql_move.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_alter.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_create.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__dameng_everything.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_alter.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_create.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__oracle__tests__oracle_everything.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_alter.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_create.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__postgres__tests__pg_everything.snap crates/datluma-dialect/src/design/sql.rs
 git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle、达梦）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2902,7 +2902,7 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 - 元数据查询模板（`sql/*.sql`）新增：`referencing_keys`（其他表指向这张表的外键）、`dependent_views`（PG、Oracle、达梦）、`grants`（PG、Oracle、达梦；MySQL 的授权按表名记录）、`table_storage`（引擎、字符集、排序规则、表空间、行数估计）、`trigger_ddl`（只有 Oracle：由 `ALL_TRIGGERS.DESCRIPTION` 拼出完整的 CREATE TRIGGER）。`MetaKey` 增加对应的 5 个 key，`meta` 增加 `ReferencingKey`、`DependentView`、`Grant`、`TableStorage` 和组装函数。
 - `design/rebuild.rs`：`Dialect::rebuild(schema, original, draft, renames, &RebuildContext) -> Result<RebuildOutcome>`。
   - 拒绝：分区表；PG 家族有视图依赖这张表；其他表的外键引用的列被删掉。
-  - 步骤：建 `<表名>_dblens_new`（超长时截断加短哈希；只有列，MySQL 带主键；保留引擎、字符集或表空间；注释建在临时表上）→ `INSERT … SELECT`（类型变了的套 CAST，MySQL 靠隐式转换；达梦用 `SET IDENTITY_INSERT`）→ 核对行数（`CountCheck`，由程序执行）→ 删其他表指向本表的外键 → 删旧表（`drop_at`）、改回原名 → 主键、唯一、检查、索引、外键、触发器 → 其他表的外键（引用列随改名）→ 自增接续（PG `setval`，Oracle `START WITH LIMIT VALUE`）、授权、Oracle 和达梦重新编译视图。
+  - 步骤：建 `<表名>_datluma_new`（超长时截断加短哈希；只有列，MySQL 带主键；保留引擎、字符集或表空间；注释建在临时表上）→ `INSERT … SELECT`（类型变了的套 CAST，MySQL 靠隐式转换；达梦用 `SET IDENTITY_INSERT`）→ 核对行数（`CountCheck`，由程序执行）→ 删其他表指向本表的外键 → 删旧表（`drop_at`）、改回原名 → 主键、唯一、检查、索引、外键、触发器 → 其他表的外键（引用列随改名）→ 自增接续（PG `setval`，Oracle `START WITH LIMIT VALUE`）、授权、Oracle 和达梦重新编译视图。
   - `cleanup`：`drop_at` 之前失败或取消时删除新表。
 
 后端词条加 `design.rebuild.*`（6 个）。
@@ -2910,37 +2910,37 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 快照文件（`src/design/snapshots/`、`tests/snapshots/`）随本任务给出；改了生成规则时用 `INSTA_UPDATE=always` 重新生成并逐个审查差异。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-dialect/sql/dameng.sql`
-- Modify: `crates/dblens-dialect/sql/mysql.sql`
-- Modify: `crates/dblens-dialect/sql/oracle.sql`
-- Modify: `crates/dblens-dialect/sql/postgres.sql`
-- Modify: `crates/dblens-dialect/src/design/mod.rs`
-- Create: `crates/dblens-dialect/src/design/rebuild.rs`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_dameng.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_mysql.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_oracle.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_postgres.snap`
-- Modify: `crates/dblens-dialect/src/meta/assemble.rs`
-- Modify: `crates/dblens-dialect/src/meta/mod.rs`
-- Modify: `crates/dblens-dialect/tests/meta_snapshots.rs`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__mariadb.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__oracle.snap`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-dialect/sql/dameng.sql`
+- Modify: `crates/datluma-dialect/sql/mysql.sql`
+- Modify: `crates/datluma-dialect/sql/oracle.sql`
+- Modify: `crates/datluma-dialect/sql/postgres.sql`
+- Modify: `crates/datluma-dialect/src/design/mod.rs`
+- Create: `crates/datluma-dialect/src/design/rebuild.rs`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_dameng.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_mysql.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_oracle.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_postgres.snap`
+- Modify: `crates/datluma-dialect/src/meta/assemble.rs`
+- Modify: `crates/datluma-dialect/src/meta/mod.rs`
+- Modify: `crates/datluma-dialect/tests/meta_snapshots.rs`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__mariadb.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__oracle.snap`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap`
 
 **Interfaces:**
 - Consumes：任务 4 的 `design_sql` 等。
 - Produces：
-  - `dblens_dialect::meta::{MetaKey::{ReferencingKeys, DependentViews, Grants, TableStorage, TriggerDdl}, ReferencingKey { schema, table, key }, DependentView { schema, name, materialized }, Grant { grantee, privilege, grantable }, TableStorage { engine, charset, collation, tablespace, row_count }, referencing_keys(&MetaRows, ref_schema, ref_table), dependent_views, grants, table_storage, trigger_ddl}`；
-  - `dblens_dialect::design::{RebuildContext { referencing, views, grants, storage, triggers }, RebuildStep::{Sql { sql }, CountCheck { source, target }}, Rebuild { steps, drop_at, cleanup, warnings }, RebuildOutcome::{Script(Rebuild), Refused { reason }}}`、`Dialect::rebuild(...)`。
+  - `datluma_dialect::meta::{MetaKey::{ReferencingKeys, DependentViews, Grants, TableStorage, TriggerDdl}, ReferencingKey { schema, table, key }, DependentView { schema, name, materialized }, Grant { grantee, privilege, grantable }, TableStorage { engine, charset, collation, tablespace, row_count }, referencing_keys(&MetaRows, ref_schema, ref_table), dependent_views, grants, table_storage, trigger_ddl}`；
+  - `datluma_dialect::design::{RebuildContext { referencing, views, grants, storage, triggers }, RebuildStep::{Sql { sql }, CountCheck { source, target }}, Rebuild { steps, drop_at, cleanup, warnings }, RebuildOutcome::{Script(Rebuild), Refused { reason }}}`、`Dialect::rebuild(...)`。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/tests/meta_snapshots.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/tests/meta_snapshots.rs`**
 
 ```diff
---- a/crates/dblens-dialect/tests/meta_snapshots.rs
-+++ b/crates/dblens-dialect/tests/meta_snapshots.rs
+--- a/crates/datluma-dialect/tests/meta_snapshots.rs
++++ b/crates/datluma-dialect/tests/meta_snapshots.rs
 @@ -38,6 +38,8 @@ fn every_family_covers_the_common_keys() {
                  | MetaKey::Synonyms
                  | MetaKey::Sequences
@@ -2952,11 +2952,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
              };
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap
 @@ -265,3 +265,54 @@ SELECT 'VERSIONS_ENDTRXID' FROM DUAL
  UNION
  SELECT 'VERSIONS_OPERATION' FROM DUAL
@@ -3014,11 +3014,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND t.TABLE_NAME = ?
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__mariadb.snap`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__mariadb.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__mariadb.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__mariadb.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__mariadb.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__mariadb.snap
 @@ -176,3 +176,35 @@ WHERE r.ROUTINE_SCHEMA = ?
  
  -- [variant_probe] []
@@ -3057,11 +3057,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND t.TABLE_NAME = ?
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap
 @@ -179,3 +179,35 @@ ORDER BY k.WORD
  
  -- [variant_probe] []
@@ -3100,11 +3100,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND t.TABLE_NAME = ?
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__oracle.snap`**
+- [ ] **Step 5: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__oracle.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__oracle.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__oracle.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__oracle.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__oracle.snap
 @@ -223,3 +223,66 @@ FROM v$reserved_words r
  WHERE (r.reserved = 'Y' OR r.res_semi = 'Y' OR r.res_attr = 'Y')
    AND REGEXP_LIKE(r.keyword, '^[A-Z][A-Z0-9_$#]*$')
@@ -3174,11 +3174,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +ORDER BY t.trigger_name
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap`**
+- [ ] **Step 6: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap
 @@ -226,3 +226,74 @@ ORDER BY line
  -- [reserved_words] []
  -- catcode R = reserved, T = reserved (can be function or type name). C (col_name) and U are not reserved.
@@ -3256,11 +3256,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND c.relkind IN ('r', 'p')
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 7: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -27,6 +27,12 @@
    "design.name_empty": {"zh-CN": "名称不能为空", "en": "Name is required"},
    "design.no_columns": {"zh-CN": "表至少要有一列", "en": "A table needs at least one column"},
@@ -3276,11 +3276,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
    "design.type_empty": {"zh-CN": "类型不能为空", "en": "Type is required"},
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-dialect/sql/dameng.sql`**
+- [ ] **Step 8: 修改 `crates/datluma-dialect/sql/dameng.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/dameng.sql
-+++ b/crates/dblens-dialect/sql/dameng.sql
+--- a/crates/datluma-dialect/sql/dameng.sql
++++ b/crates/datluma-dialect/sql/dameng.sql
 @@ -298,3 +298,54 @@ SELECT 'VERSIONS_ENDTRXID' FROM DUAL
  UNION
  SELECT 'VERSIONS_OPERATION' FROM DUAL
@@ -3338,11 +3338,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND t.TABLE_NAME = {{ bind("table") }}
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-dialect/sql/mysql.sql`**
+- [ ] **Step 9: 修改 `crates/datluma-dialect/sql/mysql.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/mysql.sql
-+++ b/crates/dblens-dialect/sql/mysql.sql
+--- a/crates/datluma-dialect/sql/mysql.sql
++++ b/crates/datluma-dialect/sql/mysql.sql
 @@ -214,3 +214,35 @@ ORDER BY k.WORD
  
  -- [variant_probe]
@@ -3381,11 +3381,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND t.TABLE_NAME = {{ bind("table") }}
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-dialect/sql/oracle.sql`**
+- [ ] **Step 10: 修改 `crates/datluma-dialect/sql/oracle.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/oracle.sql
-+++ b/crates/dblens-dialect/sql/oracle.sql
+--- a/crates/datluma-dialect/sql/oracle.sql
++++ b/crates/datluma-dialect/sql/oracle.sql
 @@ -294,3 +294,66 @@ FROM v$reserved_words r
  WHERE (r.reserved = 'Y' OR r.res_semi = 'Y' OR r.res_attr = 'Y')
    AND REGEXP_LIKE(r.keyword, '^[A-Z][A-Z0-9_$#]*$')
@@ -3455,11 +3455,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +ORDER BY t.trigger_name
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-dialect/sql/postgres.sql`**
+- [ ] **Step 11: 修改 `crates/datluma-dialect/sql/postgres.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/postgres.sql
-+++ b/crates/dblens-dialect/sql/postgres.sql
+--- a/crates/datluma-dialect/sql/postgres.sql
++++ b/crates/datluma-dialect/sql/postgres.sql
 @@ -269,3 +269,74 @@ ORDER BY line
  -- [reserved_words]
  -- catcode R = reserved, T = reserved (can be function or type name). C (col_name) and U are not reserved.
@@ -3537,11 +3537,11 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 +  AND c.relkind IN ('r', 'p')
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-dialect/src/design/mod.rs`**
+- [ ] **Step 12: 修改 `crates/datluma-dialect/src/design/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/mod.rs
-+++ b/crates/dblens-dialect/src/design/mod.rs
+--- a/crates/datluma-dialect/src/design/mod.rs
++++ b/crates/datluma-dialect/src/design/mod.rs
 @@ -6,6 +6,7 @@ mod diff;
  mod mysql;
  mod oracle;
@@ -3560,7 +3560,7 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
  /// 草稿中改了名的项：新名 → 原名。前端用每一项的 `origin` 跟踪原来的名字，发送时整理成这个映射。
 ```
 
-- [ ] **Step 13: 新建 `crates/dblens-dialect/src/design/rebuild.rs`**
+- [ ] **Step 13: 新建 `crates/datluma-dialect/src/design/rebuild.rs`**
 
 ```rust
 //! 重建表的脚本（M3 设计文档第 5 节）：库不支持的改动（或用户手动选择）时，建新表、复制数据、核对行数、
@@ -3569,8 +3569,8 @@ git commit -m "feat(dialect): 设计器按方言生成 DDL（MySQL、PG、Oracle
 //! 执行约定：先把当前 schema 切换到表所在的 schema（MySQL、Oracle 的触发器 DDL 里的表名不带 schema）；
 //! `drop_at` 之前失败或取消时执行 `cleanup` 删除新表，旧表不受影响。
 
-use dblens_core::schema::{ForeignKey, Table};
-use dblens_core::{Msg, Result, Value, msg};
+use datluma_core::schema::{ForeignKey, Table};
+use datluma_core::{Msg, Result, Value, msg};
 use serde::Serialize;
 
 use super::diff::same_type;
@@ -3644,9 +3644,9 @@ impl Dialect {
         }
     }
 
-    /// 临时表名 `<表名>_dblens_new`；超长时截断表名并加短哈希。
+    /// 临时表名 `<表名>_datluma_new`；超长时截断表名并加短哈希。
     pub(crate) fn temp_table_name(&self, table: &str) -> String {
-        const SUFFIX: &str = "_dblens_new";
+        const SUFFIX: &str = "_datluma_new";
         let max = self.max_ident();
         let full = format!("{table}{SUFFIX}");
         if full.len() <= max {
@@ -4038,41 +4038,41 @@ mod tests {
     #[test]
     fn temp_names_fit_the_limit() {
         let pg = Dialect::new(Variant::Postgres);
-        assert_eq!(pg.temp_table_name("orders"), "orders_dblens_new");
+        assert_eq!(pg.temp_table_name("orders"), "orders_datluma_new");
         let long = "a".repeat(60);
         let t = pg.temp_table_name(&long);
         assert_eq!(t.len(), 63);
-        assert!(t.ends_with("_dblens_new"));
+        assert!(t.ends_with("_datluma_new"));
         assert_ne!(t, pg.temp_table_name(&"a".repeat(61)), "截断后仍不同");
         let ora11 = Dialect::new(Variant::Oracle).with_version(Some(110200));
         assert_eq!(ora11.temp_table_name("CUSTOMER_ORDERS_2024").len(), 30);
         let cjk = Dialect::new(Variant::MySql).temp_table_name(&"订单".repeat(20));
-        assert!(cjk.len() <= 64 && cjk.ends_with("_dblens_new"));
+        assert!(cjk.len() <= 64 && cjk.ends_with("_datluma_new"));
     }
 }
 ```
 
-- [ ] **Step 14: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_dameng.snap`**
+- [ ] **Step 14: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_dameng.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/rebuild.rs
+source: crates/datluma-dialect/src/design/rebuild.rs
 expression: render(&out)
 ---
-CREATE TABLE HR."orders_dblens_new" (
+CREATE TABLE HR."orders_datluma_new" (
     "amount" DECIMAL(10,2) DEFAULT 0,
     "id" BIGINT IDENTITY(1, 1) NOT NULL,
     "order_code" VARCHAR(50)
 ) TABLESPACE USERS
-COMMENT ON TABLE HR."orders_dblens_new" IS '订单'
-COMMENT ON COLUMN HR."orders_dblens_new"."amount" IS '金额'
-SET IDENTITY_INSERT HR."orders_dblens_new" ON
-INSERT INTO HR."orders_dblens_new" ("amount", "id", "order_code") SELECT "amount", "id", CAST("code" AS VARCHAR(50)) FROM HR."orders"
-SET IDENTITY_INSERT HR."orders_dblens_new" OFF
--- COUNT HR."orders" = HR."orders_dblens_new"
+COMMENT ON TABLE HR."orders_datluma_new" IS '订单'
+COMMENT ON COLUMN HR."orders_datluma_new"."amount" IS '金额'
+SET IDENTITY_INSERT HR."orders_datluma_new" ON
+INSERT INTO HR."orders_datluma_new" ("amount", "id", "order_code") SELECT "amount", "id", CAST("code" AS VARCHAR(50)) FROM HR."orders"
+SET IDENTITY_INSERT HR."orders_datluma_new" OFF
+-- COUNT HR."orders" = HR."orders_datluma_new"
 ALTER TABLE HR."items" DROP CONSTRAINT "fk_items_order"
 ▶ DROP TABLE HR."orders"
-ALTER TABLE HR."orders_dblens_new" RENAME TO "orders"
+ALTER TABLE HR."orders_datluma_new" RENAME TO "orders"
 ALTER TABLE HR."orders" ADD CONSTRAINT "pk_orders" PRIMARY KEY ("id")
 ALTER TABLE HR."orders" ADD CONSTRAINT "uk_code" UNIQUE ("order_code")
 ALTER TABLE HR."orders" ADD CONSTRAINT "ck_amount" CHECK (amount >= 0)
@@ -4082,55 +4082,55 @@ CREATE OR REPLACE TRIGGER trg BEFORE INSERT ON orders FOR EACH ROW BEGIN NULL; E
 ALTER TABLE HR."items" ADD CONSTRAINT "fk_items_order" FOREIGN KEY ("order_code") REFERENCES HR."orders" ("order_code") ON DELETE CASCADE
 GRANT SELECT ON HR."orders" TO "report"
 ALTER VIEW HR."v_orders" COMPILE
--- cleanup: DROP TABLE HR."orders_dblens_new"
+-- cleanup: DROP TABLE HR."orders_datluma_new"
 ```
 
-- [ ] **Step 15: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_mysql.snap`**
+- [ ] **Step 15: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_mysql.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/rebuild.rs
+source: crates/datluma-dialect/src/design/rebuild.rs
 expression: render(&out)
 ---
-CREATE TABLE shop.orders_dblens_new (
+CREATE TABLE shop.orders_datluma_new (
     amount DECIMAL(10,2) NULL DEFAULT 0 COMMENT '金额',
     id BIGINT NOT NULL AUTO_INCREMENT,
     order_code VARCHAR(50) NULL,
     PRIMARY KEY (id)
 ) COMMENT = '订单' ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_0900_ai_ci
-INSERT INTO shop.orders_dblens_new (amount, id, order_code) SELECT amount, id, code FROM shop.orders
--- COUNT shop.orders = shop.orders_dblens_new
+INSERT INTO shop.orders_datluma_new (amount, id, order_code) SELECT amount, id, code FROM shop.orders
+-- COUNT shop.orders = shop.orders_datluma_new
 ALTER TABLE shop.items DROP FOREIGN KEY fk_items_order
 ▶ DROP TABLE shop.orders
-ALTER TABLE shop.orders_dblens_new RENAME TO shop.orders
+ALTER TABLE shop.orders_datluma_new RENAME TO shop.orders
 ALTER TABLE shop.orders ADD CONSTRAINT uk_code UNIQUE (order_code)
 ALTER TABLE shop.orders ADD CONSTRAINT ck_amount CHECK (amount >= 0)
 ALTER TABLE shop.orders ADD INDEX ix_amount (amount DESC)
 ALTER TABLE shop.orders ADD CONSTRAINT fk_parent FOREIGN KEY (order_code) REFERENCES shop.parent (code) ON DELETE CASCADE
 CREATE TRIGGER `trg` BEFORE INSERT ON `orders` FOR EACH ROW SET NEW.amount = 0
 ALTER TABLE shop.items ADD CONSTRAINT fk_items_order FOREIGN KEY (order_code) REFERENCES shop.orders (order_code) ON DELETE CASCADE
--- cleanup: DROP TABLE shop.orders_dblens_new
+-- cleanup: DROP TABLE shop.orders_datluma_new
 ```
 
-- [ ] **Step 16: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_oracle.snap`**
+- [ ] **Step 16: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_oracle.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/rebuild.rs
+source: crates/datluma-dialect/src/design/rebuild.rs
 expression: render(&out)
 ---
-CREATE TABLE HR."orders_dblens_new" (
+CREATE TABLE HR."orders_datluma_new" (
     "amount" NUMBER(10,2) DEFAULT 0,
     "id" NUMBER(19) GENERATED BY DEFAULT AS IDENTITY NOT NULL,
     "order_code" VARCHAR2(50 CHAR)
 ) TABLESPACE USERS
-COMMENT ON TABLE HR."orders_dblens_new" IS '订单'
-COMMENT ON COLUMN HR."orders_dblens_new"."amount" IS '金额'
-INSERT INTO HR."orders_dblens_new" ("amount", "id", "order_code") SELECT "amount", "id", CAST("code" AS VARCHAR2(50 CHAR)) FROM HR."orders"
--- COUNT HR."orders" = HR."orders_dblens_new"
+COMMENT ON TABLE HR."orders_datluma_new" IS '订单'
+COMMENT ON COLUMN HR."orders_datluma_new"."amount" IS '金额'
+INSERT INTO HR."orders_datluma_new" ("amount", "id", "order_code") SELECT "amount", "id", CAST("code" AS VARCHAR2(50 CHAR)) FROM HR."orders"
+-- COUNT HR."orders" = HR."orders_datluma_new"
 ALTER TABLE HR."items" DROP CONSTRAINT "fk_items_order"
 ▶ DROP TABLE HR."orders"
-ALTER TABLE HR."orders_dblens_new" RENAME TO "orders"
+ALTER TABLE HR."orders_datluma_new" RENAME TO "orders"
 ALTER TABLE HR."orders" ADD CONSTRAINT "pk_orders" PRIMARY KEY ("id")
 ALTER TABLE HR."orders" ADD CONSTRAINT "uk_code" UNIQUE ("order_code")
 ALTER TABLE HR."orders" ADD CONSTRAINT "ck_amount" CHECK (amount >= 0)
@@ -4144,28 +4144,28 @@ ALTER TABLE HR."items" ADD CONSTRAINT "fk_items_order" FOREIGN KEY ("order_code"
 ALTER TABLE HR."orders" MODIFY ("id" GENERATED BY DEFAULT AS IDENTITY (START WITH LIMIT VALUE))
 GRANT SELECT ON HR."orders" TO "report"
 ALTER VIEW HR."v_orders" COMPILE
--- cleanup: DROP TABLE HR."orders_dblens_new"
+-- cleanup: DROP TABLE HR."orders_datluma_new"
 ```
 
-- [ ] **Step 17: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_postgres.snap`**
+- [ ] **Step 17: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_postgres.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/rebuild.rs
+source: crates/datluma-dialect/src/design/rebuild.rs
 expression: render(&out)
 ---
-CREATE TABLE public.orders_dblens_new (
+CREATE TABLE public.orders_datluma_new (
     amount numeric(10,2) DEFAULT 0,
     id bigint GENERATED BY DEFAULT AS IDENTITY NOT NULL,
     order_code varchar(50)
 ) TABLESPACE "USERS"
-COMMENT ON TABLE public.orders_dblens_new IS '订单'
-COMMENT ON COLUMN public.orders_dblens_new.amount IS '金额'
-INSERT INTO public.orders_dblens_new (amount, id, order_code) SELECT amount, id, CAST(code AS varchar(50)) FROM public.orders
--- COUNT public.orders = public.orders_dblens_new
+COMMENT ON TABLE public.orders_datluma_new IS '订单'
+COMMENT ON COLUMN public.orders_datluma_new.amount IS '金额'
+INSERT INTO public.orders_datluma_new (amount, id, order_code) SELECT amount, id, CAST(code AS varchar(50)) FROM public.orders
+-- COUNT public.orders = public.orders_datluma_new
 ALTER TABLE public.items DROP CONSTRAINT fk_items_order
 ▶ DROP TABLE public.orders
-ALTER TABLE public.orders_dblens_new RENAME TO orders
+ALTER TABLE public.orders_datluma_new RENAME TO orders
 ALTER TABLE public.orders ADD CONSTRAINT pk_orders PRIMARY KEY (id)
 ALTER TABLE public.orders ADD CONSTRAINT uk_code UNIQUE (order_code)
 ALTER TABLE public.orders ADD CONSTRAINT ck_amount CHECK (amount >= 0)
@@ -4175,14 +4175,14 @@ CREATE TRIGGER trg BEFORE INSERT ON public.orders FOR EACH ROW EXECUTE FUNCTION 
 ALTER TABLE public.items ADD CONSTRAINT fk_items_order FOREIGN KEY (order_code) REFERENCES public.orders (order_code) ON DELETE CASCADE
 SELECT pg_catalog.setval(pg_catalog.pg_get_serial_sequence('public.orders', 'id'), COALESCE(MAX(id), 0) + 1, false) FROM public.orders
 GRANT SELECT ON public.orders TO report
--- cleanup: DROP TABLE public.orders_dblens_new
+-- cleanup: DROP TABLE public.orders_datluma_new
 ```
 
-- [ ] **Step 18: 修改 `crates/dblens-dialect/src/meta/assemble.rs`**
+- [ ] **Step 18: 修改 `crates/datluma-dialect/src/meta/assemble.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/assemble.rs
-+++ b/crates/dblens-dialect/src/meta/assemble.rs
+--- a/crates/datluma-dialect/src/meta/assemble.rs
++++ b/crates/datluma-dialect/src/meta/assemble.rs
 @@ -322,6 +322,128 @@ pub fn reserved_words(rows: &MetaRows) -> Result<Vec<String>> {
      Ok(rows.iter().map(|r| r.name("word").trim().to_ascii_uppercase()).filter(|w| !w.is_empty()).collect())
  }
@@ -4311,16 +4311,16 @@ GRANT SELECT ON public.orders TO report
 +
  #[cfg(test)]
  mod tests {
-     use dblens_core::{LogicalType, Value};
+     use datluma_core::{LogicalType, Value};
 ```
 
-- [ ] **Step 19: 修改 `crates/dblens-dialect/src/meta/mod.rs`**
+- [ ] **Step 19: 修改 `crates/datluma-dialect/src/meta/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/meta/mod.rs
-+++ b/crates/dblens-dialect/src/meta/mod.rs
+--- a/crates/datluma-dialect/src/meta/mod.rs
++++ b/crates/datluma-dialect/src/meta/mod.rs
 @@ -11,8 +11,9 @@ use serde::{Deserialize, Serialize};
- use dblens_core::Value;
+ use datluma_core::Value;
  
  pub use assemble::{
 -    ObjectInfo, SchemaInfo, TableRows, objects, reserved_words, routines, schemas, sequences, source_text,
@@ -4385,7 +4385,7 @@ GRANT SELECT ON public.orders TO report
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（dialect 新增 3 个，重建脚本快照 4 个，元数据快照更新 5 个）。
@@ -4393,7 +4393,7 @@ Expected: 全部测试通过（dialect 新增 3 个，重建脚本快照 4 个�
 - [ ] **Step 21: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-dialect/sql/dameng.sql crates/dblens-dialect/sql/mysql.sql crates/dblens-dialect/sql/oracle.sql crates/dblens-dialect/sql/postgres.sql crates/dblens-dialect/src/design/mod.rs crates/dblens-dialect/src/design/rebuild.rs crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_dameng.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_mysql.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_oracle.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_postgres.snap crates/dblens-dialect/src/meta/assemble.rs crates/dblens-dialect/src/meta/mod.rs crates/dblens-dialect/tests/meta_snapshots.rs crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__mariadb.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__mysql.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__oracle.snap crates/dblens-dialect/tests/snapshots/meta_snapshots__postgres.snap
+git add crates/datluma-core/locales/app.json crates/datluma-dialect/sql/dameng.sql crates/datluma-dialect/sql/mysql.sql crates/datluma-dialect/sql/oracle.sql crates/datluma-dialect/sql/postgres.sql crates/datluma-dialect/src/design/mod.rs crates/datluma-dialect/src/design/rebuild.rs crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_dameng.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_mysql.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_oracle.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_postgres.snap crates/datluma-dialect/src/meta/assemble.rs crates/datluma-dialect/src/meta/mod.rs crates/datluma-dialect/tests/meta_snapshots.rs crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__mariadb.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__mysql.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__oracle.snap crates/datluma-dialect/tests/snapshots/meta_snapshots__postgres.snap
 git commit -m "feat(dialect): 重建表的脚本与所需的元数据查询" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -4401,7 +4401,7 @@ git commit -m "feat(dialect): 重建表的脚本与所需的元数据查询" -m 
 
 ### Task 6: 服务层：读表、预览与执行任务
 
-`dblens-service/src/design.rs`：
+`datluma-service/src/design.rs`：
 - `design_caps`；`design_table`（跳过缓存直接读表，附存储属性和行数估计、指纹）；`MetadataCache::forget` 丢掉一条缓存。
 - `preview_design(profile_id, &DesignRequest) -> DesignPreview`：整理草稿（已有表不能改名）→ 校验 → 比对 → 判断是否重建（方言不支持或用户手动选择；需要时读取重建的依赖信息）→ 生成语句或重建脚本 → 每条语句过执行策略（拒绝的原因、需要确认的原因）→ 与请求中的指纹比较。
 - `start_design`：有校验错误、原表已被修改、不能重建时 `invalid`，被策略拒绝时 `Denied`，没有改动时 `invalid`；作为任务（`TaskKind::Design`）在单独的连接上执行：先切换到表所在的 schema，PG 家族整体一个事务；每条语句记入执行历史；失败时记下失败的语句和没有执行的语句（`TaskStatus.remaining`，PG 回滚时为空）；重建从删除旧表起不能取消，之前失败或取消时删除新表；结束后让本 schema 和其他表外键所在 schema 的缓存失效。
@@ -4410,26 +4410,26 @@ git commit -m "feat(dialect): 重建表的脚本与所需的元数据查询" -m 
 后端词条加 `design.has_errors`、`design.conflict`、`design.no_changes`、`design.count_mismatch`。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-service/src/design.rs`
-- Modify: `crates/dblens-service/src/fake.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/metadata.rs`
-- Modify: `crates/dblens-service/src/task.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-service/src/design.rs`
+- Modify: `crates/datluma-service/src/fake.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/metadata.rs`
+- Modify: `crates/datluma-service/src/task.rs`
 
 **Interfaces:**
 - Consumes：任务 2–5 的方言接口；M2b 的 `TaskManager`、`import::exec`。
-- Produces（`dblens_service`）：
+- Produces（`datluma_service`）：
   - `DesignRequest { schema, name: Option<String>, draft: Table, renames: Renames, rebuild: bool, fingerprint: Option<String> }`（Deserialize）；
   - `DesignTable { table, storage, fingerprint }`、`PreviewStatement { step (flatten), changes }`、`RebuildInfo { reasons, active, refused }`、`DesignPreview { errors, changes, statements, rebuild, warnings, transactional, denied, confirm, conflict }`（Serialize）；
   - `Service::design_caps(&str)`、`design_table(&str, schema, name)`、`preview_design(&str, &DesignRequest)`、`start_design(self: &Arc<Self>, &str, DesignRequest) -> Result<String>`；
   - `TaskKind::Design`、`TaskStatus.remaining: Option<String>`、`MetadataCache::forget(profile_id, key, &args)`。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -21,10 +21,14 @@
    "ddl.unsupported": {"zh-CN": "该数据库不支持查看 %{kind} 的 DDL", "en": "This database does not support viewing the DDL of %{kind}"},
    "design.bad_rename": {"zh-CN": "列 %{name} 的原名不对", "en": "Column %{name} has an invalid original name"},
@@ -4447,7 +4447,7 @@ git commit -m "feat(dialect): 重建表的脚本与所需的元数据查询" -m 
    "design.rebuild.dependent_views": {"zh-CN": "有视图依赖这张表（%{views}），删除旧表会失败；请先处理这些视图", "en": "Views depend on this table (%{views}); dropping the old table would fail. Deal with these views first"},
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-service/src/design.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-service/src/design.rs`**
 
 ```rust
 //! 表设计器（M3 设计文档第 6 节）：读取原表、预览改动生成的 DDL（或重建脚本）、作为任务执行。
@@ -4457,15 +4457,15 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
-use dblens_core::schema::Table;
-use dblens_core::{Error, Msg, Result, msg};
-use dblens_dialect::Dialect;
-use dblens_dialect::design::{
+use datluma_core::schema::Table;
+use datluma_core::{Error, Msg, Result, msg};
+use datluma_dialect::Dialect;
+use datluma_dialect::design::{
     DesignCaps, DesignIssue, DesignStatement, Rebuild, RebuildContext, RebuildOutcome, RebuildStep, Renames,
     TableChange, diff_table, validate,
 };
-use dblens_dialect::meta::{self, MetaArgs, MetaKey, MetaRows, TableStorage};
-use dblens_driver::{Connection, collect_all};
+use datluma_dialect::meta::{self, MetaArgs, MetaKey, MetaRows, TableStorage};
+use datluma_driver::{Connection, collect_all};
 use serde::{Deserialize, Serialize};
 
 use crate::history::NewHistory;
@@ -4937,9 +4937,9 @@ impl Run<'_> {
 mod tests {
     use std::time::Duration;
 
-    use dblens_core::schema::{Column, PrimaryKey};
-    use dblens_core::{ColumnType, LogicalType};
-    use dblens_dialect::Variant;
+    use datluma_core::schema::{Column, PrimaryKey};
+    use datluma_core::{ColumnType, LogicalType};
+    use datluma_dialect::Variant;
 
     use crate::fake::{FakeDriver, Log};
     use crate::history::{HistoryLog, HistoryQuery};
@@ -5117,11 +5117,11 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/fake.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/fake.rs`**
 
 ```diff
---- a/crates/dblens-service/src/fake.rs
-+++ b/crates/dblens-service/src/fake.rs
+--- a/crates/datluma-service/src/fake.rs
++++ b/crates/datluma-service/src/fake.rs
 @@ -3,6 +3,7 @@
  //! - `ROWS n`：返回一个结果集，n 行，每行一个整数；
  //! - `FAIL`：SQL 错误；`FAILAT n`：带出错位置 n 的 SQL 错误；`DISCONNECT`：连接错误；
@@ -5146,18 +5146,18 @@ mod tests {
              _ => match sql.strip_prefix("ROWS ").and_then(|n| n.parse::<i64>().ok()) {
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -1,6 +1,7 @@
- //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `dblens-api` 使用，自身不处理 HTTP。
+ //! 服务层：连接配置、密码、驱动注册表、会话、元数据缓存、执行策略。供 `datluma-api` 使用，自身不处理 HTTP。
  
  mod changes;
 +mod design;
  mod export;
- /// 测试用的假驱动，供本 crate 和 `dblens-api` 的测试使用（feature `testing`）。
+ /// 测试用的假驱动，供本 crate 和 `datluma-api` 的测试使用（feature `testing`）。
  #[cfg(any(test, feature = "testing"))]
 @@ -21,6 +22,7 @@ mod store;
  mod task;
@@ -5169,11 +5169,11 @@ mod tests {
      ExportStatus, ExportWarnings, MAX_RUNNING_EXPORTS,
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/metadata.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/metadata.rs`**
 
 ```diff
---- a/crates/dblens-service/src/metadata.rs
-+++ b/crates/dblens-service/src/metadata.rs
+--- a/crates/datluma-service/src/metadata.rs
++++ b/crates/datluma-service/src/metadata.rs
 @@ -42,6 +42,13 @@ impl MetadataCache {
          }
      }
@@ -5190,11 +5190,11 @@ mod tests {
      }
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-service/src/task.rs`**
+- [ ] **Step 6: 修改 `crates/datluma-service/src/task.rs`**
 
 ```diff
---- a/crates/dblens-service/src/task.rs
-+++ b/crates/dblens-service/src/task.rs
+--- a/crates/datluma-service/src/task.rs
++++ b/crates/datluma-service/src/task.rs
 @@ -24,6 +24,8 @@ pub const MAX_FAILURES: usize = 100;
  pub enum TaskKind {
      Import,
@@ -5229,7 +5229,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（service 新增 3 个）。
@@ -5237,7 +5237,7 @@ Expected: 全部测试通过（service 新增 3 个）。
 - [ ] **Step 8: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/design.rs crates/dblens-service/src/fake.rs crates/dblens-service/src/lib.rs crates/dblens-service/src/metadata.rs crates/dblens-service/src/task.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/design.rs crates/datluma-service/src/fake.rs crates/datluma-service/src/lib.rs crates/datluma-service/src/metadata.rs crates/datluma-service/src/task.rs
 git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5250,19 +5250,19 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
 实库中发现并在本任务中修正：索引方法不写与默认方法（BTREE、NORMAL）视为相同（`diff.rs`）；达梦的 `ALL_TAB_PRIVS` 用 `OWNER` 列（`dameng.sql` 和元数据快照）。
 
 **Files:**
-- Modify: `crates/dblens-dialect/sql/dameng.sql`
-- Modify: `crates/dblens-dialect/src/design/diff.rs`
-- Modify: `crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap`
-- Modify: `crates/dblens-service/tests/live.rs`
+- Modify: `crates/datluma-dialect/sql/dameng.sql`
+- Modify: `crates/datluma-dialect/src/design/diff.rs`
+- Modify: `crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap`
+- Modify: `crates/datluma-service/tests/live.rs`
 
 **Interfaces:**
 - Consumes：任务 6 的服务层接口。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap`**
 
 ```diff
---- a/crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap
-+++ b/crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap
+--- a/crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap
++++ b/crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap
 @@ -299,11 +299,12 @@ WHERE d.REFERENCED_OWNER = ?
  ORDER BY d.OWNER, d.NAME
  
@@ -5279,24 +5279,24 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
  
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -8,16 +8,18 @@ use std::path::Path;
  use std::sync::Arc;
  use std::time::Duration;
  
--use dblens_core::{Error, LogicalType, Value};
--use dblens_dialect::meta::MetaKey;
-+use dblens_core::schema::{CheckConstraint, Column, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint};
-+use dblens_core::{ColumnType, Error, LogicalType, Value};
-+use dblens_dialect::design::{Renames, TableChange, diff_table};
-+use dblens_dialect::meta::{MetaArgs, MetaKey};
- use dblens_dialect::{DdlKind, Direction, RowChange, WriteMode};
- use dblens_driver::{ConnectParams, DriverId};
- use dblens_service::{
+-use datluma_core::{Error, LogicalType, Value};
+-use datluma_dialect::meta::MetaKey;
++use datluma_core::schema::{CheckConstraint, Column, Index, IndexColumn, PrimaryKey, Table, UniqueConstraint};
++use datluma_core::{ColumnType, Error, LogicalType, Value};
++use datluma_dialect::design::{Renames, TableChange, diff_table};
++use datluma_dialect::meta::{MetaArgs, MetaKey};
+ use datluma_dialect::{DdlKind, Direction, RowChange, WriteMode};
+ use datluma_driver::{ConnectParams, DriverId};
+ use datluma_service::{
 -    ChangeSet, ColumnMapping, DEFAULT_BATCH, DataOrder, DefaultPolicy, DriverRegistry, Environment,
 -    ExecRequest, ExportFormat, ExportOptions, ExportRequest, ExportSource, ExportState, ExportStatus,
 -    FileOptions, FileSource, GenerateKind, ImportRequest, NewColumn, NewTable, ObjectKind, OnError,
@@ -5312,7 +5312,7 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
  struct Live {
 @@ -1099,3 +1101,295 @@ async fn oracle_sql_file() {
  async fn dameng_sql_file() {
-     sql_file_flow("DBLENS_TEST_DM_URL").await;
+     sql_file_flow("DATLUMA_TEST_DM_URL").await;
  }
 +
 +/// 表设计器（M3）：新建表；修改列、索引、注释后读回元数据与草稿比对；调整列顺序并改类型（强制重建：
@@ -5555,7 +5555,7 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
 +        let args =
 +            MetaArgs { schema: Some(live.schema.clone()), table: Some(n("m3_t")), ..Default::default() };
 +        let rows = s.metadata.rows(&profile, MetaKey::Grants, &args).await.unwrap().unwrap();
-+        let grants = dblens_dialect::meta::grants(&rows).unwrap();
++        let grants = datluma_dialect::meta::grants(&rows).unwrap();
 +        assert!(grants.iter().any(|g| g.grantee == "PUBLIC" && g.privilege == "SELECT"), "{env}：{grants:?}");
 +    }
 +    // 其他表指向本表的外键还在
@@ -5584,35 +5584,35 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
 +
 +#[tokio::test]
 +async fn mysql_design() {
-+    design_flow("DBLENS_TEST_MYSQL_URL").await;
++    design_flow("DATLUMA_TEST_MYSQL_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn mariadb_design() {
-+    design_flow("DBLENS_TEST_MARIADB_URL").await;
++    design_flow("DATLUMA_TEST_MARIADB_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn postgres_design() {
-+    design_flow("DBLENS_TEST_PG_URL").await;
++    design_flow("DATLUMA_TEST_PG_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn oracle_design() {
-+    design_flow("DBLENS_TEST_ORACLE_URL").await;
++    design_flow("DATLUMA_TEST_ORACLE_URL").await;
 +}
 +
 +#[tokio::test]
 +async fn dameng_design() {
-+    design_flow("DBLENS_TEST_DM_URL").await;
++    design_flow("DATLUMA_TEST_DM_URL").await;
 +}
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/sql/dameng.sql`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/sql/dameng.sql`**
 
 ```diff
---- a/crates/dblens-dialect/sql/dameng.sql
-+++ b/crates/dblens-dialect/sql/dameng.sql
+--- a/crates/datluma-dialect/sql/dameng.sql
++++ b/crates/datluma-dialect/sql/dameng.sql
 @@ -332,11 +332,12 @@ WHERE d.REFERENCED_OWNER = {{ bind("schema") }}
  ORDER BY d.OWNER, d.NAME
  
@@ -5629,11 +5629,11 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
  
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-dialect/src/design/diff.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-dialect/src/design/diff.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/diff.rs
-+++ b/crates/dblens-dialect/src/design/diff.rs
+--- a/crates/datluma-dialect/src/design/diff.rs
++++ b/crates/datluma-dialect/src/design/diff.rs
 @@ -331,12 +331,12 @@ pub fn diff_table(original: Option<&Table>, draft: &Table, renames: &Renames) ->
              .collect(),
          ..x.clone()
@@ -5660,17 +5660,17 @@ git commit -m "feat(service): 表设计器的读表、预览与执行任务" -m 
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`、`DBLENS_TEST_ORACLE_URL`、`DBLENS_TEST_DM_URL`（密码不写进任何文件）。达梦的测试与其他测试同时连库时偶发连接失败，失败时用 `-- dameng --test-threads=1` 单独重跑。
+实库测试：在上面的 `cargo test` 前以内联环境变量给出 `DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`、`DATLUMA_TEST_ORACLE_URL`、`DATLUMA_TEST_DM_URL`（密码不写进任何文件）。达梦的测试与其他测试同时连库时偶发连接失败，失败时用 `-- dameng --test-threads=1` 单独重跑。
 
 Expected: 全部测试通过（实库 5 个）。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-dialect/sql/dameng.sql crates/dblens-dialect/src/design/diff.rs crates/dblens-dialect/tests/snapshots/meta_snapshots__dameng.snap crates/dblens-service/tests/live.rs
+git add crates/datluma-dialect/sql/dameng.sql crates/datluma-dialect/src/design/diff.rs crates/datluma-dialect/tests/snapshots/meta_snapshots__dameng.snap crates/datluma-service/tests/live.rs
 git commit -m "test(service): 表设计器的实库测试（5 个库）" -m "实库中发现并修正：索引方法不写与默认方法（BTREE、NORMAL）相同；达梦的 ALL_TAB_PRIVS 用 OWNER 列。" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -5678,22 +5678,22 @@ git commit -m "test(service): 表设计器的实库测试（5 个库）" -m "实
 
 ### Task 8: 接口
 
-`dblens-api/src/design.rs`：`GET /profiles/{id}/design/caps`、`GET /profiles/{id}/design/table?schema=&name=`、`POST /profiles/{id}/design/preview`、`POST /profiles/{id}/design/apply`（201 和任务 id，状态用 `/tasks/{id}`）。错误和提示按请求的语言渲染。
+`datluma-api/src/design.rs`：`GET /profiles/{id}/design/caps`、`GET /profiles/{id}/design/table?schema=&name=`、`POST /profiles/{id}/design/preview`、`POST /profiles/{id}/design/apply`（201 和任务 id，状态用 `/tasks/{id}`）。错误和提示按请求的语言渲染。
 
 **Files:**
-- Create: `crates/dblens-api/src/design.rs`
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/tests/api.rs`
+- Create: `crates/datluma-api/src/design.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/tests/api.rs`
 
 **Interfaces:**
 - Consumes：任务 6 的 `Service` 方法。
 - Produces：上述接口。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/api.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/api.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/api.rs
-+++ b/crates/dblens-api/tests/api.rs
+--- a/crates/datluma-api/tests/api.rs
++++ b/crates/datluma-api/tests/api.rs
 @@ -685,3 +685,47 @@ async fn uploads_respect_the_limit_and_paths_are_desktop_only() {
      .await;
      assert_eq!(st, StatusCode::BAD_REQUEST, "浏览器模式不接受本机路径");
@@ -5744,7 +5744,7 @@ git commit -m "test(service): 表设计器的实库测试（5 个库）" -m "实
 +}
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-api/src/design.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-api/src/design.rs`**
 
 ```rust
 //! 表设计器的接口（M3 设计文档 6.1 节）：方言能力和类型目录、读原表、预览、执行（返回任务 id，状态用 `/tasks/{id}`）。
@@ -5752,8 +5752,8 @@ git commit -m "test(service): 表设计器的实库测试（5 个库）" -m "实
 use axum::Json;
 use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
-use dblens_dialect::design::DesignCaps;
-use dblens_service::{DesignPreview, DesignRequest, DesignTable};
+use datluma_dialect::design::DesignCaps;
+use datluma_service::{DesignPreview, DesignRequest, DesignTable};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
@@ -5798,13 +5798,13 @@ pub async fn apply(
 }
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -2,6 +2,7 @@
- //! 另提供前端页面的静态文件服务（`with_web`）。桌面模式和浏览器模式（`dblens-server`）共用。所有请求都要带访问令牌，浏览器请求还要通过 Origin 校验。
+ //! 另提供前端页面的静态文件服务（`with_web`）。桌面模式和浏览器模式（`datluma-server`）共用。所有请求都要带访问令牌，浏览器请求还要通过 Origin 校验。
  
  mod auth;
 +mod design;
@@ -5830,7 +5830,7 @@ pub async fn apply(
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（api 新增 1 个）。
@@ -5838,7 +5838,7 @@ Expected: 全部测试通过（api 新增 1 个）。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-api/src/design.rs crates/dblens-api/src/lib.rs crates/dblens-api/tests/api.rs
+git add crates/datluma-api/src/design.rs crates/datluma-api/src/lib.rs crates/datluma-api/tests/api.rs
 git commit -m "feat(api): 表设计器的接口" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -8298,7 +8298,7 @@ export default function SqlBox({ sql, driver, height }: { sql: string; driver: D
       <Editor
         language={driver ? editorLanguage(driver) : 'sql'}
         value={sql}
-        theme={theme === 'dark' ? 'dblens-dark' : 'dblens-light'}
+        theme={theme === 'dark' ? 'datluma-dark' : 'datluma-light'}
         options={{
           readOnly: true,
           domReadOnly: true,
@@ -8905,7 +8905,7 @@ export function scriptOf(steps: DesignStep[], plsql: boolean): string {
     "rebuildForced": "Some changes are not supported by the database; the table must be rebuilt",
     "changes": "Changes",
     "sql": "SQL",
-    "countCheck": "Check row counts: {{source}} and {{target}} must match (done by DBLens; check it yourself when running by hand)",
+    "countCheck": "Check row counts: {{source}} and {{target}} must match (done by DATLUMA; check it yourself when running by hand)",
     "cancel": "Cancel",
     "copy": "Copy SQL",
     "copied": "Copied",
@@ -9163,7 +9163,7 @@ export function scriptOf(steps: DesignStep[], plsql: boolean): string {
     "rebuildForced": "库不支持其中的改动，必须重建表",
     "changes": "变更",
     "sql": "SQL",
-    "countCheck": "核对行数：{{source}} 与 {{target}} 的行数一致（由 DBLens 执行；手动执行时请自行核对）",
+    "countCheck": "核对行数：{{source}} 与 {{target}} 的行数一致（由 DATLUMA 执行；手动执行时请自行核对）",
     "cancel": "取消",
     "copy": "复制 SQL",
     "copied": "已复制",
@@ -9284,7 +9284,7 @@ git commit -m "feat(web): 表设计器界面、保存确认与入口" -m "Co-Aut
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m3-table-designer.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
 
@@ -9334,16 +9334,16 @@ git commit -m "feat(web): 表设计器界面、保存确认与入口" -m "Co-Aut
 ## 结构
 
 ```text
-crates/dblens-dialect/src/design/
+crates/datluma-dialect/src/design/
   mod.rs       Renames、TableChange、Diff、DesignIssue；Dialect::prepare_draft（重新解析逻辑类型、主键列 NOT NULL）
   diff.rs      validate（校验草稿）、diff_table（比对出变更列表）
   catalog.rs   design_caps：类型目录和方言能力
   sql.rs       design_unsupported、design_sql（按家族分派）、design_transactional；共用的外键、检查约束、索引列写法
   mysql.rs / postgres.rs / oracle.rs（含达梦）   各家族的 DDL
   rebuild.rs   重建表的脚本（RebuildContext → RebuildOutcome）
-crates/dblens-dialect/sql/*.sql   新增 referencing_keys、dependent_views、grants、table_storage、trigger_ddl（只有 Oracle）
-crates/dblens-service/src/design.rs   design_caps / design_table / preview_design / start_design；执行任务（Run）
-crates/dblens-api/src/design.rs       /profiles/{id}/design/{caps,table,preview,apply}
+crates/datluma-dialect/sql/*.sql   新增 referencing_keys、dependent_views、grants、table_storage、trigger_ddl（只有 Oracle）
+crates/datluma-service/src/design.rs   design_caps / design_table / preview_design / start_design；执行任务（Run）
+crates/datluma-api/src/design.rs       /profiles/{id}/design/{caps,table,preview,apply}
 web/src/features/design/
   logic.ts          草稿（每行 key、origin、deleted）、改名跟踪、类型的拆分与拼接、改动标记、校验错误换回草稿中的行
   designStore.ts    每个设计器标签的状态
@@ -9373,7 +9373,7 @@ web/src/features/design/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过。
   - dialect：比对、校验、各家族每种变更的快照、版本差异（MySQL 5.6 的 CHANGE、MariaDB 的 DROP CONSTRAINT）、生成的每条语句经拆分仍是一条、重建脚本快照（四个家族）、拒绝重建、临时表名截断。
   - service（假驱动）：新建表的预览和执行（一个事务、执行历史）；重建在删除旧表之前失败时删除新表、之后失败时列出没有执行的语句。
   - 实库（5 个库）：用设计器新建表；改名并加长、改可空/默认值/注释、换索引、加列后读回与草稿比对无差异；原表被别人改过时拒绝执行；强制重建（调整列顺序、VARCHAR 改为数值类型）后数据、约束、索引、注释、触发器、其他表指向本表的外键、自增接续、授权（PG、Oracle、达梦授予 PUBLIC）、依赖视图（MySQL 按名字、Oracle 和达梦重新编译；PG 有依赖视图时拒绝）都正确；中途失败时 PG 全部回滚、其他库保留已执行的。
@@ -9383,11 +9383,11 @@ web/src/features/design/
 - 未验证：重建执行中途的取消只有单元测试覆盖（与失败走同一条清理路径）；桌面程序中的设计器没有单独实测。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -327,6 +327,8 @@ trait Policy: Send + Sync {
  - 2026-10-26 M2 拆成两份（用户确认）：M2a 表数据编辑；M2b 导入（CSV / Excel 导入到表、SQL 文件导入）和对象树"导出整表"的入口。查询结果和数据标签的导出已在 M1c3 完成。
  - M2a 已完成（设计 `docs/superpowers/specs/2026-10-26-m2a-data-editing-design.md`，详细计划 `docs/superpowers/plans/2026-10-26-m2a-data-editing.md`，说明 `docs/notes/m2a-data-editing.md`）。
@@ -9408,6 +9408,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m3-table-designer.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m0-4b-api.md docs/notes/m3-table-designer.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M3 表设计器的说明文档、接口说明与进度" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

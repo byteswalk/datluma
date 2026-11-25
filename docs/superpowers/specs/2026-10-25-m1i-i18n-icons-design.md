@@ -19,7 +19,7 @@
 - 前端全部界面文字；
 - antd 组件自带的文字（切换 `zh_CN` / `en_US` 语言包）；
 - Monaco 自带的菜单、查找框等，用 Monaco 官方的 `esm/vs/nls/lang/zh-cn.js`；
-- 后端给用户看的文字：错误、生产确认原因、驱动不可用提示、桌面版更新对话框、`dblens-server` 命令行的用法和启动提示。
+- 后端给用户看的文字：错误、生产确认原因、驱动不可用提示、桌面版更新对话框、`datluma-server` 命令行的用法和启动提示。
 
 不翻译：
 - 数据库返回的报错原文；
@@ -31,7 +31,7 @@
 - 设置项 `ui.lang`，取值 `auto`（默认）、`zh-CN`、`en`，放在设置对话框的"常规"里。
 - `auto` 时按 `navigator.languages` 取第一个能匹配的语言：以 `zh` 开头的取中文，其余取英文。
 - 切换后界面文字立即刷新。Monaco 自带文字在加载编辑器之前就要确定，所以下次启动才生效，设置项下面写明这一点。
-- 窗口标题、HTML `lang` 属性随语言变化。产品名中文环境为"DBLens 数洞"，英文环境为"DBLens"。
+- 窗口标题、HTML `lang` 属性随语言变化。产品名中文环境为"DATLUMA 数览"，英文环境为"DATLUMA"。
 
 ## 4. 前端
 
@@ -49,7 +49,7 @@
 
 ### 5.1 消息类型
 
-`dblens-core` 新增消息类型 `Msg`：
+`datluma-core` 新增消息类型 `Msg`：
 - `Msg::Text { key, args }`：词条键加命名参数，参数值都是字符串；
 - `Msg::Raw(String)`：原样文本，用于数据库报错原文等不翻译的内容。
 
@@ -59,7 +59,7 @@
 
 ### 5.2 渲染
 
-- 词条用 `rust-i18n`，文件集中放在 `crates/dblens-core/locales/`，只有 `dblens-core` 负责渲染。
+- 词条用 `rust-i18n`，文件集中放在 `crates/datluma-core/locales/`，只有 `datluma-core` 负责渲染。
 - `Msg` 序列化时按"当前渲染语言"输出成字符串。所以接口的 JSON 格式不变，`message` 等字段仍是字符串。
 - 当前渲染语言是一个线程局部变量。接口层在编码响应和 WebSocket 事件时，用 `with_locale(lang, …)` 包住序列化；序列化在接口层同步完成，不跨线程。
 - 请求语言：

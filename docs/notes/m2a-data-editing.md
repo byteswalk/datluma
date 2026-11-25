@@ -5,11 +5,11 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/changes.rs   改动集（RowChange）、行标识（row_key）、按改动生成语句（执行用占位符、预览用字面量）
-crates/dblens-service/src/
+crates/datluma-dialect/src/changes.rs   改动集（RowChange）、行标识（row_key）、按改动生成语句（执行用占位符、预览用字面量）
+crates/datluma-service/src/
   session.rs     Command::Apply：在会话中按事务执行，检查影响行数，失败整体回滚；ApplyOutcome / ApplyFailure
   changes.rs     ChangeSet；Service::preview_changes / apply_changes（取表的结构模型、生成语句）
-crates/dblens-api/src/routes.rs        /profiles/{id}/changes/preview、/sessions/{id}/changes
+crates/datluma-api/src/routes.rs        /profiles/{id}/changes/preview、/sessions/{id}/changes
 web/src/features/data/
   parse.ts       按逻辑类型解析文本；解析制表符分隔的文本
   edit.ts        编辑状态（修改、新增、删除）、粘贴区域、生成改动集
@@ -47,7 +47,7 @@ web/src/features/editor/{runner.ts, actions.tsx}   Runner.stop；关闭有未提
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过（420 个）。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过（420 个）。
   - 实库测试（5 个库）：建带主键、唯一键、自增列、默认值的表，含中文和 NULL。一次提交新增、修改、删除，核对结果（新增行取到默认值）。另一个会话先改同一字段，再按旧值提交，整体回滚，表中数据不变，会话恢复自动提交。没有主键的表被拒绝。
   - 有一次全量运行中，达梦的导出实库测试失败一次，单独重跑和再跑全量都通过。与 M1c1、M1c3 记录的情况相同：多个测试同时连达梦时偶发失败。
 - 前端：tsc、Vitest、打包通过。

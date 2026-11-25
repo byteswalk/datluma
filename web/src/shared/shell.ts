@@ -1,6 +1,6 @@
 // 桌面外壳的原生能力（M1 设计文档 2.2 节）：自绘标题栏的窗口操作，以及置顶、恢复默认位置、检查更新、关于、退出；
 // 导出（M1c3）用的"另存为"对话框和"在文件夹中显示"，导入（M2b）用的"打开"对话框，模型（M4a）用的"选择文件夹"对话框。
-// 只有这里调用 Tauri；其他代码通过这里的函数使用。浏览器模式（dblens-server）没有 Tauri，desktop 为 null。
+// 只有这里调用 Tauri；其他代码通过这里的函数使用。浏览器模式（datluma-server）没有 Tauri，desktop 为 null。
 
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
@@ -29,15 +29,15 @@ export type WindowAction =
   | 'quit'
 
 /** 与 Rust 端 `shell::EVENT` 一致。 */
-export const SHELL_EVENT = 'dblens://shell'
+export const SHELL_EVENT = 'datluma://shell'
 
 export type CloseAction = 'tray' | 'quit'
 
 /** 与 Rust 端 `window::CLOSE_EVENT` 一致：关闭方式没设置时，原生这边请页面询问。 */
-export const CLOSE_EVENT = 'dblens://close-requested'
+export const CLOSE_EVENT = 'datluma://close-requested'
 
 /** 与 Rust 端 `notice::EVENT` 一致。 */
-export const NOTICE_EVENT = 'dblens://notice'
+export const NOTICE_EVENT = 'datluma://notice'
 
 /** 原生这边要页面显示的提示（检查更新、关于）。`ok`/`cancel` 有值时是二选一的确认框。 */
 export interface Notice {

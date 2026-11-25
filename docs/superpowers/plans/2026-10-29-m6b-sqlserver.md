@@ -16,13 +16,13 @@
 - 默认值约束：设计器建的命名为 `DF_表名_列名`；删除时在执行时从 `sys.default_constraints` 查名字，不改公共模型。
 - SQL Server 的设计器改动在一个事务中执行，任一条失败整体回滚。
 - SQL Server 一次请求最多 2100 个参数：每条写入语句至多 2000 个参数、500 行。
-- 给 SQL Server 的脚本每条语句后接单独一行 `GO`；在 DBLens 中直接执行时语句逐条发送。
+- 给 SQL Server 的脚本每条语句后接单独一行 `GO`；在 DATLUMA 中直接执行时语句逐条发送。
 - 写入类请求加可选的 `catalog`（其他库不填，行为不变）；前端界面中仍用合成的 schema，在请求边界拆开。
 - 迁移实库路线：SQL Server 与 MySQL、PG、Oracle、达梦互迁 8 条，另加以 SQL Server 为目标的续传、跳过各 1 条。
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级（有意固定版本的记入 `scripts/check-deps.mjs` 的 `HOLD`）。
 - 前端给用户看的文字都用词条（中英文）；后端错误和提示用 `msg!` 词条（`src` 中的中文字面量只能出现在 `#[cfg(test)]` 之后，单独的测试文件中也不能有）；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 不同的仓库副本不要共用 `CARGO_TARGET_DIR`（cargo 按相对路径和修改时间判断是否要重编，会用到别的副本编出的库）。
 - 实库测试一律串行（`--test-threads=1`），不加 `--include-ignored`（会跑达梦的 spike 测试并卡住）。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
@@ -49,15 +49,15 @@
 ## 文件结构
 
 ```text
-crates/dblens-dialect/src/design/{sqlserver.rs（新增）, mod.rs, sql.rs, rebuild.rs, diff.rs}, snapshots/
-crates/dblens-dialect/src/{import.rs, changes.rs, variant.rs, lib.rs}, compare/sync.rs, migrate/{script.rs, expr.rs, tests.rs}, migrate/snapshots/
-crates/dblens-service/src/{service.rs, design.rs, compare.rs, import/job.rs, document/job.rs, model/ops.rs}, migrate/{mod.rs, run.rs, report.rs, values.rs}
-crates/dblens-service/tests/{live.rs, migrate_live.rs}; crates/dblens-api/src/{design.rs, tasks.rs}, tests/live.rs; crates/dblens-core/locales/app.json
+crates/datluma-dialect/src/design/{sqlserver.rs（新增）, mod.rs, sql.rs, rebuild.rs, diff.rs}, snapshots/
+crates/datluma-dialect/src/{import.rs, changes.rs, variant.rs, lib.rs}, compare/sync.rs, migrate/{script.rs, expr.rs, tests.rs}, migrate/snapshots/
+crates/datluma-service/src/{service.rs, design.rs, compare.rs, import/job.rs, document/job.rs, model/ops.rs}, migrate/{mod.rs, run.rs, report.rs, values.rs}
+crates/datluma-service/tests/{live.rs, migrate_live.rs}; crates/datluma-api/src/{design.rs, tasks.rs}, tests/live.rs; crates/datluma-core/locales/app.json
 web/src/shared/{api.ts, api.test.ts, schemaOptions.ts（新增）}
 web/src/features/{tree/ObjectTree.tsx, data/DataView.tsx, compare/CompareView.tsx, migrate/{MigrateView.tsx, plan.ts}, model/ModelDialogs.tsx,
   design/{summary.ts, summary.test.ts, DesignView.tsx, SaveDialog.tsx}, import/ImportDialog.tsx, document/ExportDocDialog.tsx}
 web/src/locales/{zh-CN,en}/{tree.json, model.json}
-docs/notes/{m6b-sqlserver.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-dblens-design.md
+docs/notes/{m6b-sqlserver.md（新增）, m0-4b-api.md}; docs/superpowers/specs/2026-10-22-datluma-design.md
 ```
 
 ---
@@ -86,7 +86,7 @@ Expected：输出中没有"查询失败"，以执行当天的结果为准。
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -118,26 +118,26 @@ git commit -m "chore: M6b 依赖复查" -m "Co-Authored-By: Claude Opus 5.5 <nor
 - `design/diff.rs`：`NONCLUSTERED` 视为默认的索引方法。
 
 **Files:**
-- Modify: `crates/dblens-dialect/src/design/diff.rs`
-- Modify: `crates/dblens-dialect/src/design/mod.rs`
-- Modify: `crates/dblens-dialect/src/design/rebuild.rs`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_sqlserver.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_alter.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_create.snap`
-- Create: `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_everything.snap`
-- Modify: `crates/dblens-dialect/src/design/sql.rs`
-- Create: `crates/dblens-dialect/src/design/sqlserver.rs`
+- Modify: `crates/datluma-dialect/src/design/diff.rs`
+- Modify: `crates/datluma-dialect/src/design/mod.rs`
+- Modify: `crates/datluma-dialect/src/design/rebuild.rs`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_sqlserver.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_alter.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_create.snap`
+- Create: `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_everything.snap`
+- Modify: `crates/datluma-dialect/src/design/sql.rs`
+- Create: `crates/datluma-dialect/src/design/sqlserver.rs`
 
 **Interfaces:**
 - Consumes：现有的 `Dialect`（`ident`、`qualified`、`literal`、`index_items`、`fk_clause`、`check_clause`、`constraint_name`、`required_name`）。
 - Produces：`Dialect::design_sql` 对 SQL Server 可用；`Dialect::design_transactional()` 对 SQL Server 为 true；`pub(crate) fn rename_table_sql(&self, schema, from, to) -> Result<String>`；
   `design::sqlserver::df_name(table, column) -> String`。
 
-- [ ] **Step 1: 修改 `crates/dblens-dialect/src/design/diff.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-dialect/src/design/diff.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/diff.rs
-+++ b/crates/dblens-dialect/src/design/diff.rs
+--- a/crates/datluma-dialect/src/design/diff.rs
++++ b/crates/datluma-dialect/src/design/diff.rs
 @@ -331,9 +331,12 @@ pub fn diff_table(original: Option<&Table>, draft: &Table, renames: &Renames) ->
              .collect(),
          ..x.clone()
@@ -165,11 +165,11 @@ git commit -m "chore: M6b 依赖复查" -m "Co-Authored-By: Claude Opus 5.5 <nor
      #[test]
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-dialect/src/design/mod.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-dialect/src/design/mod.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/mod.rs
-+++ b/crates/dblens-dialect/src/design/mod.rs
+--- a/crates/datluma-dialect/src/design/mod.rs
++++ b/crates/datluma-dialect/src/design/mod.rs
 @@ -8,6 +8,7 @@ mod oracle;
  mod postgres;
  mod rebuild;
@@ -180,11 +180,11 @@ git commit -m "chore: M6b 依赖复查" -m "Co-Authored-By: Claude Opus 5.5 <nor
  
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-dialect/src/design/rebuild.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-dialect/src/design/rebuild.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/rebuild.rs
-+++ b/crates/dblens-dialect/src/design/rebuild.rs
+--- a/crates/datluma-dialect/src/design/rebuild.rs
++++ b/crates/datluma-dialect/src/design/rebuild.rs
 @@ -95,7 +95,7 @@ impl Dialect {
          format!("{}_{}{SUFFIX}", &table[..end], short_hash(table))
      }
@@ -299,28 +299,28 @@ git commit -m "chore: M6b 依赖复查" -m "Co-Authored-By: Claude Opus 5.5 <nor
                      name: "v_orders".into(),
 ```
 
-- [ ] **Step 4: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_sqlserver.snap`**
+- [ ] **Step 4: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_sqlserver.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/rebuild.rs
+source: crates/datluma-dialect/src/design/rebuild.rs
 expression: render(&out)
 ---
-CREATE TABLE dbo.orders_dblens_new (
-    amount decimal(10,2) CONSTRAINT DF_orders_dblens_new_amount DEFAULT 0 NULL,
+CREATE TABLE dbo.orders_datluma_new (
+    amount decimal(10,2) CONSTRAINT DF_orders_datluma_new_amount DEFAULT 0 NULL,
     id bigint IDENTITY(1,1) NOT NULL,
     order_code nvarchar(50) NULL
 ) ON USERS
-EXEC sys.sp_addextendedproperty N'MS_Description', N'订单', N'SCHEMA', N'dbo', N'TABLE', N'orders_dblens_new'
-EXEC sys.sp_addextendedproperty N'MS_Description', N'金额', N'SCHEMA', N'dbo', N'TABLE', N'orders_dblens_new', N'COLUMN', N'amount'
-SET IDENTITY_INSERT dbo.orders_dblens_new ON
-INSERT INTO dbo.orders_dblens_new (amount, id, order_code) SELECT amount, id, CAST(code AS nvarchar(50)) FROM dbo.orders
-SET IDENTITY_INSERT dbo.orders_dblens_new OFF
--- COUNT dbo.orders = dbo.orders_dblens_new
+EXEC sys.sp_addextendedproperty N'MS_Description', N'订单', N'SCHEMA', N'dbo', N'TABLE', N'orders_datluma_new'
+EXEC sys.sp_addextendedproperty N'MS_Description', N'金额', N'SCHEMA', N'dbo', N'TABLE', N'orders_datluma_new', N'COLUMN', N'amount'
+SET IDENTITY_INSERT dbo.orders_datluma_new ON
+INSERT INTO dbo.orders_datluma_new (amount, id, order_code) SELECT amount, id, CAST(code AS nvarchar(50)) FROM dbo.orders
+SET IDENTITY_INSERT dbo.orders_datluma_new OFF
+-- COUNT dbo.orders = dbo.orders_datluma_new
 ALTER TABLE dbo.items DROP CONSTRAINT fk_items_order
 ▶ DROP TABLE dbo.orders
-EXEC sp_rename N'dbo.orders_dblens_new', N'orders'
-EXEC sp_rename N'dbo.DF_orders_dblens_new_amount', N'DF_orders_amount', N'OBJECT'
+EXEC sp_rename N'dbo.orders_datluma_new', N'orders'
+EXEC sp_rename N'dbo.DF_orders_datluma_new_amount', N'DF_orders_amount', N'OBJECT'
 ALTER TABLE dbo.orders ADD CONSTRAINT pk_orders PRIMARY KEY (id)
 ALTER TABLE dbo.orders ADD CONSTRAINT uk_code UNIQUE (order_code)
 ALTER TABLE dbo.orders ADD CONSTRAINT ck_amount CHECK (amount >= 0)
@@ -330,14 +330,14 @@ CREATE TRIGGER dbo.trg ON dbo.orders AFTER INSERT AS BEGIN SET NOCOUNT ON; END;
 ALTER TABLE dbo.items ADD CONSTRAINT fk_items_order FOREIGN KEY (order_code) REFERENCES dbo.orders (order_code) ON DELETE CASCADE
 GRANT SELECT ON dbo.orders TO report
 EXEC sp_refreshview N'dbo.v_orders'
--- cleanup: DROP TABLE dbo.orders_dblens_new
+-- cleanup: DROP TABLE dbo.orders_datluma_new
 ```
 
-- [ ] **Step 5: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_alter.snap`**
+- [ ] **Step 5: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_alter.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/sqlserver.rs
+source: crates/datluma-dialect/src/design/sqlserver.rs
 expression: "render(&d.design_sql(\"dbo\", \"orders\",\n&alter_only(&t, \"decimal(12,2)\")).unwrap())"
 ---
 [0] ALTER TABLE dbo.orders ADD CONSTRAINT DF_orders_code DEFAULT 'x' FOR code
@@ -356,11 +356,11 @@ END;
     EXEC sys.sp_dropextendedproperty N'MS_Description', N'SCHEMA', N'dbo', N'TABLE', N'orders', N'COLUMN', N'amount';
 ```
 
-- [ ] **Step 6: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_create.snap`**
+- [ ] **Step 6: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_create.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/sqlserver.rs
+source: crates/datluma-dialect/src/design/sqlserver.rs
 expression: "render(&d.design_sql(\"dbo\", \"\", &diff).unwrap())"
 ---
 [0] CREATE TABLE dbo.orders (
@@ -377,11 +377,11 @@ expression: "render(&d.design_sql(\"dbo\", \"\", &diff).unwrap())"
 [0] EXEC sys.sp_addextendedproperty N'MS_Description', N'金额', N'SCHEMA', N'dbo', N'TABLE', N'orders', N'COLUMN', N'amount'
 ```
 
-- [ ] **Step 7: 新建 `crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_everything.snap`**
+- [ ] **Step 7: 新建 `crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_everything.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/design/sqlserver.rs
+source: crates/datluma-dialect/src/design/sqlserver.rs
 expression: "render(&d.design_sql(\"dbo\", \"orders\", &diff).unwrap())"
 ---
 [0] ALTER TABLE dbo.orders DROP CONSTRAINT fk_parent
@@ -408,11 +408,11 @@ ELSE
     EXEC sys.sp_addextendedproperty N'MS_Description', N'订单表', N'SCHEMA', N'dbo', N'TABLE', N'orders';
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-dialect/src/design/sql.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-dialect/src/design/sql.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/design/sql.rs
-+++ b/crates/dblens-dialect/src/design/sql.rs
+--- a/crates/datluma-dialect/src/design/sql.rs
++++ b/crates/datluma-dialect/src/design/sql.rs
 @@ -21,9 +21,9 @@ pub(crate) fn stmt(change: usize, sql: String) -> DesignStatement {
  }
  
@@ -430,7 +430,7 @@ ELSE
              Family::Postgres => self.pg_design(schema, table, &diff.changes),
              Family::Oracle | Family::Dameng => self.oracle_design(schema, table, &diff.changes),
 -            // 表设计器的 SQL Server 支持在 M6b
--            Family::SqlServer => Err(dblens_core::Error::invalid(dblens_core::msg!("sqlserver.later"))),
+-            Family::SqlServer => Err(datluma_core::Error::invalid(datluma_core::msg!("sqlserver.later"))),
 +            Family::SqlServer => self.sqlserver_design(schema, table, &diff.changes),
          }
      }
@@ -468,15 +468,15 @@ ELSE
              // 注释、默认值里带分号、注释符和 `/`
 ```
 
-- [ ] **Step 9: 新建 `crates/dblens-dialect/src/design/sqlserver.rs`**
+- [ ] **Step 9: 新建 `crates/datluma-dialect/src/design/sqlserver.rs`**
 
 ```rust
 //! SQL Server 的设计器 DDL（M6b 设计文档第 3 节）。DDL 可以回滚，全部语句在一个事务中执行。
 //! 默认值是有名字的约束：设计器建的命名为 `DF_表_列`；删除时在执行时从 `sys.default_constraints` 查名字（库自动起的名字带随机后缀，
 //! 各库不同）。改名用 `sp_rename`，注释是扩展属性 `MS_Description`。
 
-use dblens_core::Result;
-use dblens_core::schema::{Column, Index, Table};
+use datluma_core::Result;
+use datluma_core::schema::{Column, Index, Table};
 
 use super::TableChange as C;
 use super::diff::{same_type, text};
@@ -825,7 +825,7 @@ mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（新增 SQL Server 的建表、全部变更、改列、重建快照，名字与表达式的单元测试）。快照文件随本任务给出。
@@ -833,7 +833,7 @@ Expected: 全部测试通过（新增 SQL Server 的建表、全部变更、改�
 - [ ] **Step 11: 提交**
 
 ```bash
-git add crates/dblens-dialect/src/design/diff.rs crates/dblens-dialect/src/design/mod.rs crates/dblens-dialect/src/design/rebuild.rs crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__rebuild__tests__rebuild_sqlserver.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_alter.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_create.snap crates/dblens-dialect/src/design/snapshots/dblens_dialect__design__sqlserver__tests__sqlserver_everything.snap crates/dblens-dialect/src/design/sql.rs crates/dblens-dialect/src/design/sqlserver.rs
+git add crates/datluma-dialect/src/design/diff.rs crates/datluma-dialect/src/design/mod.rs crates/datluma-dialect/src/design/rebuild.rs crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__rebuild__tests__rebuild_sqlserver.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_alter.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_create.snap crates/datluma-dialect/src/design/snapshots/datluma_dialect__design__sqlserver__tests__sqlserver_everything.snap crates/datluma-dialect/src/design/sql.rs crates/datluma-dialect/src/design/sqlserver.rs
 git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -854,31 +854,31 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
 - 实库测试：设计器、导入（含自增列）、模型与比对、文档导出加 SQL Server；M6a 的"拦截"断言改为功能可用；迁移的 SQL Server 源数据与 10 条路线。
 
 **Files:**
-- Modify: `crates/dblens-api/src/design.rs`
-- Modify: `crates/dblens-api/src/tasks.rs`
-- Modify: `crates/dblens-api/tests/live.rs`
-- Modify: `crates/dblens-core/locales/app.json`
-- Modify: `crates/dblens-dialect/src/changes.rs`
-- Modify: `crates/dblens-dialect/src/compare/sync.rs`
-- Modify: `crates/dblens-dialect/src/import.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
-- Modify: `crates/dblens-dialect/src/migrate/expr.rs`
-- Modify: `crates/dblens-dialect/src/migrate/script.rs`
-- Create: `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_sqlserver.snap`
-- Modify: `crates/dblens-dialect/src/migrate/tests.rs`
-- Modify: `crates/dblens-dialect/src/variant.rs`
-- Modify: `crates/dblens-service/src/compare.rs`
-- Modify: `crates/dblens-service/src/design.rs`
-- Modify: `crates/dblens-service/src/document/job.rs`
-- Modify: `crates/dblens-service/src/import/job.rs`
-- Modify: `crates/dblens-service/src/migrate/mod.rs`
-- Modify: `crates/dblens-service/src/migrate/report.rs`
-- Modify: `crates/dblens-service/src/migrate/run.rs`
-- Modify: `crates/dblens-service/src/migrate/values.rs`
-- Modify: `crates/dblens-service/src/model/ops.rs`
-- Modify: `crates/dblens-service/src/service.rs`
-- Modify: `crates/dblens-service/tests/live.rs`
-- Modify: `crates/dblens-service/tests/migrate_live.rs`
+- Modify: `crates/datluma-api/src/design.rs`
+- Modify: `crates/datluma-api/src/tasks.rs`
+- Modify: `crates/datluma-api/tests/live.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Modify: `crates/datluma-dialect/src/changes.rs`
+- Modify: `crates/datluma-dialect/src/compare/sync.rs`
+- Modify: `crates/datluma-dialect/src/import.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
+- Modify: `crates/datluma-dialect/src/migrate/expr.rs`
+- Modify: `crates/datluma-dialect/src/migrate/script.rs`
+- Create: `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_sqlserver.snap`
+- Modify: `crates/datluma-dialect/src/migrate/tests.rs`
+- Modify: `crates/datluma-dialect/src/variant.rs`
+- Modify: `crates/datluma-service/src/compare.rs`
+- Modify: `crates/datluma-service/src/design.rs`
+- Modify: `crates/datluma-service/src/document/job.rs`
+- Modify: `crates/datluma-service/src/import/job.rs`
+- Modify: `crates/datluma-service/src/migrate/mod.rs`
+- Modify: `crates/datluma-service/src/migrate/report.rs`
+- Modify: `crates/datluma-service/src/migrate/run.rs`
+- Modify: `crates/datluma-service/src/migrate/values.rs`
+- Modify: `crates/datluma-service/src/model/ops.rs`
+- Modify: `crates/datluma-service/src/service.rs`
+- Modify: `crates/datluma-service/tests/live.rs`
+- Modify: `crates/datluma-service/tests/migrate_live.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `design_sql`、`rename_table_sql`、`df_name`。
@@ -887,11 +887,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
   `Service::design_table(&self, profile_id, catalog: Option<&str>, schema, name)`、`Service::import_ddl(&self, profile_id, catalog: Option<&str>, schema, table, def)`；
   请求结构的 `catalog: Option<String>`：`DesignRequest`、`ImportRequest`、`CompareSideRef::Database`、`DocSource::Database`、`MigrationEnd`、`ReverseRequest`。
 
-- [ ] **Step 1: 修改 `crates/dblens-api/tests/live.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-api/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-api/tests/live.rs
-+++ b/crates/dblens-api/tests/live.rs
+--- a/crates/datluma-api/tests/live.rs
++++ b/crates/datluma-api/tests/live.rs
 @@ -222,9 +222,15 @@ async fn sqlserver_catalogs() {
          call(&app, "GET", &format!("/api/profiles/{id}/schemas/sys/objects?catalog=msdb&kind=views"), None)
              .await;
@@ -903,7 +903,7 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
 +    let (st, e) = call(
 +        &app,
 +        "GET",
-+        &format!("/api/profiles/{id}/design/table?catalog=master&schema=dbo&name=dblens_no_such"),
++        &format!("/api/profiles/{id}/design/table?catalog=master&schema=dbo&name=datluma_no_such"),
 +        None,
 +    )
 +    .await;
@@ -913,11 +913,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  #[tokio::test]
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/tests/live.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/tests/live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/live.rs
-+++ b/crates/dblens-service/tests/live.rs
+--- a/crates/datluma-service/tests/live.rs
++++ b/crates/datluma-service/tests/live.rs
 @@ -91,6 +91,11 @@ async fn setup(env: &str) -> Option<Live> {
  }
  
@@ -936,7 +936,7 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  #[tokio::test]
 -async fn sqlserver_catalogs_batches_and_gating() {
 +async fn sqlserver_catalogs_and_batches() {
-     let Some(live) = setup("DBLENS_TEST_SQLSERVER_URL").await else { return };
+     let Some(live) = setup("DATLUMA_TEST_SQLSERVER_URL").await else { return };
      let s = &live.service;
      let profile = s.profile(&live.profile_id).unwrap();
 @@ -359,7 +364,9 @@ async fn sqlserver_catalogs_batches_and_gating() {
@@ -945,7 +945,7 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  
 -    assert!(matches!(s.design_table(&live.profile_id, "dbo", "t").await, Err(Error::Invalid { .. })));
 +    // M6b 起写入类功能不再拦截：读不存在的表是"找不到"
-+    let missing = s.design_table(&live.profile_id, live.catalog().as_deref(), "dbo", "dblens_no_such").await;
++    let missing = s.design_table(&live.profile_id, live.catalog().as_deref(), "dbo", "datluma_no_such").await;
 +    assert!(matches!(missing, Err(Error::NotFound { .. })), "{missing:?}");
      s.delete_profile(&live.profile_id).await.unwrap();
  }
@@ -999,12 +999,12 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
          live.submit(id, ExecRequest::new(*sql)).await;
      }
 @@ -1140,6 +1174,11 @@ async fn dameng_import() {
-     import_flow("DBLENS_TEST_DM_URL").await;
+     import_flow("DATLUMA_TEST_DM_URL").await;
  }
  
 +#[tokio::test]
 +async fn sqlserver_import() {
-+    import_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    import_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
  /// 执行 SQL 文件（M2b）：各方言的程序体写法（MySQL 的 DELIMITER、PG 的 $$、Oracle/达梦的 PL/SQL 块加 `/`），
@@ -1113,7 +1113,7 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
 @@ -1531,24 +1586,40 @@ async fn design_flow(env: &str) {
              MetaArgs { schema: Some(live.schema.clone()), table: Some(n("m3_t")), ..Default::default() };
          let rows = s.metadata.rows(&profile, MetaKey::Grants, &args).await.unwrap().unwrap();
-         let grants = dblens_dialect::meta::grants(&rows).unwrap();
+         let grants = datluma_dialect::meta::grants(&rows).unwrap();
 -        assert!(grants.iter().any(|g| g.grantee == "PUBLIC" && g.privilege == "SELECT"), "{env}：{grants:?}");
 +        // SQL Server 的角色名是小写的 public
 +        assert!(
@@ -1158,12 +1158,12 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
      cleanup().await;
      if live.driver == DriverId::Postgres {
 @@ -1582,6 +1653,11 @@ async fn dameng_design() {
-     design_flow("DBLENS_TEST_DM_URL").await;
+     design_flow("DATLUMA_TEST_DM_URL").await;
  }
  
 +#[tokio::test]
 +async fn sqlserver_design() {
-+    design_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    design_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
  /// MySQL 驱动的取消测试用的耗时查询（SLEEP() 被 KILL QUERY 打断时返回 1 而不报错）。
@@ -1225,12 +1225,12 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
          assert!(m4_status(&r).iter().all(|(_, st)| *st == TableStatus::Added), "{env}：{:?}", m4_status(&r));
          let sync = SyncRequest { compare: compare(&db, &b), selected: m4_items(&r), fingerprint: None };
 @@ -1855,6 +1945,11 @@ async fn dameng_model() {
-     model_flow("DBLENS_TEST_DM_URL").await;
+     model_flow("DATLUMA_TEST_DM_URL").await;
  }
  
 +#[tokio::test]
 +async fn sqlserver_model() {
-+    model_flow("DBLENS_TEST_SQLSERVER_URL").await;
++    model_flow("DATLUMA_TEST_SQLSERVER_URL").await;
 +}
 +
  const MYSQL_SLOW: &str = "SELECT COUNT(*) FROM information_schema.columns a, information_schema.columns b, information_schema.columns c";
@@ -1238,11 +1238,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  /// 国产库第一批：与 MySQL、PostgreSQL 走同样的流程。`$ops` 是允许失败的运维查询。
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/tests/migrate_live.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/tests/migrate_live.rs`**
 
 ```diff
---- a/crates/dblens-service/tests/migrate_live.rs
-+++ b/crates/dblens-service/tests/migrate_live.rs
+--- a/crates/datluma-service/tests/migrate_live.rs
++++ b/crates/datluma-service/tests/migrate_live.rs
 @@ -31,6 +31,8 @@ struct End {
      profile: String,
      driver: DriverId,
@@ -1348,34 +1348,34 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
      ($($name:ident: $src:literal => $tgt:literal, $p:literal;)*) => {
          $(
 @@ -604,6 +652,14 @@ routes! {
-     kingbase_pg_to_pg: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_PG_URL", "m5kp";
-     kingbase_pg_to_oracle: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_ORACLE_URL", "m5kp";
-     kingbase_pg_to_dameng: "DBLENS_TEST_KINGBASE_PG_URL" => "DBLENS_TEST_DM_URL", "m5kp";
-+    sqlserver_to_mysql: "DBLENS_TEST_SQLSERVER_URL" => "DBLENS_TEST_MYSQL_URL", "m6ms";
-+    sqlserver_to_pg: "DBLENS_TEST_SQLSERVER_URL" => "DBLENS_TEST_PG_URL", "m6ms";
-+    sqlserver_to_oracle: "DBLENS_TEST_SQLSERVER_URL" => "DBLENS_TEST_ORACLE_URL", "m6ms";
-+    sqlserver_to_dameng: "DBLENS_TEST_SQLSERVER_URL" => "DBLENS_TEST_DM_URL", "m6ms";
-+    mysql_to_sqlserver: "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_SQLSERVER_URL", "m6my";
-+    pg_to_sqlserver: "DBLENS_TEST_PG_URL" => "DBLENS_TEST_SQLSERVER_URL", "m6pg";
-+    oracle_to_sqlserver: "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_SQLSERVER_URL", "m6or";
-+    dameng_to_sqlserver: "DBLENS_TEST_DM_URL" => "DBLENS_TEST_SQLSERVER_URL", "m6dm";
+     kingbase_pg_to_pg: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_PG_URL", "m5kp";
+     kingbase_pg_to_oracle: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_ORACLE_URL", "m5kp";
+     kingbase_pg_to_dameng: "DATLUMA_TEST_KINGBASE_PG_URL" => "DATLUMA_TEST_DM_URL", "m5kp";
++    sqlserver_to_mysql: "DATLUMA_TEST_SQLSERVER_URL" => "DATLUMA_TEST_MYSQL_URL", "m6ms";
++    sqlserver_to_pg: "DATLUMA_TEST_SQLSERVER_URL" => "DATLUMA_TEST_PG_URL", "m6ms";
++    sqlserver_to_oracle: "DATLUMA_TEST_SQLSERVER_URL" => "DATLUMA_TEST_ORACLE_URL", "m6ms";
++    sqlserver_to_dameng: "DATLUMA_TEST_SQLSERVER_URL" => "DATLUMA_TEST_DM_URL", "m6ms";
++    mysql_to_sqlserver: "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_SQLSERVER_URL", "m6my";
++    pg_to_sqlserver: "DATLUMA_TEST_PG_URL" => "DATLUMA_TEST_SQLSERVER_URL", "m6pg";
++    oracle_to_sqlserver: "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_SQLSERVER_URL", "m6or";
++    dameng_to_sqlserver: "DATLUMA_TEST_DM_URL" => "DATLUMA_TEST_SQLSERVER_URL", "m6dm";
  }
  
  /// 续传和跳过：每种目标家族各一条。
 @@ -627,4 +683,6 @@ special! {
-     skip_mysql_to_oracle: skip_flow, "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_ORACLE_URL", "m5sm";
-     skip_oracle_to_pg: skip_flow, "DBLENS_TEST_ORACLE_URL" => "DBLENS_TEST_PG_URL", "m5so";
-     skip_pg_to_dameng: skip_flow, "DBLENS_TEST_PG_URL" => "DBLENS_TEST_DM_URL", "m5sd";
-+    resume_pg_to_sqlserver: resume_flow, "DBLENS_TEST_PG_URL" => "DBLENS_TEST_SQLSERVER_URL", "m6rp";
-+    skip_mysql_to_sqlserver: skip_flow, "DBLENS_TEST_MYSQL_URL" => "DBLENS_TEST_SQLSERVER_URL", "m6sm";
+     skip_mysql_to_oracle: skip_flow, "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_ORACLE_URL", "m5sm";
+     skip_oracle_to_pg: skip_flow, "DATLUMA_TEST_ORACLE_URL" => "DATLUMA_TEST_PG_URL", "m5so";
+     skip_pg_to_dameng: skip_flow, "DATLUMA_TEST_PG_URL" => "DATLUMA_TEST_DM_URL", "m5sd";
++    resume_pg_to_sqlserver: resume_flow, "DATLUMA_TEST_PG_URL" => "DATLUMA_TEST_SQLSERVER_URL", "m6rp";
++    skip_mysql_to_sqlserver: skip_flow, "DATLUMA_TEST_MYSQL_URL" => "DATLUMA_TEST_SQLSERVER_URL", "m6sm";
  }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-api/src/design.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-api/src/design.rs`**
 
 ```diff
---- a/crates/dblens-api/src/design.rs
-+++ b/crates/dblens-api/src/design.rs
+--- a/crates/datluma-api/src/design.rs
++++ b/crates/datluma-api/src/design.rs
 @@ -17,6 +17,8 @@ pub async fn caps(State(s): State<AppState>, Path(id): Path<String>) -> ApiResul
  
  #[derive(Deserialize)]
@@ -1396,11 +1396,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  pub async fn preview(
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-api/src/tasks.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-api/src/tasks.rs`**
 
 ```diff
---- a/crates/dblens-api/src/tasks.rs
-+++ b/crates/dblens-api/src/tasks.rs
+--- a/crates/datluma-api/src/tasks.rs
++++ b/crates/datluma-api/src/tasks.rs
 @@ -83,6 +83,8 @@ pub async fn preview(State(s): State<AppState>, Json(b): Json<PreviewBody>) -> A
  
  #[derive(Deserialize)]
@@ -1421,11 +1421,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  
 ```
 
-- [ ] **Step 6: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 6: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -300,7 +300,6 @@
    "session.task_gone": {"zh-CN": "会话任务已退出", "en": "The session task has exited"},
    "sqlserver.bad_auth": {"zh-CN": "不认识的认证方式：%{value}", "en": "Unknown authentication method: %{value}"},
@@ -1436,11 +1436,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
    "sqlfile.history": {"zh-CN": "执行 SQL 文件 %{file}：%{done} 条，失败 %{failed} 条", "en": "Run SQL file %{file}: %{done} statements, %{failed} failed"},
 ```
 
-- [ ] **Step 7: 修改 `crates/dblens-dialect/src/changes.rs`**
+- [ ] **Step 7: 修改 `crates/datluma-dialect/src/changes.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/changes.rs
-+++ b/crates/dblens-dialect/src/changes.rs
+--- a/crates/datluma-dialect/src/changes.rs
++++ b/crates/datluma-dialect/src/changes.rs
 @@ -87,6 +87,11 @@ impl<'a> Builder<'a> {
      }
  
@@ -1455,11 +1455,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
          // PG 驱动不能直接绑定 NUMERIC 参数：精确小数按文本传，由数据库转换（整数列也接受 numeric 的赋值和比较）
 ```
 
-- [ ] **Step 8: 修改 `crates/dblens-dialect/src/compare/sync.rs`**
+- [ ] **Step 8: 修改 `crates/datluma-dialect/src/compare/sync.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/compare/sync.rs
-+++ b/crates/dblens-dialect/src/compare/sync.rs
+--- a/crates/datluma-dialect/src/compare/sync.rs
++++ b/crates/datluma-dialect/src/compare/sync.rs
 @@ -101,10 +101,8 @@ pub fn sync_script(
              match &item.change {
                  SchemaChange::DropTable { name } => drop_tables
@@ -1475,11 +1475,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
                      // 外键在所有表建好之后再加
 ```
 
-- [ ] **Step 9: 修改 `crates/dblens-dialect/src/import.rs`**
+- [ ] **Step 9: 修改 `crates/datluma-dialect/src/import.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/import.rs
-+++ b/crates/dblens-dialect/src/import.rs
+--- a/crates/datluma-dialect/src/import.rs
++++ b/crates/datluma-dialect/src/import.rs
 @@ -38,6 +38,11 @@ impl Dialect {
          format!("DELETE FROM {}", self.qualified(Some(schema), table))
      }
@@ -1608,11 +1608,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
      #[test]
 ```
 
-- [ ] **Step 10: 修改 `crates/dblens-dialect/src/lib.rs`**
+- [ ] **Step 10: 修改 `crates/datluma-dialect/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/lib.rs
-+++ b/crates/dblens-dialect/src/lib.rs
+--- a/crates/datluma-dialect/src/lib.rs
++++ b/crates/datluma-dialect/src/lib.rs
 @@ -170,6 +170,12 @@ impl Dialect {
          session::set_schema(self.family(), schema)
      }
@@ -1628,11 +1628,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
      }
 ```
 
-- [ ] **Step 11: 修改 `crates/dblens-dialect/src/migrate/expr.rs`**
+- [ ] **Step 11: 修改 `crates/datluma-dialect/src/migrate/expr.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/expr.rs
-+++ b/crates/dblens-dialect/src/migrate/expr.rs
+--- a/crates/datluma-dialect/src/migrate/expr.rs
++++ b/crates/datluma-dialect/src/migrate/expr.rs
 @@ -35,6 +35,31 @@ fn tokenize(family: Family, s: &str) -> Option<Vec<Tok>> {
          let c = b[i];
          if c.is_whitespace() {
@@ -1766,11 +1766,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
          assert_eq!(conv(Oracle, Postgres, "SYSDATE", "TIMESTAMP(0)"), Ok(Some("LOCALTIMESTAMP".into())));
 ```
 
-- [ ] **Step 12: 修改 `crates/dblens-dialect/src/migrate/script.rs`**
+- [ ] **Step 12: 修改 `crates/datluma-dialect/src/migrate/script.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/script.rs
-+++ b/crates/dblens-dialect/src/migrate/script.rs
+--- a/crates/datluma-dialect/src/migrate/script.rs
++++ b/crates/datluma-dialect/src/migrate/script.rs
 @@ -95,13 +95,18 @@ pub fn migration_script(
                      drop_sql(tgt, schema, &t.target.name),
                  ));
@@ -1859,11 +1859,11 @@ git commit -m "feat(dialect): SQL Server 表设计器的变更语句与重建" -
  }
 ```
 
-- [ ] **Step 13: 新建 `crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_sqlserver.snap`**
+- [ ] **Step 13: 新建 `crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_sqlserver.snap`**
 
 ```text
 ---
-source: crates/dblens-dialect/src/migrate/tests.rs
+source: crates/datluma-dialect/src/migrate/tests.rs
 expression: "render(&draft, tgt)"
 ---
 Info customers_id_seq: Sequence owned by a serial column; migrated with the identity column
@@ -1923,11 +1923,11 @@ ALTER TABLE app.orders ADD CONSTRAINT fk_orders_customer FOREIGN KEY (customer_i
 GO
 ```
 
-- [ ] **Step 14: 修改 `crates/dblens-dialect/src/migrate/tests.rs`**
+- [ ] **Step 14: 修改 `crates/datluma-dialect/src/migrate/tests.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/migrate/tests.rs
-+++ b/crates/dblens-dialect/src/migrate/tests.rs
+--- a/crates/datluma-dialect/src/migrate/tests.rs
++++ b/crates/datluma-dialect/src/migrate/tests.rs
 @@ -171,7 +171,7 @@ fn render(draft: &MigrationDraft, tgt: Variant) -> String {
          );
      }
@@ -1947,11 +1947,11 @@ GO
          assert!(!draft.blocked(), "{name}");
 ```
 
-- [ ] **Step 15: 修改 `crates/dblens-dialect/src/variant.rs`**
+- [ ] **Step 15: 修改 `crates/datluma-dialect/src/variant.rs`**
 
 ```diff
---- a/crates/dblens-dialect/src/variant.rs
-+++ b/crates/dblens-dialect/src/variant.rs
+--- a/crates/datluma-dialect/src/variant.rs
++++ b/crates/datluma-dialect/src/variant.rs
 @@ -19,6 +19,22 @@ pub enum Family {
      SqlServer,
  }
@@ -1999,23 +1999,23 @@ GO
  }
 ```
 
-- [ ] **Step 16: 修改 `crates/dblens-service/src/compare.rs`**
+- [ ] **Step 16: 修改 `crates/datluma-service/src/compare.rs`**
 
 ```diff
---- a/crates/dblens-service/src/compare.rs
-+++ b/crates/dblens-service/src/compare.rs
+--- a/crates/datluma-service/src/compare.rs
++++ b/crates/datluma-service/src/compare.rs
 @@ -7,13 +7,13 @@ use std::sync::Arc;
  
- use dblens_core::schema::Table;
- use dblens_core::{Error, Msg, Result, msg};
--use dblens_dialect::Dialect;
- use dblens_dialect::compare::{
+ use datluma_core::schema::Table;
+ use datluma_core::{Error, Msg, Result, msg};
+-use datluma_dialect::Dialect;
+ use datluma_dialect::compare::{
      CompareOptions, CompareRenames, CompareSide, SchemaChange, SchemaDiff, SyncScript, SyncStep,
      apply_changes, compare_schemas, sync_rebuild_tables, sync_script,
  };
- use dblens_dialect::design::{RebuildContext, TableChange};
- use dblens_dialect::meta::{MetaArgs, MetaKey};
-+use dblens_dialect::{Dialect, Family};
+ use datluma_dialect::design::{RebuildContext, TableChange};
+ use datluma_dialect::meta::{MetaArgs, MetaKey};
++use datluma_dialect::{Dialect, Family};
  use serde::{Deserialize, Serialize};
  
  use crate::design::{Part, Run};
@@ -2077,11 +2077,11 @@ GO
                      self.check_policy(profile, c.target.dialect, &texts).await;
 ```
 
-- [ ] **Step 17: 修改 `crates/dblens-service/src/design.rs`**
+- [ ] **Step 17: 修改 `crates/datluma-service/src/design.rs`**
 
 ```diff
---- a/crates/dblens-service/src/design.rs
-+++ b/crates/dblens-service/src/design.rs
+--- a/crates/datluma-service/src/design.rs
++++ b/crates/datluma-service/src/design.rs
 @@ -26,6 +26,9 @@ use crate::task::{TaskFailure, TaskHandle, TaskKind, TaskPhase};
  /// 预览和执行的请求。
  #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -2139,11 +2139,11 @@ GO
              draft: Table {
 ```
 
-- [ ] **Step 18: 修改 `crates/dblens-service/src/document/job.rs`**
+- [ ] **Step 18: 修改 `crates/datluma-service/src/document/job.rs`**
 
 ```diff
---- a/crates/dblens-service/src/document/job.rs
-+++ b/crates/dblens-service/src/document/job.rs
+--- a/crates/datluma-service/src/document/job.rs
++++ b/crates/datluma-service/src/document/job.rs
 @@ -56,7 +56,13 @@ pub enum DocSource {
      /// 打开的模型中的若干 schema。
      Model { model: String, schemas: Vec<String> },
@@ -2194,18 +2194,18 @@ GO
              format,
 ```
 
-- [ ] **Step 19: 修改 `crates/dblens-service/src/import/job.rs`**
+- [ ] **Step 19: 修改 `crates/datluma-service/src/import/job.rs`**
 
 ```diff
---- a/crates/dblens-service/src/import/job.rs
-+++ b/crates/dblens-service/src/import/job.rs
+--- a/crates/datluma-service/src/import/job.rs
++++ b/crates/datluma-service/src/import/job.rs
 @@ -6,6 +6,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
  
- use dblens_core::schema::{Column, PrimaryKey, Table};
- use dblens_core::{ColumnType, Error, LogicalType, Result, Value, msg};
-+use dblens_dialect::migrate::data::identity_insert_sql;
- use dblens_dialect::{Dialect, ImportStatement, WriteMode};
- use dblens_driver::{Connection, ExecEvent};
+ use datluma_core::schema::{Column, PrimaryKey, Table};
+ use datluma_core::{ColumnType, Error, LogicalType, Result, Value, msg};
++use datluma_dialect::migrate::data::identity_insert_sql;
+ use datluma_dialect::{Dialect, ImportStatement, WriteMode};
+ use datluma_driver::{Connection, ExecEvent};
  use serde::{Deserialize, Serialize};
 @@ -73,6 +74,10 @@ pub enum OnError {
  #[derive(Debug, Clone, PartialEq, Deserialize)]
@@ -2289,11 +2289,11 @@ GO
          let up = upload(&s, 3, &[]);
 ```
 
-- [ ] **Step 20: 修改 `crates/dblens-service/src/migrate/mod.rs`**
+- [ ] **Step 20: 修改 `crates/datluma-service/src/migrate/mod.rs`**
 
 ```diff
---- a/crates/dblens-service/src/migrate/mod.rs
-+++ b/crates/dblens-service/src/migrate/mod.rs
+--- a/crates/datluma-service/src/migrate/mod.rs
++++ b/crates/datluma-service/src/migrate/mod.rs
 @@ -34,6 +34,9 @@ pub use run::{MigrationProgress, TableView};
  #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
  pub struct MigrationEnd {
@@ -2348,18 +2348,18 @@ GO
      pub(crate) fn plan() -> MigrationPlan {
 ```
 
-- [ ] **Step 21: 修改 `crates/dblens-service/src/migrate/report.rs`**
+- [ ] **Step 21: 修改 `crates/datluma-service/src/migrate/report.rs`**
 
 ````diff
---- a/crates/dblens-service/src/migrate/report.rs
-+++ b/crates/dblens-service/src/migrate/report.rs
+--- a/crates/datluma-service/src/migrate/report.rs
++++ b/crates/datluma-service/src/migrate/report.rs
 @@ -4,8 +4,8 @@
  use std::fmt::Write as _;
  
- use dblens_core::{Error, Lang, Msg, Result, msg};
--use dblens_dialect::DdlKind;
- use dblens_dialect::migrate::script_text;
-+use dblens_dialect::{DdlKind, Family, Variant};
+ use datluma_core::{Error, Lang, Msg, Result, msg};
+-use datluma_dialect::DdlKind;
+ use datluma_dialect::migrate::script_text;
++use datluma_dialect::{DdlKind, Family, Variant};
  
  use super::record::{MigrationRecord, TableState};
  use crate::profile::Profile;
@@ -2385,11 +2385,11 @@ GO
      }
 ````
 
-- [ ] **Step 22: 修改 `crates/dblens-service/src/migrate/run.rs`**
+- [ ] **Step 22: 修改 `crates/datluma-service/src/migrate/run.rs`**
 
 ```diff
---- a/crates/dblens-service/src/migrate/run.rs
-+++ b/crates/dblens-service/src/migrate/run.rs
+--- a/crates/datluma-service/src/migrate/run.rs
++++ b/crates/datluma-service/src/migrate/run.rs
 @@ -93,13 +93,17 @@ impl Ctx {
  
      pub async fn connect_source(&self) -> Result<Box<dyn Connection>> {
@@ -2412,11 +2412,11 @@ GO
  
 ```
 
-- [ ] **Step 23: 修改 `crates/dblens-service/src/migrate/values.rs`**
+- [ ] **Step 23: 修改 `crates/datluma-service/src/migrate/values.rs`**
 
 ```diff
---- a/crates/dblens-service/src/migrate/values.rs
-+++ b/crates/dblens-service/src/migrate/values.rs
+--- a/crates/datluma-service/src/migrate/values.rs
++++ b/crates/datluma-service/src/migrate/values.rs
 @@ -115,7 +115,15 @@ pub fn to_target(v: &Value, col: &Column) -> Result<Value> {
          (L::Decimal { .. }, Value::Float(f)) => Value::Decimal(f.to_string()),
          _ => convert(v, col, EmptyAs::Null)?,
@@ -2436,11 +2436,11 @@ GO
  /// 去掉小数末尾的 0（`1.50` → `1.5`，`2.00` → `2`）。
 ```
 
-- [ ] **Step 24: 修改 `crates/dblens-service/src/model/ops.rs`**
+- [ ] **Step 24: 修改 `crates/datluma-service/src/model/ops.rs`**
 
 ```diff
---- a/crates/dblens-service/src/model/ops.rs
-+++ b/crates/dblens-service/src/model/ops.rs
+--- a/crates/datluma-service/src/model/ops.rs
++++ b/crates/datluma-service/src/model/ops.rs
 @@ -33,6 +33,10 @@ pub struct NewModel {
  #[derive(Debug, Clone, PartialEq, Deserialize)]
  pub struct ReverseRequest {
@@ -2471,19 +2471,19 @@ GO
              name: "rev".into(),
 ```
 
-- [ ] **Step 25: 修改 `crates/dblens-service/src/service.rs`**
+- [ ] **Step 25: 修改 `crates/datluma-service/src/service.rs`**
 
 ```diff
---- a/crates/dblens-service/src/service.rs
-+++ b/crates/dblens-service/src/service.rs
+--- a/crates/datluma-service/src/service.rs
++++ b/crates/datluma-service/src/service.rs
 @@ -3,9 +3,8 @@
  use std::path::Path;
  use std::sync::Arc;
  
--use dblens_core::{Error, Lang, Result, msg, set_default_lang};
-+use dblens_core::{Lang, Result, set_default_lang};
- use dblens_dialect::{Dialect, OpsQuery, Variant};
--use dblens_driver::DriverId;
+-use datluma_core::{Error, Lang, Result, msg, set_default_lang};
++use datluma_core::{Lang, Result, set_default_lang};
+ use datluma_dialect::{Dialect, OpsQuery, Variant};
+-use datluma_driver::DriverId;
  
  use crate::export::ExportManager;
  use crate::history::HistoryLog;
@@ -2513,27 +2513,27 @@ GO
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实库测试（SQL Server）：测试虚拟机 192.168.139.106 上的 Docker 容器 `mssql2022`（`mcr.microsoft.com/mssql/server:2022-latest`，1433，`--restart unless-stopped`）。sa 密码在 root 的 `/root/dblens-test/creds.env`（`MSSQL_SA=`），读进 shell 变量后做 URL 编码，以内联环境变量传入，不写进任何文件：
+实库测试（SQL Server）：测试虚拟机 192.168.139.106 上的 Docker 容器 `mssql2022`（`mcr.microsoft.com/mssql/server:2022-latest`，1433，`--restart unless-stopped`）。sa 密码在 root 的 `/root/datluma-test/creds.env`（`MSSQL_SA=`），读进 shell 变量后做 URL 编码，以内联环境变量传入，不写进任何文件：
 
 ```bash
 H=192.168.139.106
-P=$(ssh -i ~/.ssh/nexa_linux_vm -o IdentitiesOnly=yes nexa@$H 'sudo grep "^MSSQL_SA=" /root/dblens-test/creds.env | cut -d= -f2-')
+P=$(ssh -i ~/.ssh/nexa_linux_vm -o IdentitiesOnly=yes nexa@$H 'sudo grep "^MSSQL_SA=" /root/datluma-test/creds.env | cut -d= -f2-')
 ENC=$(python -c "import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1], safe=''))" "$P")
-DBLENS_TEST_SQLSERVER_URL="sqlserver://sa:$ENC@$H:1433/dblens_test" DBLENS_LANG=en CARGO_INCREMENTAL=0 \
+DATLUMA_TEST_SQLSERVER_URL="sqlserver://sa:$ENC@$H:1433/datluma_test" DATLUMA_LANG=en CARGO_INCREMENTAL=0 \
   cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace -- --test-threads=1 sqlserver
 ```
 
-测试库 `dblens_test` 由测试自己建（不存在时）。全部实库测试串行运行（`--test-threads=1`），不加 `--include-ignored`。
+测试库 `datluma_test` 由测试自己建（不存在时）。全部实库测试串行运行（`--test-threads=1`），不加 `--include-ignored`。
 
 回归：再带上原有 12 个实库目标的环境变量（MySQL、MariaDB、PG、Oracle、达梦，以及 TiDB、OceanBase、openGauss 三个、人大金仓两个；密码读法同上）跑一遍 `cargo test … --workspace -- --test-threads=1`。
 - OceanBase 在虚拟机开机后要几分钟才能连上（"Server is initializing"），连接被拒或报这个错时等它启动完再重跑。
 - 达梦偶发"网络通讯失败"，失败时单独重跑该用例。
 
 兼容（设计文档 8 节）：Win11 测试虚拟机 192.168.139.103 上的 SQL Server 2025 Express（实例 `SQLEXPRESS`，固定端口 1433，中文环境、中文报错）。
-sa 密码在虚拟机的 `C:\ProgramData\dblens-test\creds.txt`（只有管理员可读），用 `ssh bytes@192.168.139.103 "type …"` 读进变量，把 `DBLENS_TEST_SQLSERVER_URL` 指向它，
+sa 密码在虚拟机的 `C:\ProgramData\datluma-test\creds.txt`（只有管理员可读），用 `ssh bytes@192.168.139.103 "type …"` 读进变量，把 `DATLUMA_TEST_SQLSERVER_URL` 指向它，
 再跑一遍上面的 SQL Server 测试和迁移路线。
 
 Expected: 全部测试通过；SQL Server 的实库测试和 10 条迁移路线全部通过；回归无失败。
@@ -2541,7 +2541,7 @@ Expected: 全部测试通过；SQL Server 的实库测试和 10 条迁移路线�
 - [ ] **Step 27: 提交**
 
 ```bash
-git add crates/dblens-api/src/design.rs crates/dblens-api/src/tasks.rs crates/dblens-api/tests/live.rs crates/dblens-core/locales/app.json crates/dblens-dialect/src/changes.rs crates/dblens-dialect/src/compare/sync.rs crates/dblens-dialect/src/import.rs crates/dblens-dialect/src/lib.rs crates/dblens-dialect/src/migrate/expr.rs crates/dblens-dialect/src/migrate/script.rs crates/dblens-dialect/src/migrate/snapshots/dblens_dialect__migrate__tests__pg_to_sqlserver.snap crates/dblens-dialect/src/migrate/tests.rs crates/dblens-dialect/src/variant.rs crates/dblens-service/src/compare.rs crates/dblens-service/src/design.rs crates/dblens-service/src/document/job.rs crates/dblens-service/src/import/job.rs crates/dblens-service/src/migrate/mod.rs crates/dblens-service/src/migrate/report.rs crates/dblens-service/src/migrate/run.rs crates/dblens-service/src/migrate/values.rs crates/dblens-service/src/model/ops.rs crates/dblens-service/src/service.rs crates/dblens-service/tests/live.rs crates/dblens-service/tests/migrate_live.rs
+git add crates/datluma-api/src/design.rs crates/datluma-api/src/tasks.rs crates/datluma-api/tests/live.rs crates/datluma-core/locales/app.json crates/datluma-dialect/src/changes.rs crates/datluma-dialect/src/compare/sync.rs crates/datluma-dialect/src/import.rs crates/datluma-dialect/src/lib.rs crates/datluma-dialect/src/migrate/expr.rs crates/datluma-dialect/src/migrate/script.rs crates/datluma-dialect/src/migrate/snapshots/datluma_dialect__migrate__tests__pg_to_sqlserver.snap crates/datluma-dialect/src/migrate/tests.rs crates/datluma-dialect/src/variant.rs crates/datluma-service/src/compare.rs crates/datluma-service/src/design.rs crates/datluma-service/src/document/job.rs crates/datluma-service/src/import/job.rs crates/datluma-service/src/migrate/mod.rs crates/datluma-service/src/migrate/report.rs crates/datluma-service/src/migrate/run.rs crates/datluma-service/src/migrate/values.rs crates/datluma-service/src/model/ops.rs crates/datluma-service/src/service.rs crates/datluma-service/tests/live.rs crates/datluma-service/tests/migrate_live.rs
 git commit -m "feat: SQL Server 的导入、比对与模型、文档导出、迁移（后端）" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3212,7 +3212,7 @@ git commit -m "feat: SQL Server 的导入、比对与模型、文档导出、迁
 +  return req.source.kind === 'database' ? { ...req, source: withCatalog(req.source) } : req
  }
  
- /** 服务端的错误对象（dblens_core::Error），按 kind 区分。 */
+ /** 服务端的错误对象（datluma_core::Error），按 kind 区分。 */
 @@ -482,7 +513,9 @@ export interface SqlFileRequest {
  /** 结构迁移（M5a）：迁移的一端。 */
  export interface MigrationEnd {
@@ -3337,7 +3337,7 @@ export async function schemaOptions(api: Api, profile: Profile): Promise<SchemaO
 export CARGO_INCREMENTAL=0
 cargo fmt --all -- --check
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -3350,12 +3350,12 @@ Expected: 全部通过（前端新增库名拆分、迁移方案、反向生成�
 
 - [ ] **Step 21: 浏览器实测**
 
-浏览器实测（设计文档 8 节）：用 `dblens-server --listen 127.0.0.1:<端口> --data-dir <临时目录> --web-dir web/dist --no-update-check` 启动浏览器模式，
-按 `DBLENS_TEST_SQLSERVER_URL`、`DBLENS_TEST_MYSQL_URL` 建两个"测试"环境的连接（可用接口 `POST /api/profiles`）。
+浏览器实测（设计文档 8 节）：用 `datluma-server --listen 127.0.0.1:<端口> --data-dir <临时目录> --web-dir web/dist --no-update-check` 启动浏览器模式，
+按 `DATLUMA_TEST_SQLSERVER_URL`、`DATLUMA_TEST_MYSQL_URL` 建两个"测试"环境的连接（可用接口 `POST /api/profiles`）。
 1. 对象树中 SQL Server 的架构和表的右键菜单没有置灰的项。
-2. 表设计器打开 `dblens_test.dblens_meta.emp`（标题为 `库.架构.表`）；加一列后 SQL 预览为 `ALTER TABLE … ADD …`，提示"整体在一个事务中执行"；保存执行后列已加上；再删掉这列。
-3. 结构比对：两边选 SQL Server，schema 下拉框列出 `dblens_test.dblens_meta`、`dblens_test.dbo`；同一个架构与自身比对没有差异。
-4. 在 `dblens_meta` 上"迁移到…"：来源为 `dblens_test.dblens_meta`；目标选 MySQL 的 `dblens_test`，读取结构后列出表和需要处理的不支持映射（geography、rowversion）。
+2. 表设计器打开 `datluma_test.datluma_meta.emp`（标题为 `库.架构.表`）；加一列后 SQL 预览为 `ALTER TABLE … ADD …`，提示"整体在一个事务中执行"；保存执行后列已加上；再删掉这列。
+3. 结构比对：两边选 SQL Server，schema 下拉框列出 `datluma_test.datluma_meta`、`datluma_test.dbo`；同一个架构与自身比对没有差异。
+4. 在 `datluma_meta` 上"迁移到…"：来源为 `datluma_test.datluma_meta`；目标选 MySQL 的 `datluma_test`，读取结构后列出表和需要处理的不支持映射（geography、rowversion）。
 
 - [ ] **Step 22: 提交**
 
@@ -3375,7 +3375,7 @@ git commit -m "feat(web): SQL Server 的写入类功能取消置灰，schema 下
 **Files:**
 - Modify: `docs/notes/m0-4b-api.md`
 - Create: `docs/notes/m6b-sqlserver.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`
 
 - [ ] **Step 1: 修改 `docs/notes/m0-4b-api.md`**
 
@@ -3404,22 +3404,22 @@ git commit -m "feat(web): SQL Server 的写入类功能取消置灰，schema 下
 ## 结构
 
 ```text
-crates/dblens-dialect/src/design/sqlserver.rs  设计器的变更语句：带名字的默认值（DF_表_列）、执行时查名删除默认值约束、sp_rename、扩展属性注释
-crates/dblens-dialect/src/design/sql.rs        SQL Server 分支、可回滚（design_transactional）、rename_table_sql
-crates/dblens-dialect/src/design/rebuild.rs    重建：文件组 ON […]、IDENTITY_INSERT、sp_rename 改回原名并把默认值约束改回按原表名命名、sp_refreshview
-crates/dblens-dialect/src/design/diff.rs       NONCLUSTERED 是默认的索引方法
-crates/dblens-dialect/src/import.rs            每条语句的参数上限由方言给出（SQL Server 2000）、多行 MERGE、NULL 直接写进语句
-crates/dblens-dialect/src/changes.rs           表数据编辑：NULL 直接写进语句
-crates/dblens-dialect/src/variant.rs           Family::terminate：脚本中一条语句的写法（SQL Server 后接 GO）
-crates/dblens-dialect/src/lib.rs               schema_switch_sql：SQL Server 不切换 schema
-crates/dblens-dialect/src/compare/sync.rs      同步脚本的表改名用 rename_table_sql
-crates/dblens-dialect/src/migrate/             序列（AS BIGINT、NO CACHE / NO CYCLE）、默认值（时间、UUID、布尔）、源表达式的方括号和 N''、
+crates/datluma-dialect/src/design/sqlserver.rs  设计器的变更语句：带名字的默认值（DF_表_列）、执行时查名删除默认值约束、sp_rename、扩展属性注释
+crates/datluma-dialect/src/design/sql.rs        SQL Server 分支、可回滚（design_transactional）、rename_table_sql
+crates/datluma-dialect/src/design/rebuild.rs    重建：文件组 ON […]、IDENTITY_INSERT、sp_rename 改回原名并把默认值约束改回按原表名命名、sp_refreshview
+crates/datluma-dialect/src/design/diff.rs       NONCLUSTERED 是默认的索引方法
+crates/datluma-dialect/src/import.rs            每条语句的参数上限由方言给出（SQL Server 2000）、多行 MERGE、NULL 直接写进语句
+crates/datluma-dialect/src/changes.rs           表数据编辑：NULL 直接写进语句
+crates/datluma-dialect/src/variant.rs           Family::terminate：脚本中一条语句的写法（SQL Server 后接 GO）
+crates/datluma-dialect/src/lib.rs               schema_switch_sql：SQL Server 不切换 schema
+crates/datluma-dialect/src/compare/sync.rs      同步脚本的表改名用 rename_table_sql
+crates/datluma-dialect/src/migrate/             序列（AS BIGINT、NO CACHE / NO CYCLE）、默认值（时间、UUID、布尔）、源表达式的方括号和 N''、
                                                NEXT VALUE FOR 带 schema、script_text 按目标结束语句
-crates/dblens-service/src/service.rs           scoped_profile（替代 feature_profile，不再拦截）
-crates/dblens-service/src/{design,import/job,compare,document/job,migrate/mod,model/ops}.rs  请求加 catalog
-crates/dblens-service/src/import/job.rs        映射了自增列时包上 IDENTITY_INSERT
-crates/dblens-service/src/migrate/values.rs    时间按目标精度截断后再写
-crates/dblens-api/src/{design,tasks}.rs        读原表、建表语句预览的 catalog 参数
+crates/datluma-service/src/service.rs           scoped_profile（替代 feature_profile，不再拦截）
+crates/datluma-service/src/{design,import/job,compare,document/job,migrate/mod,model/ops}.rs  请求加 catalog
+crates/datluma-service/src/import/job.rs        映射了自增列时包上 IDENTITY_INSERT
+crates/datluma-service/src/migrate/values.rs    时间按目标精度截断后再写
+crates/datluma-api/src/{design,tasks}.rs        读原表、建表语句预览的 catalog 参数
 web/src/shared/api.ts                          withCatalog、planEnds：请求和保存的方案中拆开合成的 schema
 web/src/shared/schemaOptions.ts                连接下可选的 schema（SQL Server 列出各用户库的架构）
 web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取消置灰、下拉框、GO、库.架构 的显示
@@ -3450,7 +3450,7 @@ web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取�
 
 ## 已知限制
 
-- 非 Unicode 的 `varchar`、`char` 列在默认排序规则下存不了中文（数据库的限制）；DBLens 生成的字符串列一律是 `nvarchar`。
+- 非 Unicode 的 `varchar`、`char` 列在默认排序规则下存不了中文（数据库的限制）；DATLUMA 生成的字符串列一律是 `nvarchar`。
 - 改列类型时，若有索引、检查约束、计算列引用该列，由服务器报错、整体回滚；不自动删除再重建。
 - 带 `SCHEMABINDING` 的视图引用的表不能重建（删表失败、整体回滚）。
 - 触发器定义中不带 schema 的表名按执行者的默认架构解析（重建时原样执行触发器 DDL）。
@@ -3459,7 +3459,7 @@ web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取�
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过（不连库 837 个）。按任务拆分的每个提交都单独跑过 fmt、clippy 和全部测试。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过（不连库 837 个）。按任务拆分的每个提交都单独跑过 fmt、clippy 和全部测试。
   - 方言层：SQL Server 的建表、全部变更、改列、重建快照；默认值约束名、计算列表达式；2000 个参数的拆分、多行 MERGE（NULL 直接写）；脚本的 GO；
     迁移的 PG → SQL Server 快照、布尔和时间默认值、来源表达式的方括号和 N''。
 - 实库（串行）：
@@ -3470,15 +3470,15 @@ web/src/features/{tree,data,compare,migrate,model,design,import,document}/  取�
   - SQL Server 2025 Express（Win11 测试虚拟机 192.168.139.103，中文环境）：上面 SQL Server 的测试和 10 条迁移路线全部通过。
 - 前端：tsc、Vitest 287 个（库名拆分、迁移方案、反向生成的库检查、设计器脚本的 GO）、打包通过。
 - 浏览器：对象树中 SQL Server 的菜单不再置灰；设计器读原表（标题 `库.架构.表`）、加列的预览（一个事务）、保存执行后列已加上，再删掉；
-  比对的 schema 下拉框列出 `dblens_test.dblens_meta`、`dblens_test.dbo`，同一个架构与自身比对没有差异；从对象树"迁移到…" MySQL，读取结构后列出表和需要处理的不支持映射。
+  比对的 schema 下拉框列出 `datluma_test.datluma_meta`、`datluma_test.dbo`，同一个架构与自身比对没有差异；从对象树"迁移到…" MySQL，读取结构后列出表和需要处理的不支持映射。
 - 未验证：桌面程序（Tauri）中的这些功能；文档导出和导入在浏览器中的完整操作（接口转换有单元测试，后端有实库测试）；SQL Server 2017。
 ````
 
-- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-dblens-design.md`**
+- [ ] **Step 3: 修改 `docs/superpowers/specs/2026-10-22-datluma-design.md`**
 
 ```diff
---- a/docs/superpowers/specs/2026-10-22-dblens-design.md
-+++ b/docs/superpowers/specs/2026-10-22-dblens-design.md
+--- a/docs/superpowers/specs/2026-10-22-datluma-design.md
++++ b/docs/superpowers/specs/2026-10-22-datluma-design.md
 @@ -338,7 +338,8 @@ trait Policy: Send + Sync {
  - M5a 已完成（设计 `docs/superpowers/specs/2026-10-28-m5a-structure-migration-design.md`，详细计划 `docs/superpowers/plans/2026-10-28-m5a-structure-migration.md`，说明 `docs/notes/m5a-structure-migration.md`）。
  - M5b 已完成（设计 `docs/superpowers/specs/2026-10-28-m5b-data-migration-design.md`，详细计划 `docs/superpowers/plans/2026-10-29-m5b-data-migration.md`，说明 `docs/notes/m5b-data-migration.md`）。M5 全部完成。
@@ -3500,6 +3500,6 @@ Expected: 无。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/m0-4b-api.md docs/notes/m6b-sqlserver.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/m0-4b-api.md docs/notes/m6b-sqlserver.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: M6b 说明文档、接口与总设计文档更新" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```

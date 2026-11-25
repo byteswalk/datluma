@@ -5,15 +5,15 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/
+crates/datluma-dialect/src/
   ddl.rs          DdlKind；ddl_query（MySQL 系 SHOW CREATE、Oracle / 达梦 DBMS_METADATA.GET_DDL）；
                   PG 系由结构模型拼装（table_ddl = table_create + table_extras、view_ddl、sequence_ddl）；ddl_text
   browse.rs       外键关系 relations、关联查询 join_sql、数据标签的 data_sql
   meta/mod.rs     MetaKey::Ddl（不在模板文件中，只用于缓存）
-crates/dblens-service/src/
+crates/datluma-service/src/
   objects.rs      MetadataService::ddl / generate / relations / data_sql
   metadata.rs     run：按方言生成查询、经元数据连接池执行、按键缓存（rows 改为调用它）
-crates/dblens-api/src/
+crates/datluma-api/src/
   routes.rs       …/ddl、…/generate、…/relations、…/data-sql
   ws.rs           cancel 在等 fetch_more 时丢掉剩下的行（见下）
 web/src/
@@ -68,7 +68,7 @@ web/src/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过。
   - 服务层的实库测试在 5 个库中建父子表（主键、唯一、外键、检查、索引、注释）、视图、序列、函数，查看 DDL、生成 SQL、取外键关系、执行数据 SQL 后删除。
   - 接口的实库测试检查参数、状态码；WebSocket 新增"等 fetch_more 时取消"的测试。
 - 前端：tsc、Vitest、打包通过。

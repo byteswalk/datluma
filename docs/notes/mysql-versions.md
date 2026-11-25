@@ -11,9 +11,9 @@ VM .106 上的 Docker 容器，镜像是华为云 SWR 同步的 Docker Hub 官�
 | 5.7.44 | `my57` | 3317 | 5.7 的最后一版；默认字符集是 latin1，启动参数改成 utf8mb4 |
 | 8.0.44 | `my80` | 3318 | |
 
-- 账号 `admin`（全局全部权限，带 GRANT OPTION），库 `dblens_test`，密码同 9.7 的 `MYSQL_ADMIN`。
-- 初始化脚本挂在 VM 的 `/var/lib/dblens-mysql-init/<容器>`，建完清空（容器重启时还要挂载这个目录）。
-- 本机连接串 `DBLENS_TEST_MY57_URL`、`DBLENS_TEST_MY80_URL`，跑测试时赋给 `DBLENS_TEST_MYSQL_URL`。
+- 账号 `admin`（全局全部权限，带 GRANT OPTION），库 `datluma_test`，密码同 9.7 的 `MYSQL_ADMIN`。
+- 初始化脚本挂在 VM 的 `/var/lib/datluma-mysql-init/<容器>`，建完清空（容器重启时还要挂载这个目录）。
+- 本机连接串 `DATLUMA_TEST_MY57_URL`、`DATLUMA_TEST_MY80_URL`，跑测试时赋给 `DATLUMA_TEST_MYSQL_URL`。
 
 ## 改了什么（5.7）
 

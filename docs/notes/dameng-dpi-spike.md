@@ -10,10 +10,10 @@
 
 | 验证项 | 结果 | 观察 |
 |---|---|---|
-| 连接与中文（PG_UTF8） | 通过 | 登录前设置 `DSQL_ATTR_LOCAL_CODE = PG_UTF8`、`DSQL_ATTR_LOGIN_PORT`，`dpi_login(主机, 用户, 密码)` 成功。`SELECT '数洞', 1, SYSDATE FROM DUAL` 的列描述：`'数洞'` 类型 2（VARCHAR）精度 6、`1` 类型 7（INT）精度 10、`SYSDATE` 类型 16（DSQL_TIMESTAMP）精度 19，均可空；列名、数据、错误信息都是 UTF-8，"数洞" 原样往返 |
+| 连接与中文（PG_UTF8） | 通过 | 登录前设置 `DSQL_ATTR_LOCAL_CODE = PG_UTF8`、`DSQL_ATTR_LOGIN_PORT`，`dpi_login(主机, 用户, 密码)` 成功。`SELECT '数览', 1, SYSDATE FROM DUAL` 的列描述：`'数览'` 类型 2（VARCHAR）精度 6、`1` 类型 7（INT）精度 10、`SYSDATE` 类型 16（DSQL_TIMESTAMP）精度 19，均可空；列名、数据、错误信息都是 UTF-8，"数览" 原样往返 |
 | 从其他线程 dpi_cancel | 通过 | 计划原用的三表笛卡尔积 COUNT 会被优化成计数相乘，约 0.12 秒就返回，取消请求到达时语句已结束（第一次运行因此"失败"）。换成逐行计算条件的查询（不取消约 132 秒）后：`dpi_cancel` 返回 0（DSQL_SUCCESS），调用本身约 6 ms；被取消的 `dpi_exec_direct` 返回错误，诊断码 **-6515**「操作被取消」；从发出取消到语句返回约 **3～3.5 秒**（200 ms / 500 ms / 1000 ms / 2500 ms 后取消，语句分别在约 4.0 / 3.1～3.7 / 4.0 / 6.0 秒返回），PL/SQL `WHILE` 循环同样可取消、延迟相同；取消后连接可继续使用，同一语句句柄也可直接复用 |
 | CLOB 分块读取 | 通过 | `SELECT RPAD(TO_CLOB('a'), 100000, 'a') FROM DUAL` 可用，列类型 19（DSQL_CLOB）精度 2147483647。`DSQL_C_NCHAR` 读取时，`dpi_get_data` 的长度输出是**本次调用开始时剩余的字节数（客户端编码 UTF-8，不含结尾 \0）**：5 万个汉字的 CLOB 第一次报告 150000（字节，不是字符；`DBMS_LOB.GETLENGTH` 为 50000），之后依次 84465、18930。没有 NO_TOTAL（头文件里也没有这个常量）。缓冲区写满时返回 1（SUCCESS_WITH_INFO），最后一块返回 0。分块会切在 UTF-8 字符中间（1001 字节缓冲区每块 1000 字节），拼接后完整有效 |
-| 错误码格式 | 通过 | `dpi_get_diag_rec` 给出负数错误码和中文信息：不存在的表 **-2106**「第1 行附近出现错误:\n无效的表或视图名[DBLENS_NO_SUCH_TABLE]」；语法错误 **-2007**「第 1 行, 第 6 列[1]附近出现错误: \n语法分析出错」 |
+| 错误码格式 | 通过 | `dpi_get_diag_rec` 给出负数错误码和中文信息：不存在的表 **-2106**「第1 行附近出现错误:\n无效的表或视图名[DATLUMA_NO_SUCH_TABLE]」；语法错误 **-2007**「第 1 行, 第 6 列[1]附近出现错误: \n语法分析出错」 |
 
 补充验证：
 
@@ -40,7 +40,7 @@
    Task 4 最终没有改成"读到 ≥ limit 即停"，而是保留 `out.len() > limit` 的判断，目的是让读到的字节数一旦超过限额，
    后续的 `cap_large` 一定会触发，把值截断在 limit 处（并退回到字符边界）。另外 `bytes_value` 在数据库报告的总长度大于已读字节数时，
    一律把值标记为截断的 LOB 预览（`total_len` 取数据库报告的总长度），所以提前停止读取不会把不完整的内容当作完整值返回。
-7. **VARCHAR 的列精度是字节数**（`'数洞'` 精度 6，库为 UTF-8、`LENGTH_IN_CHAR=0`），类型映射时不要把精度当作字符数。
+7. **VARCHAR 的列精度是字节数**（`'数览'` 精度 6，库为 UTF-8、`LENGTH_IN_CHAR=0`），类型映射时不要把精度当作字符数。
 8. **必须在登录前设置 `DSQL_ATTR_LOCAL_CODE = PG_UTF8`**：列名、数据和错误信息因此都是 UTF-8；错误信息中可能带换行和"第 N 行, 第 M 列"的位置描述，
    需要时可从中解析 `position`，并去掉多余的换行。
 9. **类型以 ffi.rs 为准**：`dpi_number_columns` 的输出参数是 `sdint2*`（计划写的是 `udint2`）；`dpi_desc_column` 的列号是 `sdint2`，

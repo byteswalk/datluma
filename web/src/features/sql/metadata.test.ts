@@ -103,6 +103,6 @@ describe('findName / defaultSchema', () => {
     expect(defaultSchema('mysql', 'root', 'shop')).toBe('shop')
     expect(defaultSchema('mysql', 'root', null)).toBeNull()
     expect(defaultSchema('postgres', 'admin', 'db')).toBe('public')
-    expect(defaultSchema('oracle', 'dblens_test')).toBe('DBLENS_TEST')
+    expect(defaultSchema('oracle', 'datluma_test')).toBe('DATLUMA_TEST')
   })
 })

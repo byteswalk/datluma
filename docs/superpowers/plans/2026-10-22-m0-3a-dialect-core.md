@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 新建 `dblens-dialect` crate，实现方言层中不涉及元数据读取的纯逻辑部分：
+**Goal:** 新建 `datluma-dialect` crate，实现方言层中不涉及元数据读取的纯逻辑部分：
 - 兼容库变体识别；
 - 标识符引用与占位符；
 - SQL 语句拆分；
@@ -11,7 +11,7 @@
 - 由表模型生成 SELECT/INSERT/UPDATE/DELETE。
 
 **Architecture:**
-- `dblens-dialect` 不做任何 IO，也不依赖 tokio。
+- `datluma-dialect` 不做任何 IO，也不依赖 tokio。
 - 方言差异全部按"家族"（`Family`：MySQL / PostgreSQL / Oracle / 达梦）区分，写成纯函数；兼容库变体（`Variant`）只在个别地方覆盖。
 - 对外暴露一个轻量的 `Dialect` 结构体（只含一个 `Variant`），把各模块的纯函数包装成方法。
 
@@ -19,17 +19,17 @@
 
 **Tech Stack:** Rust 1.99（edition 2024）、chrono、serde；只用到工作区已有的依赖。
 
-**Spec:** `docs/superpowers/specs/2026-10-22-dblens-design.md`，第 6.2 节（方言接口的 2、3、4 项）、第 6.3 节（兼容库）、第 7.3 节（生成 SQL 菜单），以及第 9 节。总览见 `docs/superpowers/plans/2026-10-22-m0-overview.md`（M0-3 拆成 3a 和 3b）。
+**Spec:** `docs/superpowers/specs/2026-10-22-datluma-design.md`，第 6.2 节（方言接口的 2、3、4 项）、第 6.3 节（兼容库）、第 7.3 节（生成 SQL 菜单），以及第 9 节。总览见 `docs/superpowers/plans/2026-10-22-m0-overview.md`（M0-3 拆成 3a 和 3b）。
 
 ## Global Constraints
 
 - 沿用 M0-1 和 M0-2 的约束：
-  - 仓库根目录 `E:\VibeCoding\16数据库管理工具\dblens\`；
+  - 仓库根目录 `E:\VibeCoding\16数据库管理工具\datluma\`；
   - Rust 1.99.0，edition 2024；依赖版本在工作区统一声明；
-  - 错误一律转换为 `dblens_core::Error`，不允许在库代码里 `unwrap`；
+  - 错误一律转换为 `datluma_core::Error`，不允许在库代码里 `unwrap`；
   - 注释和用户可见文案用中文；
   - 提交时附加 `Co-Authored-By` 行，写明实际完成工作的模型。
-- `dblens-dialect` **不做任何 IO**：不连数据库、不读文件、不依赖 tokio 和任何驱动 crate。只依赖 `dblens-core`，以及 `dblens-driver` 里的两个纯类型 `DriverId` 和 `ServerInfo`。
+- `datluma-dialect` **不做任何 IO**：不连数据库、不读文件、不依赖 tokio 和任何驱动 crate。只依赖 `datluma-core`，以及 `datluma-driver` 里的两个纯类型 `DriverId` 和 `ServerInfo`。
 - 计划中的代码已在临时工作区按最终状态完整编译并测试过：35 个测试全部通过，clippy 没有警告。但排版不完全符合 rustfmt，所以**每次提交前先运行 `cargo fmt --all`**。
 - 全部用单元测试验证，不需要数据库。完成标准：`cargo fmt --all --check`、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo test --workspace` 全部通过。
 - **生成的 SQL 要拿去执行**。凡是会拼进 SQL 的标识符和字面量，必须经过本 crate 的引用和转义函数；本 crate 不得把任何调用方传入的文本原样拼进 SQL。
@@ -40,7 +40,7 @@
 ## File Structure
 
 ```
-crates/dblens-dialect/
+crates/datluma-dialect/
 ├── Cargo.toml
 └── src/
     ├── lib.rs        模块导出、Dialect 结构体（Task 5 补全方法）
@@ -58,10 +58,10 @@ docs/superpowers/plans/2026-10-22-m0-overview.md   （Task 5 更新 M0-3a 状态
 ### Task 1: crate 骨架、变体识别、标识符与占位符
 
 **Files:**
-- Create: `crates/dblens-dialect/Cargo.toml`, `src/lib.rs`, `src/variant.rs`, `src/ident.rs`
+- Create: `crates/datluma-dialect/Cargo.toml`, `src/lib.rs`, `src/variant.rs`, `src/ident.rs`
 
 **Interfaces:**
-- Consumes: `dblens_driver::{DriverId, ServerInfo}`
+- Consumes: `datluma_driver::{DriverId, ServerInfo}`
 - Produces:
   - `Family { MySql, Postgres, Oracle, Dameng }`（Copy、可序列化）
   - `Variant { MySql, MariaDb, TiDb, OceanBase, Postgres, Kingbase, OpenGauss, GaussDb, HighGo, Oracle, Dameng }`，以及 `Variant::family(self) -> Family`、`Variant::display_name(self) -> &'static str`、`Variant::detect(DriverId, &ServerInfo) -> Variant`、`Variant::base(DriverId) -> Variant`
@@ -71,10 +71,10 @@ docs/superpowers/plans/2026-10-22-m0-overview.md   （Task 5 更新 M0-3a 状态
 
 - [ ] **Step 1: 创建 crate 并写失败的测试**
 
-`crates/dblens-dialect/Cargo.toml`：
+`crates/datluma-dialect/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-dialect"
+name = "datluma-dialect"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -82,19 +82,19 @@ publish.workspace = true
 
 [dependencies]
 chrono.workspace = true
-dblens-core.workspace = true
-dblens-driver.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 ```
 
-在根目录 `Cargo.toml` 的 `[workspace.dependencies]` 中，`dblens-driver` 一行之后追加：
+在根目录 `Cargo.toml` 的 `[workspace.dependencies]` 中，`datluma-driver` 一行之后追加：
 ```toml
-dblens-dialect = { path = "crates/dblens-dialect" }
+datluma-dialect = { path = "crates/datluma-dialect" }
 ```
 
-`crates/dblens-dialect/src/lib.rs`（本任务的版本，后续任务逐步添加模块）：
+`crates/datluma-dialect/src/lib.rs`（本任务的版本，后续任务逐步添加模块）：
 ```rust
 //! 方言层：不做任何 IO，只负责各数据库的语法差异——标识符与字面量、语句拆分、类型映射、SQL 生成。
 
@@ -104,7 +104,7 @@ mod variant;
 pub use variant::{Family, Variant};
 ```
 
-`crates/dblens-dialect/src/variant.rs` 末尾：
+`crates/datluma-dialect/src/variant.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -150,7 +150,7 @@ mod tests {
 }
 ```
 
-`crates/dblens-dialect/src/ident.rs` 末尾：
+`crates/datluma-dialect/src/ident.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -168,7 +168,7 @@ mod tests {
         assert_eq!(ident(Family::MySql, "user_name"), "user_name");
         assert_eq!(ident(Family::MySql, "UserName"), "UserName");
         assert_eq!(ident(Family::MySql, "order"), "`order`");
-        assert_eq!(ident(Family::MySql, "数洞"), "`数洞`");
+        assert_eq!(ident(Family::MySql, "数览"), "`数览`");
         assert_eq!(ident(Family::MySql, "a b"), "`a b`");
         assert_eq!(ident(Family::MySql, "1abc"), "`1abc`");
         assert_eq!(ident(Family::Postgres, "name"), "name");
@@ -193,7 +193,7 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-dialect`
+Run: `cargo test -p datluma-dialect`
 Expected: 编译失败，提示找不到 `Variant`、`quote_ident` 等。
 
 - [ ] **Step 3: 实现 `variant.rs` 和 `ident.rs`**
@@ -202,7 +202,7 @@ Expected: 编译失败，提示找不到 `Variant`、`quote_ident` 等。
 ```rust
 //! 方言家族与具体产品变体的识别。
 
-use dblens_driver::{DriverId, ServerInfo};
+use datluma_driver::{DriverId, ServerInfo};
 use serde::{Deserialize, Serialize};
 
 /// 方言家族：语法规则基本相同的一组数据库。
@@ -349,13 +349,13 @@ const RESERVED: &[&str] = &[
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-dialect && cargo clippy -p dblens-dialect --all-targets -- -D warnings`
+Run: `cargo test -p datluma-dialect && cargo clippy -p datluma-dialect --all-targets -- -D warnings`
 Expected: 6 个测试全部 PASS，没有警告。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add Cargo.toml Cargo.lock crates/dblens-dialect
+git add Cargo.toml Cargo.lock crates/datluma-dialect
 git commit -m "feat(dialect): 方言 crate 骨架、兼容库变体识别、标识符与占位符" -m "Co-Authored-By: <实际模型> <noreply@anthropic.com>"
 ```
 
@@ -364,8 +364,8 @@ git commit -m "feat(dialect): 方言 crate 骨架、兼容库变体识别、标�
 ### Task 2: SQL 语句拆分
 
 **Files:**
-- Create: `crates/dblens-dialect/src/split.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
+- Create: `crates/datluma-dialect/src/split.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
 
 **Interfaces:**
 - Consumes: `Family`
@@ -393,7 +393,7 @@ git commit -m "feat(dialect): 方言 crate 骨架、兼容库变体识别、标�
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-dialect/src/split.rs`（测试模块；实现在 Step 3 写在它前面）：
+`crates/datluma-dialect/src/split.rs`（测试模块；实现在 Step 3 写在它前面）：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -419,7 +419,7 @@ mod tests {
 
     #[test]
     fn offsets_are_byte_positions() {
-        let sql = "SELECT '数洞;'; SELECT 2";
+        let sql = "SELECT '数览;'; SELECT 2";
         let out = split_statements(sql, Family::MySql);
         assert_eq!(out.len(), 2);
         assert_eq!((out[0].start, out[0].end), (0, 16));
@@ -533,7 +533,7 @@ pub use variant::{Family, Variant};
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-dialect split`
+Run: `cargo test -p datluma-dialect split`
 Expected: 编译失败，提示找不到 `split_statements`。
 
 - [ ] **Step 3: 实现 `split.rs`**
@@ -856,7 +856,7 @@ fn leading_words(s: &[u8], n: usize) -> Vec<String> {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-dialect split && cargo clippy -p dblens-dialect --all-targets -- -D warnings`
+Run: `cargo test -p datluma-dialect split && cargo clippy -p datluma-dialect --all-targets -- -D warnings`
 Expected: 11 个拆分测试全部 PASS，没有警告。
 
 测试失败时，先判断是实现有 bug，还是测试的期望写错了。只有在确认测试期望违背了本任务列出的拆分规则时，才可以修改期望，并要在报告里逐条说明。
@@ -864,7 +864,7 @@ Expected: 11 个拆分测试全部 PASS，没有警告。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-dialect
+git add crates/datluma-dialect
 git commit -m "feat(dialect): SQL 语句拆分（字符串、注释、DELIMITER、\$\$、PL/SQL 块与 /）" -m "Co-Authored-By: <实际模型> <noreply@anthropic.com>"
 ```
 
@@ -873,18 +873,18 @@ git commit -m "feat(dialect): SQL 语句拆分（字符串、注释、DELIMITER�
 ### Task 3: 字面量与分页包装
 
 **Files:**
-- Create: `crates/dblens-dialect/src/literal.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
+- Create: `crates/datluma-dialect/src/literal.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
 
 **Interfaces:**
-- Consumes: `Family`、`dblens_core::{Error, Result, Value}`
+- Consumes: `Family`、`datluma_core::{Error, Result, Value}`
 - Produces:
   - `literal::literal(Family, &Value) -> Result<String>`
   - `literal::paginate(Family, sql: &str, offset: u64, limit: u64) -> String`
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-dialect/src/literal.rs`（测试模块）：
+`crates/datluma-dialect/src/literal.rs`（测试模块）：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -917,7 +917,7 @@ mod tests {
         assert_eq!(lit(Family::Postgres, Value::String("it's".into())), "'it''s'");
         assert_eq!(lit(Family::MySql, Value::String("a\\b'c".into())), "'a\\\\b''c'");
         assert_eq!(lit(Family::Oracle, Value::String("a\\b".into())), "'a\\b'");
-        assert_eq!(lit(Family::Dameng, Value::String("数洞".into())), "'数洞'");
+        assert_eq!(lit(Family::Dameng, Value::String("数览".into())), "'数览'");
         assert_eq!(lit(Family::MySql, Value::Json(serde_json::json!({"a": "x'y"}))), "'{\"a\":\"x''y\"}'");
     }
 
@@ -948,7 +948,7 @@ mod tests {
 
     #[test]
     fn unsupported_values() {
-        let lob = Value::Lob(dblens_core::LobPreview { binary: false, preview: "a".into(), total_len: 9, truncated: true });
+        let lob = Value::Lob(datluma_core::LobPreview { binary: false, preview: "a".into(), total_len: 9, truncated: true });
         assert!(literal(Family::MySql, &lob).is_err());
         assert!(literal(Family::MySql, &Value::Other { type_name: "x".into(), text: "y".into() }).is_err());
     }
@@ -957,13 +957,13 @@ mod tests {
     fn pagination() {
         assert_eq!(
             paginate(Family::MySql, "SELECT * FROM t;", 20, 10),
-            "SELECT * FROM (\nSELECT * FROM t\n) dblens_page LIMIT 10 OFFSET 20"
+            "SELECT * FROM (\nSELECT * FROM t\n) datluma_page LIMIT 10 OFFSET 20"
         );
         assert_eq!(
             paginate(Family::Oracle, "SELECT * FROM t -- 注释", 0, 50),
             "SELECT * FROM (\nSELECT * FROM t -- 注释\n) OFFSET 0 ROWS FETCH NEXT 50 ROWS ONLY"
         );
-        assert!(paginate(Family::Dameng, "SELECT 1", 0, 1).ends_with("dblens_page LIMIT 1 OFFSET 0"));
+        assert!(paginate(Family::Dameng, "SELECT 1", 0, 1).ends_with("datluma_page LIMIT 1 OFFSET 0"));
     }
 }
 ```
@@ -972,7 +972,7 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-dialect literal`
+Run: `cargo test -p datluma-dialect literal`
 Expected: 编译失败，提示找不到 `literal`、`paginate`。
 
 - [ ] **Step 3: 实现 `literal.rs`**
@@ -981,7 +981,7 @@ Expected: 编译失败，提示找不到 `literal`、`paginate`。
 ```rust
 //! 值 → SQL 字面量（用于"生成 SQL"和脚本导出，执行用户 SQL 时一律走参数绑定），以及分页包装。
 
-use dblens_core::{Error, Result, Value};
+use datluma_core::{Error, Result, Value};
 
 use crate::Family;
 
@@ -1075,7 +1075,7 @@ pub fn paginate(family: Family, sql: &str, offset: u64, limit: u64) -> String {
     match family {
         Family::Oracle => format!("SELECT * FROM (\n{inner}\n) OFFSET {offset} ROWS FETCH NEXT {limit} ROWS ONLY"),
         Family::MySql | Family::Postgres | Family::Dameng => {
-            format!("SELECT * FROM (\n{inner}\n) dblens_page LIMIT {limit} OFFSET {offset}")
+            format!("SELECT * FROM (\n{inner}\n) datluma_page LIMIT {limit} OFFSET {offset}")
         }
     }
 }
@@ -1083,13 +1083,13 @@ pub fn paginate(family: Family, sql: &str, offset: u64, limit: u64) -> String {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-dialect literal && cargo clippy -p dblens-dialect --all-targets -- -D warnings`
+Run: `cargo test -p datluma-dialect literal && cargo clippy -p datluma-dialect --all-targets -- -D warnings`
 Expected: 6 个测试全部 PASS，没有警告。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-dialect
+git add crates/datluma-dialect
 git commit -m "feat(dialect): SQL 字面量生成与分页包装" -m "Co-Authored-By: <实际模型> <noreply@anthropic.com>"
 ```
 
@@ -1098,11 +1098,11 @@ git commit -m "feat(dialect): SQL 字面量生成与分页包装" -m "Co-Authore
 ### Task 4: 原生类型与逻辑类型互转
 
 **Files:**
-- Create: `crates/dblens-dialect/src/types.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`
+- Create: `crates/datluma-dialect/src/types.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`
 
 **Interfaces:**
-- Consumes: `Family`、`dblens_core::LogicalType`
+- Consumes: `Family`、`datluma_core::LogicalType`
 - Produces:
   - `types::ParsedType { name: String, args: Vec<String>, suffix: String, unsigned: bool }`
   - `types::parse_type(&str) -> ParsedType`
@@ -1121,7 +1121,7 @@ git commit -m "feat(dialect): SQL 字面量生成与分页包装" -m "Co-Authore
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-dialect/src/types.rs`（测试模块）：
+`crates/datluma-dialect/src/types.rs`（测试模块）：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -1301,7 +1301,7 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-dialect types`
+Run: `cargo test -p datluma-dialect types`
 Expected: 编译失败，提示找不到 `parse_type` 等。
 
 - [ ] **Step 3: 实现 `types.rs`**
@@ -1311,7 +1311,7 @@ Expected: 编译失败，提示找不到 `parse_type` 等。
 //! 原生类型文本与逻辑类型的互相转换。原生类型文本来自元数据（如 `varchar(100)`、`NUMBER(10,2)`、
 //! `timestamp(6) with time zone`），逻辑类型用于跨库映射和设计器。
 
-use dblens_core::LogicalType;
+use datluma_core::LogicalType;
 
 use crate::Family;
 
@@ -1631,13 +1631,13 @@ pub fn native_type(family: Family, logical: &LogicalType) -> String {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-dialect types && cargo clippy -p dblens-dialect --all-targets -- -D warnings`
+Run: `cargo test -p datluma-dialect types && cargo clippy -p datluma-dialect --all-targets -- -D warnings`
 Expected: 6 个测试全部 PASS，没有警告。规则同 Task 2：只有在确认测试期望违背了本任务的映射约定时，才可以修改期望，并要在报告里说明。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-dialect
+git add crates/datluma-dialect
 git commit -m "feat(dialect): 原生类型与逻辑类型互转（MySQL/PG/Oracle/达梦）" -m "Co-Authored-By: <实际模型> <noreply@anthropic.com>"
 ```
 
@@ -1646,11 +1646,11 @@ git commit -m "feat(dialect): 原生类型与逻辑类型互转（MySQL/PG/Oracl
 ### Task 5: `Dialect` 结构体与 DML 生成
 
 **Files:**
-- Create: `crates/dblens-dialect/src/dml.rs`
-- Modify: `crates/dblens-dialect/src/lib.rs`、`docs/superpowers/plans/2026-10-22-m0-overview.md`
+- Create: `crates/datluma-dialect/src/dml.rs`
+- Modify: `crates/datluma-dialect/src/lib.rs`、`docs/superpowers/plans/2026-10-22-m0-overview.md`
 
 **Interfaces:**
-- Consumes: Task 1–4 的全部函数；`dblens_core::schema::Table`
+- Consumes: Task 1–4 的全部函数；`datluma_core::schema::Table`
 - Produces：
   - `Dialect`（Copy，包含一个 `Variant`），构造函数为 `new(Variant)`、`detect(DriverId, &ServerInfo)`、`for_driver(DriverId)`；
   - 方法：`variant()`、`family()`、`quote_ident(&str)`、`ident(&str)`、`qualified(schema: Option<&str>, name: &str)`、`placeholder(usize)`、`literal(&Value)`、`paginate(&str, u64, u64)`、`split(&str)`、`logical_type(&str)`、`native_type(&LogicalType)`；
@@ -1669,13 +1669,13 @@ git commit -m "feat(dialect): 原生类型与逻辑类型互转（MySQL/PG/Oracl
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-dialect/src/dml.rs`（测试模块）：
+`crates/datluma-dialect/src/dml.rs`（测试模块）：
 ```rust
 #[cfg(test)]
 mod tests {
-    use dblens_core::schema::{Column, PrimaryKey, Table};
-    use dblens_core::{ColumnType, LogicalType};
-    use dblens_driver::{DriverId, ServerInfo};
+    use datluma_core::schema::{Column, PrimaryKey, Table};
+    use datluma_core::{ColumnType, LogicalType};
+    use datluma_driver::{DriverId, ServerInfo};
 
     use crate::{Dialect, Family, Variant};
 
@@ -1786,7 +1786,7 @@ mod tests {
         assert_eq!(d.native_type(&d.logical_type("int4")), "INTEGER");
         assert_eq!(d.qualified(Some("s"), "T"), "s.\"T\"");
         assert!(d.paginate("SELECT 1", 0, 10).contains("LIMIT 10"));
-        assert_eq!(d.literal(&dblens_core::Value::Int(1)).unwrap(), "1");
+        assert_eq!(d.literal(&datluma_core::Value::Int(1)).unwrap(), "1");
     }
 }
 ```
@@ -1802,8 +1802,8 @@ mod split;
 pub mod types;
 mod variant;
 
-use dblens_core::{LogicalType, Result, Value};
-use dblens_driver::{DriverId, ServerInfo};
+use datluma_core::{LogicalType, Result, Value};
+use datluma_driver::{DriverId, ServerInfo};
 
 pub use split::{SqlStatement, split_statements};
 pub use variant::{Family, Variant};
@@ -1881,7 +1881,7 @@ impl Dialect {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-dialect dml`
+Run: `cargo test -p datluma-dialect dml`
 Expected: 编译失败，提示 `Dialect` 上没有 `select_sql` 等方法。
 
 - [ ] **Step 3: 实现 `dml.rs`**
@@ -1890,7 +1890,7 @@ Expected: 编译失败，提示 `Dialect` 上没有 `select_sql` 等方法。
 ```rust
 //! 由表模型生成 SELECT/INSERT/UPDATE/DELETE（"生成 SQL"菜单）。参数一律用占位符。
 
-use dblens_core::schema::{Column, Table};
+use datluma_core::schema::{Column, Table};
 
 use crate::Dialect;
 
@@ -1973,7 +1973,7 @@ fn primary_key(table: &Table) -> Option<Vec<&str>> {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-dialect && cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check`
+Run: `cargo test -p datluma-dialect && cargo clippy --workspace --all-targets -- -D warnings && cargo fmt --all --check`
 Expected: dialect 的全部测试 PASS（Task 1 有 6 个、Task 2 有 11 个、Task 3 有 6 个、Task 4 有 6 个、Task 5 有 6 个，共 35 个），没有警告，格式检查通过。
 
 - [ ] **Step 5: 更新总览**
@@ -1987,6 +1987,6 @@ Run: `cargo test --workspace`
 Expected: 全部通过（不设置数据库环境变量时，数据库测试会跳过）。
 
 ```bash
-git add crates/dblens-dialect docs/superpowers/plans/2026-10-22-m0-overview.md
+git add crates/datluma-dialect docs/superpowers/plans/2026-10-22-m0-overview.md
 git commit -m "feat(dialect): Dialect 结构体与 SELECT/INSERT/UPDATE/DELETE 生成" -m "Co-Authored-By: <实际模型> <noreply@anthropic.com>"
 ```

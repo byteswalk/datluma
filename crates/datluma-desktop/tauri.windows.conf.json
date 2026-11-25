@@ -1,0 +1,6 @@
+{
+  "mainBinaryName": "DATLUMA",
+  "bundle": {
+    "targets": ["nsis"]
+  }
+}

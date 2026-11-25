@@ -27,7 +27,7 @@ DROP TABLE IF EXISTS META_PART_T CASCADE
 -- @@ pre_drop_mixed
 DROP TABLE IF EXISTS "META_Mixed Case" CASCADE
 -- @@ pre_drop_cn
-DROP TABLE IF EXISTS "META_数洞表" CASCADE
+DROP TABLE IF EXISTS "META_数览表" CASCADE
 -- @@ pre_drop_ds
 DROP TABLE IF EXISTS META_DS_T CASCADE
 -- @@ pre_drop_ds2
@@ -138,11 +138,11 @@ CREATE TABLE META_PART_T (
   PARTITION pmax VALUES LESS THAN (MAXVALUE)
 )
 -- @@ mixed
-CREATE TABLE "META_Mixed Case" ("select" INT, "数洞" VARCHAR(20 CHAR), "Mixed Col" INT, CONSTRAINT "META_PK_Mixed" PRIMARY KEY ("select"))
+CREATE TABLE "META_Mixed Case" ("select" INT, "数览" VARCHAR(20 CHAR), "Mixed Col" INT, CONSTRAINT "META_PK_Mixed" PRIMARY KEY ("select"))
 -- @@ mixed_c
-COMMENT ON COLUMN "META_Mixed Case"."数洞" IS '中文列'
+COMMENT ON COLUMN "META_Mixed Case"."数览" IS '中文列'
 -- @@ cn
-CREATE TABLE "META_数洞表" (id INT)
+CREATE TABLE "META_数览表" (id INT)
 -- @@ ds
 CREATE TABLE META_DS_T (
   c_tinyint TINYINT,

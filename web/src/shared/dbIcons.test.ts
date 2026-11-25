@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { VARIANT_ICONS, dbIcon } from './dbIcons'
 
-// 后端 Variant 的全部序列化名称（crates/dblens-dialect/src/variant.rs）
+// 后端 Variant 的全部序列化名称（crates/datluma-dialect/src/variant.rs）
 const VARIANTS = [
   'mysql',
   'mariadb',

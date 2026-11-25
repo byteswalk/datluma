@@ -15,7 +15,7 @@
 - 单机版行为不变：现有全部测试不改断言即通过（只允许机械地改函数调用形式）。
 - 不打包、不发布、不改 `DefaultPolicy` 的判定结果。
 - 依赖用最新稳定版且发布满 7 天；本计划预计不新增 Rust 依赖。
-- 用户可见文字走 `msg!` 和 `crates/dblens-core/locales/app.json`，中英文都要有。
+- 用户可见文字走 `msg!` 和 `crates/datluma-core/locales/app.json`，中英文都要有。
 - 代码注释用中文，风格同周围代码。
 - 提交身份 ThinkBuddy；推送要用户同意。
 - 权限修改路径只把脱敏后的语句交给策略，密码绝不进入 `Policy`。
@@ -32,13 +32,13 @@
 
 | 文件 | 职责 |
 |---|---|
-| `crates/dblens-service/src/operator.rs`（新建） | `Operator` 和 task-local |
-| `crates/dblens-service/src/policy.rs` | `Operation`、`ExecContext::new`、`RequireTicket`、`ask`、`Policy` 新签名 |
-| `crates/dblens-service/src/source.rs`（新建） | `CredentialSource`、`ProfileSource` 及单机版实现 |
-| `crates/dblens-service/src/{session,design,compare,sqlfile,privilege}.rs`、`import/job.rs`、`export/job.rs`、`migrate/{mod,run,copy}.rs` | 接入 `ask`、`after_execute`、凭据 |
-| `crates/dblens-service/src/task.rs` | 任务、上传归属 |
-| `crates/dblens-service/tests/architecture.rs`（新建） | 入口约束 |
-| `crates/dblens-api/src/lib.rs`、`ws.rs` | 路由组合、`/capabilities`、操作者传递 |
+| `crates/datluma-service/src/operator.rs`（新建） | `Operator` 和 task-local |
+| `crates/datluma-service/src/policy.rs` | `Operation`、`ExecContext::new`、`RequireTicket`、`ask`、`Policy` 新签名 |
+| `crates/datluma-service/src/source.rs`（新建） | `CredentialSource`、`ProfileSource` 及单机版实现 |
+| `crates/datluma-service/src/{session,design,compare,sqlfile,privilege}.rs`、`import/job.rs`、`export/job.rs`、`migrate/{mod,run,copy}.rs` | 接入 `ask`、`after_execute`、凭据 |
+| `crates/datluma-service/src/task.rs` | 任务、上传归属 |
+| `crates/datluma-service/tests/architecture.rs`（新建） | 入口约束 |
+| `crates/datluma-api/src/lib.rs`、`ws.rs` | 路由组合、`/capabilities`、操作者传递 |
 | `web/src/index.ts`、`web/src/shared/capabilities.ts`（新建）、`web/package.json` | 前端包入口和能力开关 |
 | `docs/notes/g0-gate.md`（新建） | 实现说明 |
 
@@ -47,14 +47,14 @@
 ### Task 1: 操作者、操作类型和判定入口
 
 **Files:**
-- Create: `crates/dblens-service/src/operator.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/policy.rs:54-87,104-128`
-- Modify: `crates/dblens-service/src/session.rs:289-295,608-632,776-787,875-879`
-- Modify: `crates/dblens-service/src/design.rs:336-360`、`compare.rs:369`、`migrate/mod.rs:312`
-- Modify: `crates/dblens-service/src/sqlfile.rs:150-156,200-229`、`import/job.rs:327-340`、`privilege.rs:334-342,367`
-- Modify: `crates/dblens-core/locales/app.json`
-- Test: `crates/dblens-service/src/policy.rs`、`crates/dblens-service/src/operator.rs`
+- Create: `crates/datluma-service/src/operator.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/policy.rs:54-87,104-128`
+- Modify: `crates/datluma-service/src/session.rs:289-295,608-632,776-787,875-879`
+- Modify: `crates/datluma-service/src/design.rs:336-360`、`compare.rs:369`、`migrate/mod.rs:312`
+- Modify: `crates/datluma-service/src/sqlfile.rs:150-156,200-229`、`import/job.rs:327-340`、`privilege.rs:334-342,367`
+- Modify: `crates/datluma-core/locales/app.json`
+- Test: `crates/datluma-service/src/policy.rs`、`crates/datluma-service/src/operator.rs`
 
 **Interfaces:**
 - Produces:
@@ -116,7 +116,7 @@ mod tests {
 
 - [ ] **Step 2: 确认失败**
 
-Run: `cargo test -p dblens-service --lib policy`
+Run: `cargo test -p datluma-service --lib policy`
 Expected: 编译失败，找不到 `Operator`、`ask`。
 
 - [ ] **Step 3: 实现 `operator.rs`**
@@ -304,24 +304,24 @@ pub(crate) async fn ask(
 
 - [ ] **Step 6: 跑测试**
 
-Run: `cargo test -p dblens-service --lib`
+Run: `cargo test -p datluma-service --lib`
 Expected: 全部 PASS。原有断言一条不改。
 
 - [ ] **Step 7: 提交**
 
 ```bash
-git add crates/dblens-service crates/dblens-core/locales/app.json
+git add crates/datluma-service crates/datluma-core/locales/app.json
 git commit -m "feat(policy): 策略带上操作者、操作类型和完整语句，统一判定入口"
 ```
 
 ### Task 2: 导出接入策略，写路径全部回报结果
 
 **Files:**
-- Modify: `crates/dblens-service/src/export/job.rs:225-244,288-340`
-- Modify: `crates/dblens-service/src/design.rs:413-443`
-- Modify: `crates/dblens-service/src/sqlfile.rs:285-296`
-- Modify: `crates/dblens-service/src/import/job.rs`（任务结束处）
-- Modify: `crates/dblens-service/src/migrate/run.rs:237,358,374`、`migrate/copy.rs:59,85,128,156`
+- Modify: `crates/datluma-service/src/export/job.rs:225-244,288-340`
+- Modify: `crates/datluma-service/src/design.rs:413-443`
+- Modify: `crates/datluma-service/src/sqlfile.rs:285-296`
+- Modify: `crates/datluma-service/src/import/job.rs`（任务结束处）
+- Modify: `crates/datluma-service/src/migrate/run.rs:237,358,374`、`migrate/copy.rs:59,85,128,156`
 - Test: 上述文件的测试模块
 
 **Interfaces:**
@@ -344,7 +344,7 @@ git commit -m "feat(policy): 策略带上操作者、操作类型和完整语句
     impl Policy for DenyExport {
         async fn before_execute(&self, ctx: &ExecContext, _: &StatementInfo, _: &str) -> Decision {
             if ctx.operation == Operation::Export {
-                Decision::RequireTicket { reason: dblens_core::msg!("policy.ticket_required") }
+                Decision::RequireTicket { reason: datluma_core::msg!("policy.ticket_required") }
             } else {
                 Decision::Allow
             }
@@ -391,12 +391,12 @@ git commit -m "feat(policy): 策略带上操作者、操作类型和完整语句
 
 - [ ] **Step 2: 确认失败**
 
-Run: `cargo test -p dblens-service --lib policy_can_block_export`
+Run: `cargo test -p datluma-service --lib policy_can_block_export`
 Expected: FAIL，当前导出不询问策略。
 
 - [ ] **Step 3: 实现**
 
-`policy.rs` 增加（`Task 1` 已加入 `use std::sync::Arc`、`Operator`、`Profile`；这里再引入 `dblens_core::{Error, Result}`）：
+`policy.rs` 增加（`Task 1` 已加入 `use std::sync::Arc`、`Operator`、`Profile`；这里再引入 `datluma_core::{Error, Result}`）：
 
 ```rust
 /// 把一条语句的执行结果告诉策略。
@@ -464,24 +464,24 @@ pub(crate) async fn report(
 
 - [ ] **Step 4: 跑测试**
 
-Run: `cargo test -p dblens-service --lib`
+Run: `cargo test -p datluma-service --lib`
 Expected: 全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service
+git add crates/datluma-service
 git commit -m "feat(policy): 导出经过策略，所有写路径回报执行结果"
 ```
 
 ### Task 3: 凭据和连接配置的来源
 
 **Files:**
-- Create: `crates/dblens-service/src/source.rs`
-- Modify: `crates/dblens-service/src/service.rs:25-95,97-103,154-178`
-- Modify: `crates/dblens-service/src/metadata.rs`（字段和 199、259 行）
+- Create: `crates/datluma-service/src/source.rs`
+- Modify: `crates/datluma-service/src/service.rs:25-95,97-103,154-178`
+- Modify: `crates/datluma-service/src/metadata.rs`（字段和 199、259 行）
 - Modify: `compare.rs:420`、`design.rs:386`、`export/job.rs:227`、`import/job.rs:295`、`migrate/mod.rs:495-496`、`privilege.rs:343`、`sqlfile.rs:161`
-- Test: `crates/dblens-service/src/service.rs`
+- Test: `crates/datluma-service/src/service.rs`
 
 **Interfaces:**
 - Produces:
@@ -530,7 +530,7 @@ git commit -m "feat(policy): 导出经过策略，所有写路径回报执行结
 
 - [ ] **Step 2: 确认失败**
 
-Run: `cargo test -p dblens-service --lib sessions_use_the_configured`
+Run: `cargo test -p datluma-service --lib sessions_use_the_configured`
 Expected: 编译失败，找不到 `CredentialSource`。
 
 - [ ] **Step 3: 实现 `source.rs`**
@@ -539,7 +539,7 @@ Expected: 编译失败，找不到 `CredentialSource`。
 //! 凭据和连接配置从哪里来（审计版设计 3.1 节）。单机版取本机的钥匙串或密码库、本地库；审计版由服务端托管。
 
 use async_trait::async_trait;
-use dblens_core::Result;
+use datluma_core::Result;
 
 use crate::profile::Profile;
 use crate::secret::Secrets;
@@ -593,23 +593,23 @@ impl ProfileSource for Store {
 
 - [ ] **Step 4: 跑测试**
 
-Run: `cargo test -p dblens-service --lib`
+Run: `cargo test -p datluma-service --lib`
 Expected: 全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service
+git add crates/datluma-service
 git commit -m "feat(service): 凭据和连接配置改由可替换的来源提供"
 ```
 
 ### Task 4: 会话、任务、导出、上传的归属
 
 **Files:**
-- Modify: `crates/dblens-service/src/session.rs:242-270,326-345`
-- Modify: `crates/dblens-service/src/task.rs:134,249,353-370,391-437`
-- Modify: `crates/dblens-service/src/export/job.rs:83,146-190`
-- Modify: `crates/dblens-service/src/sqlfile.rs` 等后台任务内调用 `tasks` 取上传的位置（只读核对）
+- Modify: `crates/datluma-service/src/session.rs:242-270,326-345`
+- Modify: `crates/datluma-service/src/task.rs:134,249,353-370,391-437`
+- Modify: `crates/datluma-service/src/export/job.rs:83,146-190`
+- Modify: `crates/datluma-service/src/sqlfile.rs` 等后台任务内调用 `tasks` 取上传的位置（只读核对）
 - Test: 同文件测试模块
 
 **Interfaces:**
@@ -661,7 +661,7 @@ git commit -m "feat(service): 凭据和连接配置改由可替换的来源提�
 
 - [ ] **Step 2: 确认失败**
 
-Run: `cargo test -p dblens-service --lib belong_to_their_operator`
+Run: `cargo test -p datluma-service --lib belong_to_their_operator`
 Expected: FAIL。
 
 - [ ] **Step 3: 实现**
@@ -706,35 +706,35 @@ Expected: FAIL。
 
 - [ ] **Step 4: 跑测试**
 
-Run: `cargo test -p dblens-service --lib`
+Run: `cargo test -p datluma-service --lib`
 Expected: 全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service
+git add crates/datluma-service
 git commit -m "feat(service): 会话、任务、导出和上传按操作者隔离"
 ```
 
 ### Task 5: API 路由可组合，能力查询，WebSocket 传递操作者
 
 **Files:**
-- Modify: `crates/dblens-api/src/lib.rs:56-177`
-- Modify: `crates/dblens-api/src/ws.rs:109-119`（及文件内全部 `tokio::spawn`）
-- Modify: `crates/dblens-api/src/routes.rs`
-- Test: `crates/dblens-api/tests/api.rs`
+- Modify: `crates/datluma-api/src/lib.rs:56-177`
+- Modify: `crates/datluma-api/src/ws.rs:109-119`（及文件内全部 `tokio::spawn`）
+- Modify: `crates/datluma-api/src/routes.rs`
+- Test: `crates/datluma-api/tests/api.rs`
 
 **Interfaces:**
 - Consumes: `Operator`
 - Produces:
-  - `dblens_api::api_routes() -> Router<AppState>`：不带鉴权和语言层
+  - `datluma_api::api_routes() -> Router<AppState>`：不带鉴权和语言层
   - `pub use lang::negotiate`
   - `GET /api/capabilities` → `{"edition":"standalone","features":[]}`，只在 `router()` 里挂载，审计版自己实现
-  - `dblens_service::Operator` 从 service 导出（API 层和私有仓库都用）
+  - `datluma_service::Operator` 从 service 导出（API 层和私有仓库都用）
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-api/tests/api.rs`。现有辅助函数是 `app() -> (Router, Arc<Service>)`（第 20 行），带令牌的请求写法照该文件现有用例：
+`crates/datluma-api/tests/api.rs`。现有辅助函数是 `app() -> (Router, Arc<Service>)`（第 20 行），带令牌的请求写法照该文件现有用例：
 
 ```rust
 #[tokio::test]
@@ -765,11 +765,11 @@ async fn routes_compose_under_a_custom_auth_layer() {
 
 `authed_get`、`body_json` 若文件里名字不同，用文件现有的等价写法，不要新增第二套辅助函数。
 
-`crates/dblens-api/tests/` 下再加一个 WebSocket 用例：在 `Operator::scope` 外层中间件下开会话、经 WS 执行 `ROWS 1`，断言收到 `done`。写法复用 `tests/api.rs` 现有的 WS 测试。这个用例防止 `tokio::spawn` 丢失操作者导致 `NotFound`。
+`crates/datluma-api/tests/` 下再加一个 WebSocket 用例：在 `Operator::scope` 外层中间件下开会话、经 WS 执行 `ROWS 1`，断言收到 `done`。写法复用 `tests/api.rs` 现有的 WS 测试。这个用例防止 `tokio::spawn` 丢失操作者导致 `NotFound`。
 
 - [ ] **Step 2: 确认失败**
 
-Run: `cargo test -p dblens-api --test api capabilities`
+Run: `cargo test -p datluma-api --test api capabilities`
 Expected: 编译失败。
 
 - [ ] **Step 3: 实现**
@@ -820,23 +820,23 @@ pub async fn capabilities() -> Json<serde_json::Value> {
 
 - [ ] **Step 4: 跑测试**
 
-Run: `cargo test -p dblens-api`
+Run: `cargo test -p datluma-api`
 Expected: 全部 PASS。
 
-Run: `cargo build -p dblens-server -p dblens-desktop`
+Run: `cargo build -p datluma-server -p datluma-desktop`
 Expected: 成功。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-api crates/dblens-service/src/lib.rs
+git add crates/datluma-api crates/datluma-service/src/lib.rs
 git commit -m "feat(api): 路由可组合，增加能力查询，WebSocket 传递操作者"
 ```
 
 ### Task 6: 架构测试锁住入口
 
 **Files:**
-- Create: `crates/dblens-service/tests/architecture.rs`
+- Create: `crates/datluma-service/tests/architecture.rs`
 
 **Interfaces:**
 - Consumes: Task 1–3 的收口结果
@@ -910,13 +910,13 @@ fn connections_are_opened_in_known_places() {
 
 - [ ] **Step 2: 跑测试**
 
-Run: `cargo test -p dblens-service --test architecture`
+Run: `cargo test -p datluma-service --test architecture`
 Expected: PASS。若失败，说明前面的任务有遗漏，回去修代码，不要放宽断言；`.registry.connect(` 列表与实际不符时，逐个确认该路径经过策略后再更新列表。
 
 - [ ] **Step 3: 提交**
 
 ```bash
-git add crates/dblens-service/tests/architecture.rs
+git add crates/datluma-service/tests/architecture.rs
 git commit -m "test(service): 架构测试锁住策略和凭据入口"
 ```
 
@@ -1019,7 +1019,7 @@ git commit -m "feat(web): 导出包入口，增加版本和能力开关"
 
 **Files:**
 - Create: `docs/notes/g0-gate.md`
-- Modify: `docs/superpowers/specs/2026-10-22-dblens-design.md`（第 11 节进度）
+- Modify: `docs/superpowers/specs/2026-10-22-datluma-design.md`（第 11 节进度）
 
 - [ ] **Step 1: 全量离线测试**
 
@@ -1031,14 +1031,14 @@ Expected: 无警告。
 
 - [ ] **Step 2: 实连回归**
 
-按 `~/.dblens-test/test-env.ps1` 设好环境变量（只在环境变量里放密码），用硬超时跑 `crates/dblens-service/tests/live.rs`、`privilege_live.rs`、`migrate_live.rs`、`crates/dblens-api/tests/live.rs`，串行：
+按 `~/.datluma-test/test-env.ps1` 设好环境变量（只在环境变量里放密码），用硬超时跑 `crates/datluma-service/tests/live.rs`、`privilege_live.rs`、`migrate_live.rs`、`crates/datluma-api/tests/live.rs`，串行：
 
-Run: `cargo test -p dblens-service --test live -- --ignored --test-threads=1`
+Run: `cargo test -p datluma-service --test live -- --ignored --test-threads=1`
 Expected: PASS。其余三个文件同样运行。
 
 - [ ] **Step 3: 界面回归**
 
-启动 `dblens-server`，用真实鼠标走一遍：编辑器执行、生产连接确认弹窗、数据编辑保存、表设计器执行、导出下载、SQL 文件导入、账号权限修改。确认行为和改造前一致，并截图。
+启动 `datluma-server`，用真实鼠标走一遍：编辑器执行、生产连接确认弹窗、数据编辑保存、表设计器执行、导出下载、SQL 文件导入、账号权限修改。确认行为和改造前一致，并截图。
 
 - [ ] **Step 4: 写说明**
 
@@ -1054,6 +1054,6 @@ Expected: PASS。其余三个文件同样运行。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/notes/g0-gate.md docs/superpowers/specs/2026-10-22-dblens-design.md
+git add docs/notes/g0-gate.md docs/superpowers/specs/2026-10-22-datluma-design.md
 git commit -m "docs: G0 实现说明"
 ```

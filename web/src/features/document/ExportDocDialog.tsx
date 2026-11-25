@@ -217,7 +217,7 @@ function Dialog({ target }: { target: DocTarget }) {
   const saveBuiltin = async () => {
     if (!desktop || (o.format !== 'html' && o.format !== 'markdown')) return
     const ext = extensionOf(o.format)
-    const path = await desktop.saveDialog(`dblens-template.${ext}`, [{ name: ext.toUpperCase(), extensions: [ext] }])
+    const path = await desktop.saveDialog(`datluma-template.${ext}`, [{ name: ext.toUpperCase(), extensions: [ext] }])
     if (!path) return
     try {
       await api.exportDocTemplate(o.format, path)

@@ -4,7 +4,7 @@
 
 ## 结构
 
-- 新 crate `dblens-driver-sqlite`：rusqlite 0.41.1（`bundled`，静态编入 SQLite，自带 dbstat），经阻塞适配器每连接一个线程。没有新增依赖（rusqlite 原来就用于本地存储）。
+- 新 crate `datluma-driver-sqlite`：rusqlite 0.41.1（`bundled`，静态编入 SQLite，自带 dbstat），经阻塞适配器每连接一个线程。没有新增依赖（rusqlite 原来就用于本地存储）。
 - 方言：`Family::Sqlite`、`Variant::Sqlite`，元数据模板 `sql/sqlite.sql`，运维模板 `sql/ops/sqlite.sql`，建对象原文的读取在 `meta/sqlite.rs`。
 - 服务：`DriverRegistry::allow_local_files`，接口层按 `ApiConfig::local_files` 设置（桌面版、只监听本机的服务器版为真）；为假时 SQLite 驱动不可用，产品列表不出现。审计版的引擎不设置，所以不开放。
 - M10b 的功能在服务层报 `sqlite.later`（`later.rs`），前端菜单置灰，比对和迁移的连接列表不出现 SQLite。M10b 完成后这些拦截已去掉（`m10b-sqlite.md`）。
@@ -26,7 +26,7 @@
 - 服务：完整流程、工作台、取消、运维页、导出四种格式、数据编辑（含冲突）、SQL 文件（触发器）、M10b 拦截、`local_files` 关闭时拒绝。
 - 接口：`/api/drivers` 的可用状态、测试连接按 `local_files` 放行或拒绝。
 - 前端：连接表单的转换和校验、图标。
-- 界面（2026-11-05，只监听本机的 dblens-server 加浏览器，真实鼠标键盘）：新建连接只显示文件、打开方式、环境，测试连接识别为 SQLite 3.54.1；对象树只有表、视图，`sqlite_sequence` 不列出；查看数据（中文、实数、日期文本、BLOB、生成列）；改一个单元格提交，生成 `UPDATE main.emp SET salary = 9900 WHERE id = 2;`，文件里确认改了；编辑器执行带触发器的脚本，触发器体没被拆开；设计表、导入置灰并说明；连接和表的菜单里没有权限项。
+- 界面（2026-11-05，只监听本机的 datluma-server 加浏览器，真实鼠标键盘）：新建连接只显示文件、打开方式、环境，测试连接识别为 SQLite 3.54.1；对象树只有表、视图，`sqlite_sequence` 不列出；查看数据（中文、实数、日期文本、BLOB、生成列）；改一个单元格提交，生成 `UPDATE main.emp SET salary = 9900 WHERE id = 2;`，文件里确认改了；编辑器执行带触发器的脚本，触发器体没被拆开；设计表、导入置灰并说明；连接和表的菜单里没有权限项。
 
 ## 已知局限
 

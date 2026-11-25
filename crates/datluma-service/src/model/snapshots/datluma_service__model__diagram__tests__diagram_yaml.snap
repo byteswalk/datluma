@@ -1,0 +1,11 @@
+---
+source: crates/datluma-service/src/model/diagram.rs
+expression: text
+---
+name: _all
+tables: all
+display: keys
+positions:
+  orders:
+    x: 120
+    "y": 40

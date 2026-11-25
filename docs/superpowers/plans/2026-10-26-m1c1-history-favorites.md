@@ -4,7 +4,7 @@
 
 **Goal:** 记录每条执行过的语句并在历史侧栏中查找、复用；用多级文件夹收藏常用 SQL。
 
-**Architecture:** 后端在会话执行每条语句后把历史交给后台线程批量写入本地 SQLite（迁移到版本 3），收藏同样存在本地库；`dblens-api` 提供 `/history`、`/favorites` 接口。前端新增历史、收藏两个侧栏和收藏对话框，通过"插入 SQL"通道和新开标签复用 SQL；"收藏光标所在的语句"由 M1b2 的 SQL 语言 worker 分句。
+**Architecture:** 后端在会话执行每条语句后把历史交给后台线程批量写入本地 SQLite（迁移到版本 3），收藏同样存在本地库；`datluma-api` 提供 `/history`、`/favorites` 接口。前端新增历史、收藏两个侧栏和收藏对话框，通过"插入 SQL"通道和新开标签复用 SQL；"收藏光标所在的语句"由 M1b2 的 SQL 语言 worker 分句。
 
 **Tech Stack:** Rust（rusqlite、标准库线程与同步通道）、axum；React 19 + TypeScript、antd 6（Tree、TreeSelect）、@tanstack/react-query 5、Vitest。
 
@@ -18,7 +18,7 @@
 - 依赖只用正式发布版，跟随最新；新版发布满 7 天再升级；本里程碑不引入新依赖。
 - 前端给用户看的文字都用词条（中英文），英文区分单复数；后端错误文字用 `msg!` 词条；日志不翻译。
 - 代码注释用中文；文件 UTF-8、LF 换行；前端代码风格：无分号、单引号、两格缩进。
-- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DBLENS_LANG=en` 下运行。
+- cargo 命令加 `--config "source.mirror.registry='sparse+https://rsproxy.cn/index/'"`（clippy 写在 `clippy` 之后），并设 `CARGO_INCREMENTAL=0`；后端测试在 `DATLUMA_LANG=en` 下运行。
 - 前端工具用 PowerShell 执行（`npm`/`npx` 在本机不可用，用 `pnpm exec`）。
 - 测试数据库的密码只在命令行中以内联环境变量传入，不写进仓库、报告或提交信息。
 
@@ -29,10 +29,10 @@
 ## 文件结构
 
 ```text
-crates/dblens-service/src/{history.rs, favorite.rs}   历史、收藏的存储（新增）
-crates/dblens-service/src/{store.rs, session.rs, service.rs, profile.rs, lib.rs}   迁移、写历史、组装
-crates/dblens-core/locales/app.json                   收藏的错误文字
-crates/dblens-api/src/{routes.rs, lib.rs}; tests/library.rs   接口与测试
+crates/datluma-service/src/{history.rs, favorite.rs}   历史、收藏的存储（新增）
+crates/datluma-service/src/{store.rs, session.rs, service.rs, profile.rs, lib.rs}   迁移、写历史、组装
+crates/datluma-core/locales/app.json                   收藏的错误文字
+crates/datluma-api/src/{routes.rs, lib.rs}; tests/library.rs   接口与测试
 docs/notes/m0-4b-api.md                               接口说明
 web/src/shared/api.ts                                 接口客户端
 web/src/features/history/                             历史侧栏（新增）
@@ -67,7 +67,7 @@ Expected：2026-10-26 写计划时为"共 71 个直接依赖，0 个可升级"�
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 在 PowerShell 中执行（bash 里 `cd web` 会触发坏掉的 fnm 钩子，`&&` 后面的命令会被跳过）：
@@ -92,14 +92,14 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 本地库迁移到版本 3，新增 `history`、`favorites` 两张表。`history.rs` 负责历史的写入、清理、查询、删除和设置，以及后台写入线程 `HistoryLog`；`favorite.rs` 负责收藏的增删改和移动。新增的错误文字加入后端词条。
 
 **Files:**
-- Modify: `crates/dblens-core/locales/app.json`
-- Create: `crates/dblens-service/src/favorite.rs`
-- Create: `crates/dblens-service/src/history.rs`
-- Modify: `crates/dblens-service/src/lib.rs`
-- Modify: `crates/dblens-service/src/store.rs`
+- Modify: `crates/datluma-core/locales/app.json`
+- Create: `crates/datluma-service/src/favorite.rs`
+- Create: `crates/datluma-service/src/history.rs`
+- Modify: `crates/datluma-service/src/lib.rs`
+- Modify: `crates/datluma-service/src/store.rs`
 
 **Interfaces:**
-- Produces（`dblens_service`）：
+- Produces（`datluma_service`）：
   - `NewHistory { at, profile_id, profile_name, driver, variant, schema, sql, elapsed_ms, rows, error }`、`HistoryItem { id, ..NewHistory }`（序列化时平铺）、`HistoryQuery { q, profile, failed, before, limit }`；
   - `Store::add_history(&[NewHistory], limit)`、`history(&HistoryQuery)`、`delete_history(id)`、`clear_history()`、`history_settings() -> (bool, u64)`；
   - `HISTORY_ENABLED_SETTING = "ui.history.enabled"`、`HISTORY_LIMIT_SETTING = "ui.history.limit"`、`DEFAULT_HISTORY_LIMIT = 10000`；
@@ -108,11 +108,11 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
   - `Store::favorites()`、`create_favorite(NewFavorite)`、`update_favorite(id, FavoritePatch)`、`delete_favorite(id)`；
   - `Store::lock()`（crate 内）。
 
-- [ ] **Step 1: 修改 `crates/dblens-core/locales/app.json`**
+- [ ] **Step 1: 修改 `crates/datluma-core/locales/app.json`**
 
 ```diff
---- a/crates/dblens-core/locales/app.json
-+++ b/crates/dblens-core/locales/app.json
+--- a/crates/datluma-core/locales/app.json
++++ b/crates/datluma-core/locales/app.json
 @@ -38,6 +38,11 @@
    "error.kind.not_found": {"zh-CN": "找不到%{what}", "en": "Not found: %{what}"},
    "error.kind.sql": {"zh-CN": "SQL 错误 [%{code}]：%{message}", "en": "SQL error [%{code}]: %{message}"},
@@ -136,7 +136,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
    "oracle.bad_chars": {"zh-CN": "Oracle %{what}含有不允许的字符：%{value}", "en": "The Oracle %{what} contains characters that are not allowed: %{value}"},
 ```
 
-- [ ] **Step 2: 新建 `crates/dblens-service/src/favorite.rs`**
+- [ ] **Step 2: 新建 `crates/datluma-service/src/favorite.rs`**
 
 ```rust
 //! 收藏（M1c1 设计文档第 3 节）：多级文件夹和收藏的 SQL 放在同一张表里，`parent_id` 指向上级文件夹。
@@ -144,7 +144,7 @@ git commit -m "chore: 依赖复查：升级到发布满 7 天的最新正式版"
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use dblens_core::{Error, Result, msg};
+use datluma_core::{Error, Result, msg};
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use serde::{Deserialize, Serialize};
 
@@ -546,7 +546,7 @@ mod tests {
 }
 ```
 
-- [ ] **Step 3: 新建 `crates/dblens-service/src/history.rs`**
+- [ ] **Step 3: 新建 `crates/datluma-service/src/history.rs`**
 
 ```rust
 //! 执行历史（M1c1 设计文档第 3、4 节）：每条执行过的语句一条记录，保存在本地库，超出上限时删除最旧的。
@@ -555,7 +555,7 @@ mod tests {
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
 
-use dblens_core::{Error, Result, msg};
+use datluma_core::{Error, Result, msg};
 use rusqlite::{Row, params, params_from_iter};
 use serde::{Deserialize, Serialize};
 
@@ -754,7 +754,7 @@ impl HistoryLog {
     pub fn start(store: Arc<Store>) -> Self {
         let (tx, rx) = sync_channel(QUEUE);
         std::thread::Builder::new()
-            .name("dblens-history".into())
+            .name("datluma-history".into())
             .spawn(move || writer(&store, &rx))
             .map(|_| Self { inner: Inner::Thread(tx) })
             .unwrap_or_else(|e| {
@@ -927,13 +927,13 @@ pub(crate) mod tests {
 }
 ```
 
-- [ ] **Step 4: 修改 `crates/dblens-service/src/lib.rs`**
+- [ ] **Step 4: 修改 `crates/datluma-service/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-service/src/lib.rs
-+++ b/crates/dblens-service/src/lib.rs
+--- a/crates/datluma-service/src/lib.rs
++++ b/crates/datluma-service/src/lib.rs
 @@ -3,6 +3,8 @@
- /// 测试用的假驱动，供本 crate 和 `dblens-api` 的测试使用（feature `testing`）。
+ /// 测试用的假驱动，供本 crate 和 `datluma-api` 的测试使用（feature `testing`）。
  #[cfg(any(test, feature = "testing"))]
  pub mod fake;
 +mod favorite;
@@ -955,11 +955,11 @@ pub(crate) mod tests {
      Decision, DefaultPolicy, ExecContext, ObjectRef, Outcome, Policy, StatementInfo, StatementKind, classify,
 ```
 
-- [ ] **Step 5: 修改 `crates/dblens-service/src/store.rs`**
+- [ ] **Step 5: 修改 `crates/datluma-service/src/store.rs`**
 
 ```diff
---- a/crates/dblens-service/src/store.rs
-+++ b/crates/dblens-service/src/store.rs
+--- a/crates/datluma-service/src/store.rs
++++ b/crates/datluma-service/src/store.rs
 @@ -3,7 +3,7 @@
  
  use std::collections::BTreeMap;
@@ -967,7 +967,7 @@ pub(crate) mod tests {
 -use std::sync::Mutex;
 +use std::sync::{Mutex, MutexGuard};
  
- use dblens_core::{Error, Result, msg};
+ use datluma_core::{Error, Result, msg};
  use rusqlite::{Connection, OptionalExtension, params};
 @@ -43,6 +43,36 @@ const MIGRATIONS: &[&str] = &[
      );",
@@ -1032,7 +1032,7 @@ pub(crate) mod tests {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: fmt、clippy 无输出；全部测试通过（357 个，新增历史 7 个、收藏 5 个）。
@@ -1040,7 +1040,7 @@ Expected: fmt、clippy 无输出；全部测试通过（357 个，新增历史 7
 - [ ] **Step 7: 提交**
 
 ```bash
-git add crates/dblens-core/locales/app.json crates/dblens-service/src/favorite.rs crates/dblens-service/src/history.rs crates/dblens-service/src/lib.rs crates/dblens-service/src/store.rs
+git add crates/datluma-core/locales/app.json crates/datluma-service/src/favorite.rs crates/datluma-service/src/history.rs crates/datluma-service/src/lib.rs crates/datluma-service/src/store.rs
 git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏的存储，历史后台写入" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1051,9 +1051,9 @@ git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏
 会话每执行完一条语句（成功、失败、被策略拒绝、被取消）记一条历史，执行计划和等待确认而没有执行的语句不记。行数为增删改的影响行数，或查询取回的行数。`SessionManager::new` 多一个 `HistoryLog` 参数，`open` 改为接收连接配置（要用连接名和驱动）。`Service::with_parts` 启动后台写入线程，另加 `Service::with_history` 供测试指定写法。
 
 **Files:**
-- Modify: `crates/dblens-service/src/profile.rs`
-- Modify: `crates/dblens-service/src/service.rs`
-- Modify: `crates/dblens-service/src/session.rs`
+- Modify: `crates/datluma-service/src/profile.rs`
+- Modify: `crates/datluma-service/src/service.rs`
+- Modify: `crates/datluma-service/src/session.rs`
 
 **Interfaces:**
 - Consumes：任务 2 的 `HistoryLog`、`NewHistory`、`HistoryQuery`。
@@ -1063,11 +1063,11 @@ git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏
   - `Service::with_history(store, secrets, registry, policy, history)`；
   - `profile::driver_name`、`profile::variant_code` 改为 `pub(crate)`。
 
-- [ ] **Step 1: 修改 `crates/dblens-service/src/profile.rs`**
+- [ ] **Step 1: 修改 `crates/datluma-service/src/profile.rs`**
 
 ```diff
---- a/crates/dblens-service/src/profile.rs
-+++ b/crates/dblens-service/src/profile.rs
+--- a/crates/datluma-service/src/profile.rs
++++ b/crates/datluma-service/src/profile.rs
 @@ -96,7 +96,7 @@ impl Profile {
      }
  }
@@ -1088,14 +1088,14 @@ git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏
  
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-service/src/service.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-service/src/service.rs`**
 
 ```diff
---- a/crates/dblens-service/src/service.rs
-+++ b/crates/dblens-service/src/service.rs
+--- a/crates/datluma-service/src/service.rs
++++ b/crates/datluma-service/src/service.rs
 @@ -5,6 +5,7 @@ use std::sync::Arc;
  
- use dblens_core::{Lang, Result, set_default_lang};
+ use datluma_core::{Lang, Result, set_default_lang};
  
 +use crate::history::HistoryLog;
  use crate::metadata::{MetadataCache, MetadataService};
@@ -1143,11 +1143,11 @@ git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏
          self.sessions.info(id)
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-service/src/session.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-service/src/session.rs`**
 
 ```diff
---- a/crates/dblens-service/src/session.rs
-+++ b/crates/dblens-service/src/session.rs
+--- a/crates/datluma-service/src/session.rs
++++ b/crates/datluma-service/src/session.rs
 @@ -2,11 +2,12 @@
  //! 执行是拉取式的：调用方每调用一次 `next` 取一个事件，结果集按批读取，读多少取多少。
  //! 每条语句执行前都经过 `Policy`；需要确认时脚本停下，调用方确认后用 `confirmed = true` 重新提交。
@@ -1160,9 +1160,9 @@ git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏
 -use std::time::Instant;
 +use std::time::{Instant, SystemTime, UNIX_EPOCH};
  
- use dblens_core::{Error, Msg, Result, Row, Value, msg};
- use dblens_dialect::{Dialect, SqlStatement, Variant, may_change_schema};
-@@ -14,8 +15,10 @@ use dblens_driver::{CancelHandle, ColumnMeta, Connection, ExecEvent};
+ use datluma_core::{Error, Msg, Result, Row, Value, msg};
+ use datluma_dialect::{Dialect, SqlStatement, Variant, may_change_schema};
+@@ -14,8 +15,10 @@ use datluma_driver::{CancelHandle, ColumnMeta, Connection, ExecEvent};
  use serde::{Deserialize, Serialize};
  use tokio::sync::{mpsc, oneshot};
  
@@ -1457,7 +1457,7 @@ git commit -m "feat(service): 本地库迁移到版本 3：执行历史与收藏
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（359 个，新增会话写历史 2 个）。
@@ -1465,7 +1465,7 @@ Expected: 全部测试通过（359 个，新增会话写历史 2 个）。
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-service/src/profile.rs crates/dblens-service/src/service.rs crates/dblens-service/src/session.rs
+git add crates/datluma-service/src/profile.rs crates/datluma-service/src/service.rs crates/datluma-service/src/session.rs
 git commit -m "feat(service): 每条执行过的语句写入历史（执行计划和等待确认的不记），记录行数、耗时、错误" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1476,9 +1476,9 @@ git commit -m "feat(service): 每条执行过的语句写入历史（执行计�
 新增 `/api/history`、`/api/favorites` 接口，接口说明补充两节。
 
 **Files:**
-- Modify: `crates/dblens-api/src/lib.rs`
-- Modify: `crates/dblens-api/src/routes.rs`
-- Create: `crates/dblens-api/tests/library.rs`
+- Modify: `crates/datluma-api/src/lib.rs`
+- Modify: `crates/datluma-api/src/routes.rs`
+- Create: `crates/datluma-api/tests/library.rs`
 - Modify: `docs/notes/m0-4b-api.md`
 
 **Interfaces:**
@@ -1487,7 +1487,7 @@ git commit -m "feat(service): 每条执行过的语句写入历史（执行计�
   - `GET /api/history?q=&profile=&failed=true&before=&limit=`、`DELETE /api/history/{id}`、`DELETE /api/history`；
   - `GET /api/favorites`、`POST /api/favorites`（201）、`PUT /api/favorites/{id}`、`DELETE /api/favorites/{id}`（204）。
 
-- [ ] **Step 1: 新建 `crates/dblens-api/tests/library.rs`**
+- [ ] **Step 1: 新建 `crates/datluma-api/tests/library.rs`**
 
 ```rust
 //! 历史和收藏接口（M1c1）。
@@ -1497,8 +1497,8 @@ use std::sync::Arc;
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
-use dblens_api::{ApiConfig, router};
-use dblens_service::{
+use datluma_api::{ApiConfig, router};
+use datluma_service::{
     DefaultPolicy, DriverRegistry, HistoryLog, NewHistory, SecretBackend, Secrets, Service, Store,
 };
 use http_body_util::BodyExt;
@@ -1644,18 +1644,18 @@ async fn favorites_crud_and_move() {
 }
 ```
 
-- [ ] **Step 2: 修改 `crates/dblens-api/src/lib.rs`**
+- [ ] **Step 2: 修改 `crates/datluma-api/src/lib.rs`**
 
 ```diff
---- a/crates/dblens-api/src/lib.rs
-+++ b/crates/dblens-api/src/lib.rs
+--- a/crates/datluma-api/src/lib.rs
++++ b/crates/datluma-api/src/lib.rs
 @@ -12,7 +12,7 @@ use std::sync::Arc;
  
  use axum::Router;
  use axum::middleware;
 -use axum::routing::{get, post, put};
 +use axum::routing::{delete, get, post, put};
- use dblens_service::Service;
+ use datluma_service::Service;
  use tokio::net::TcpListener;
  
 @@ -48,6 +48,10 @@ pub fn router(service: Arc<Service>, config: ApiConfig) -> Router {
@@ -1671,15 +1671,15 @@ async fn favorites_crud_and_move() {
          .route("/secrets/unlock", post(routes::unlock))
 ```
 
-- [ ] **Step 3: 修改 `crates/dblens-api/src/routes.rs`**
+- [ ] **Step 3: 修改 `crates/datluma-api/src/routes.rs`**
 
 ```diff
---- a/crates/dblens-api/src/routes.rs
-+++ b/crates/dblens-api/src/routes.rs
-@@ -11,7 +11,8 @@ use dblens_core::{Error, msg};
- use dblens_dialect::meta::{MetaKey, ObjectInfo, SchemaInfo};
- use dblens_driver::DriverId;
- use dblens_service::{
+--- a/crates/datluma-api/src/routes.rs
++++ b/crates/datluma-api/src/routes.rs
+@@ -11,7 +11,8 @@ use datluma_core::{Error, msg};
+ use datluma_dialect::meta::{MetaKey, ObjectInfo, SchemaInfo};
+ use datluma_driver::DriverId;
+ use datluma_service::{
 -    DriverStatus, Profile, ProfileInput, SecretStatus, ServerSummary, SessionId, SessionInfo,
 +    DriverStatus, Favorite, FavoritePatch, HistoryItem, HistoryQuery, NewFavorite, Profile, ProfileInput,
 +    SecretStatus, ServerSummary, SessionId, SessionInfo,
@@ -1783,7 +1783,7 @@ async fn favorites_crud_and_move() {
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
 Expected: 全部测试通过（361 个，新增接口测试 2 个）。
@@ -1791,7 +1791,7 @@ Expected: 全部测试通过（361 个，新增接口测试 2 个）。
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-api/src/lib.rs crates/dblens-api/src/routes.rs crates/dblens-api/tests/library.rs docs/notes/m0-4b-api.md
+git add crates/datluma-api/src/lib.rs crates/datluma-api/src/routes.rs crates/datluma-api/tests/library.rs docs/notes/m0-4b-api.md
 git commit -m "feat(api): 历史与收藏接口" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3889,13 +3889,13 @@ git commit -m "feat(web): 收藏：多级文件夹侧栏（拖动整理、插入
 ## 结构
 
 ```text
-crates/dblens-service/src/
+crates/datluma-service/src/
   store.rs        迁移到版本 3：history、favorites 两张表；Store::lock 供多步事务使用
   history.rs      历史的存储（写入并清理、分页查询、删除、清空、设置）；HistoryLog：后台线程批量写入
   favorite.rs     收藏的存储：文件夹和收藏同表，增删改、移动（防止移进自己的下级）、同级重新编号
   session.rs      每条语句执行完写一条历史（执行计划、等待确认没有执行的不记）；统计取回的行数
   service.rs      Service::with_parts 启动历史写入线程；Service::with_history 供测试指定写法
-crates/dblens-api/src/routes.rs   /history、/favorites 接口；tests/library.rs
+crates/datluma-api/src/routes.rs   /history、/favorites 接口；tests/library.rs
 web/src/
   features/history/   历史侧栏（HistoryPanel.tsx）与纯逻辑（history.ts：日期分组、摘要）
   features/favorites/ 收藏侧栏（FavoritesPanel.tsx）、收藏对话框（FavoriteDialog.tsx、dialog.ts）、树的逻辑（tree.ts）
@@ -3940,8 +3940,8 @@ web/src/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下对 5 个实库通过（361 个）。
-  - 第一次全量运行时，dblens-api 的达梦实库测试偶发连接失败。单独运行和再跑两遍都通过，判断是多个测试程序同时连达梦造成的。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下对 5 个实库通过（361 个）。
+  - 第一次全量运行时，datluma-api 的达梦实库测试偶发连接失败。单独运行和再跑两遍都通过，判断是多个测试程序同时连达梦造成的。
 - 前端：tsc 通过；29 个测试文件、189 个测试通过；打包通过。
 - 浏览器实测（MariaDB，中英文界面）：
   - 执行三条语句（第二条出错）后，历史侧栏按"今天"分组显示两条：出错的显示 MariaDB 的报错原文，成功的显示"2 行"；第三条因出错停止没有执行，不在历史中。
@@ -3969,16 +3969,16 @@ web/src/
 
 - [ ] **Step 3: 检查**
 
-全量回归：后端对 5 个实库（各 `DBLENS_TEST_*_URL` 只用命令行内联的环境变量传入，密码不写进任何文件），前端测试和打包：
+全量回归：后端对 5 个实库（各 `DATLUMA_TEST_*_URL` 只用命令行内联的环境变量传入，密码不写进任何文件），前端测试和打包：
 
 ```bash
 export CARGO_INCREMENTAL=0
 cargo fmt --all
 cargo clippy --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace --all-targets -- -D warnings
-DBLENS_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
+DATLUMA_LANG=en cargo test --config "source.mirror.registry='sparse+https://rsproxy.cn/index/'" --workspace
 ```
 
-实测（浏览器模式，用新的数据目录启动 `dblens-server --web-dir web/dist`）：
+实测（浏览器模式，用新的数据目录启动 `datluma-server --web-dir web/dist`）：
 1. 建 5 个测试连接（密码只经环境变量传给建连接的脚本），确认 Oracle、达梦的客户端库目录。
 2. MariaDB 标签执行三条语句（第二条出错，默认出错停止）：历史侧栏"今天"下有两条，出错的显示报错原文，成功的显示行数；第三条不在历史中。
 3. "只看失败"只剩出错的那条；搜索框按 SQL 过滤；双击一条，插入到编辑器（光标前已有内容时另起一行）。

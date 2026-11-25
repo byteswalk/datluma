@@ -7,8 +7,8 @@
 Oracle Database 19c 企业版 19.3.0.0.0，用户提供的 rpm 安装包（`oracle-database-ee-19c-1.0-1.x86_64.rpm`，加上 preinstall、compat-libstdc++-33 两个依赖包）。EE 和 preinstall 包用 Oracle 的 OL7 公钥校验签名通过。
 
 - VM .106 的容器 `ora19c`：centos:7，带 `--init`（和 11.2.0.4 一样，没有它后台进程会成僵尸），端口 1524，软件和数据在 `/data/ora19c`（挂到 `/opt/oracle`）。
-- CDB `ORCLCDB`，PDB `ORCLPDB1`，字符集 AL32UTF8，内存 2G。测试用户 `DBLENS_TEST`（DBA）建在 PDB 里。
-- 连接串在本机 `~/.dblens-test`：`DBLENS_TEST_ORACLE19_URL`（原生客户端）、`DBLENS_TEST_ORACLE19_JDBC_URL`（JDBC 桥接），服务名 `ORCLPDB1`。跑 19c 时赋给 `DBLENS_TEST_ORACLE_URL`。
+- CDB `ORCLCDB`，PDB `ORCLPDB1`，字符集 AL32UTF8，内存 2G。测试用户 `DATLUMA_TEST`（DBA）建在 PDB 里。
+- 连接串在本机 `~/.datluma-test`：`DATLUMA_TEST_ORACLE19_URL`（原生客户端）、`DATLUMA_TEST_ORACLE19_JDBC_URL`（JDBC 桥接），服务名 `ORCLPDB1`。跑 19c 时赋给 `DATLUMA_TEST_ORACLE_URL`。
 
 安装要点：
 

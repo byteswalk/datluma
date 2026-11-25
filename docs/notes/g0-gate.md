@@ -2,17 +2,17 @@
 
 依据：设计文档 `docs/superpowers/specs/2026-10-31-audit-edition-design.md` 第 2、3.2 节；计划 `docs/superpowers/plans/2026-10-31-g0-gate-extension-points.md`。
 
-单机版行为不变。这里放开的扩展点由私有仓库的 `dblens-gate` 使用。
+单机版行为不变。这里放开的扩展点由私有仓库的 `datluma-gate` 使用。
 
 ## 结构
 
 ```text
-crates/dblens-service/src/operator.rs     Operator：操作者，task-local 传递
-crates/dblens-service/src/policy.rs       Operation、ExecContext::new、RequireTicket、ask、report
-crates/dblens-service/src/source.rs       CredentialSource、ProfileSource
-crates/dblens-service/src/path_tests.rs   各执行路径和策略的衔接，操作者隔离
-crates/dblens-service/tests/architecture.rs  入口约束
-crates/dblens-api/src/lib.rs              api_routes：不带鉴权层的业务路由
+crates/datluma-service/src/operator.rs     Operator：操作者，task-local 传递
+crates/datluma-service/src/policy.rs       Operation、ExecContext::new、RequireTicket、ask、report
+crates/datluma-service/src/source.rs       CredentialSource、ProfileSource
+crates/datluma-service/src/path_tests.rs   各执行路径和策略的衔接，操作者隔离
+crates/datluma-service/tests/architecture.rs  入口约束
+crates/datluma-api/src/lib.rs              api_routes：不带鉴权层的业务路由
 web/src/index.ts                          前端包入口
 web/src/shared/capabilities.ts            版本和能力开关
 ```
@@ -72,7 +72,7 @@ task-local 不会跟着 `tokio::spawn` 走：
 
 ## 验证状态
 
-- 通过：工作区离线测试（不含桌面端测试）、clippy、前端 341 个测试和类型检查、`dblens-api` 和 `dblens-service` 的 `live` 实连测试。
+- 通过：工作区离线测试（不含桌面端测试）、clippy、前端 341 个测试和类型检查、`datluma-api` 和 `datluma-service` 的 `live` 实连测试。
 - 界面冒烟（真实鼠标）：编辑器执行、生产环境 DROP 提示需要确认、打开导出对话框。
 - **未做，用户决定放到后面**：`migrate_live`、`privilege_live` 实连测试；界面上的数据编辑保存、表设计器执行、导出下载、SQL 文件导入、账号权限修改。
 

@@ -2,43 +2,43 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 建立 DBLens 的 Cargo 工作区，实现公共类型（`dblens-core`）、驱动接口与一致性测试套件（`dblens-driver`），以及通过一致性测试的 MySQL 和 PostgreSQL 驱动。
+**Goal:** 建立 DATLUMA 的 Cargo 工作区，实现公共类型（`datluma-core`）、驱动接口与一致性测试套件（`datluma-driver`），以及通过一致性测试的 MySQL 和 PostgreSQL 驱动。
 
 **Architecture:**
-- `dblens-core` 只定义数据类型，不做任何 IO：错误、值、列类型、结构模型。
-- `dblens-driver` 定义 `Driver`、`Connection`、`ExecStream` 这几个 trait，以及 `CancelHandle`。另外在 `conformance` 特性下提供一套各驱动共用的一致性测试。
+- `datluma-core` 只定义数据类型，不做任何 IO：错误、值、列类型、结构模型。
+- `datluma-driver` 定义 `Driver`、`Connection`、`ExecStream` 这几个 trait，以及 `CancelHandle`。另外在 `conformance` 特性下提供一套各驱动共用的一致性测试。
 - MySQL 驱动基于 `mysql_async`，PG 驱动基于 `tokio-postgres`。两者都实现拉取式的流式执行：调用方每次 `next(max_rows)` 才继续读取游标。
 
 **Tech Stack:** Rust 1.99（edition 2024）、tokio、async-trait、serde、chrono、mysql_async 0.37、tokio-postgres 0.7、GitHub Actions。
 
-**Spec:** `docs/superpowers/specs/2026-10-22-dblens-design.md`（第 4.2、5、6.1、8、9 节）。总览见 `docs/superpowers/plans/2026-10-22-m0-overview.md`。
+**Spec:** `docs/superpowers/specs/2026-10-22-datluma-design.md`（第 4.2、5、6.1、8、9 节）。总览见 `docs/superpowers/plans/2026-10-22-m0-overview.md`。
 
 ## Global Constraints
 
-- **仓库根目录**：`E:\VibeCoding\16数据库管理工具\dblens\`。下文的路径都相对于它。
+- **仓库根目录**：`E:\VibeCoding\16数据库管理工具\datluma\`。下文的路径都相对于它。
 - **工具链**：Rust 1.99.0 stable（由 `rust-toolchain.toml` 固定），edition 2024，`rust-version = "1.99"`。
-- **命名**：crate 名统一用 `dblens-*`；所有 crate 设 `publish = false`。
+- **命名**：crate 名统一用 `datluma-*`；所有 crate 设 `publish = false`。
 - **依赖版本**：统一在根目录 `Cargo.toml` 的 `[workspace.dependencies]` 中声明，成员 crate 一律用 `xxx.workspace = true` 引用。
   - 如果某个依赖的实际 API 与本计划中的代码不一致，以 docs.rs 上对应版本的文档为准修改实现，但**不改变本计划定义的对外类型和函数签名**。
-- **错误处理**：所有错误都转换为 `dblens_core::Error` 往上传，不允许 `unwrap` 吞错。测试代码除外。
+- **错误处理**：所有错误都转换为 `datluma_core::Error` 往上传，不允许 `unwrap` 吞错。测试代码除外。
 - **敏感信息**：密码不得出现在 `Debug` 输出和日志中。
 - **SQL 参数**：调用方传入的值一律走参数绑定，不拼接进 SQL。测试夹具中的表名是常量，拼接表名不受此限制。
 - **注释和用户可见文案**：用中文。
 - **集成测试的数据库**：
-  - 连接 URL 从环境变量读取：`DBLENS_TEST_MYSQL_URL`、`DBLENS_TEST_MARIADB_URL`、`DBLENS_TEST_PG_URL`。
+  - 连接 URL 从环境变量读取：`DATLUMA_TEST_MYSQL_URL`、`DATLUMA_TEST_MARIADB_URL`、`DATLUMA_TEST_PG_URL`。
   - 未设置时测试会打印"跳过"并直接通过。
   - **Task 7 和 Task 9 必须在设置了这些环境变量的情况下实际跑通才算完成**，"跳过"不算完成。
 - **提交信息**：每次提交都附加一行 `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`。
 - **前置条件**：本机没有 Docker。执行 Task 7 之前，需要准备好 MySQL 8.4、MariaDB 11.4、PostgreSQL 17 测试库，方式二选一：
   - 安装 Docker Desktop（需要 WSL2），然后运行 `docker compose -f docker/docker-compose.test.yml up -d`；
-  - 或者在本机或局域网已有的实例上，建一个空库 `dblens_test`，并设置上面三个环境变量。
+  - 或者在本机或局域网已有的实例上，建一个空库 `datluma_test`，并设置上面三个环境变量。
 
 ---
 
 ## File Structure
 
 ```
-dblens/
+datluma/
 ├── Cargo.toml                         工作区与依赖版本
 ├── rust-toolchain.toml                固定工具链 1.99.0 + rustfmt/clippy
 ├── rustfmt.toml
@@ -48,13 +48,13 @@ dblens/
 ├── .github/workflows/ci.yml           fmt/clippy/单元测试（三平台）+ 集成测试（Linux）
 ├── docs/superpowers/{specs,plans}/    已有的设计文档与计划
 └── crates/
-    ├── dblens-core/src/
+    ├── datluma-core/src/
     │   ├── lib.rs                     模块导出
     │   ├── error.rs                   Error、Result
     │   ├── value.rs                   Value、LobPreview、Row、cap_large
     │   ├── types.rs                   LogicalType、ColumnType
     │   └── schema.rs                  结构模型
-    ├── dblens-driver/
+    ├── datluma-driver/
     │   ├── src/lib.rs                 模块导出
     │   ├── src/params.rs              DriverId、ConnectParams、Capabilities、ServerInfo
     │   ├── src/exec.rs                ColumnMeta、ExecEvent、ExecStream、collect_all
@@ -62,14 +62,14 @@ dblens/
     │   ├── src/traits.rs              Driver、Connection
     │   ├── src/conformance.rs         一致性测试套件（feature = "conformance"）
     │   └── tests/fake_driver.rs       用内存假驱动验证 trait 可用性
-    ├── dblens-driver-mysql/
+    ├── datluma-driver-mysql/
     │   ├── src/lib.rs                 MySqlDriver
     │   ├── src/conn.rs                MySqlConnection
     │   ├── src/exec.rs                MyExec（流式结果）
     │   ├── src/value.rs               类型名、值映射、参数转换
     │   ├── src/error.rs               map_err
     │   └── tests/conformance.rs       MySQL 和 MariaDB 一致性测试
-    └── dblens-driver-postgres/
+    └── datluma-driver-postgres/
         ├── src/lib.rs                 PgDriver
         ├── src/conn.rs                PgConnection（含 notice 转发、手动事务）
         ├── src/exec.rs                PgExec（流式结果）
@@ -84,11 +84,11 @@ dblens/
 
 **Files:**
 - Create: `Cargo.toml`, `rust-toolchain.toml`, `rustfmt.toml`, `.gitignore`, `README.md`
-- Create: `crates/dblens-core/Cargo.toml`, `crates/dblens-core/src/lib.rs`
+- Create: `crates/datluma-core/Cargo.toml`, `crates/datluma-core/src/lib.rs`
 
 **Interfaces:**
 - Consumes: 无
-- Produces: 工作区依赖表（后续所有 crate 都引用它）；空的 `dblens-core` crate
+- Produces: 工作区依赖表（后续所有 crate 都引用它）；空的 `datluma-core` crate
 
 - [ ] **Step 1: 创建 `Cargo.toml`（工作区）**
 
@@ -104,8 +104,8 @@ rust-version = "1.99"
 publish = false
 
 [workspace.dependencies]
-dblens-core = { path = "crates/dblens-core" }
-dblens-driver = { path = "crates/dblens-driver" }
+datluma-core = { path = "crates/datluma-core" }
+datluma-driver = { path = "crates/datluma-driver" }
 
 async-trait = "0.1.92"
 base64 = "0.23.1"
@@ -147,12 +147,12 @@ max_width = 110
 node_modules/
 ```
 
-- [ ] **Step 3: 创建 `crates/dblens-core/Cargo.toml` 和 `src/lib.rs`**
+- [ ] **Step 3: 创建 `crates/datluma-core/Cargo.toml` 和 `src/lib.rs`**
 
-`crates/dblens-core/Cargo.toml`：
+`crates/datluma-core/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-core"
+name = "datluma-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -167,19 +167,19 @@ thiserror.workspace = true
 uuid.workspace = true
 ```
 
-`crates/dblens-core/src/lib.rs`：
+`crates/datluma-core/src/lib.rs`：
 ```rust
-//! DBLens 公共类型：错误、值、列类型、结构模型。本 crate 不做任何 IO。
+//! DATLUMA 公共类型：错误、值、列类型、结构模型。本 crate 不做任何 IO。
 ```
 
 - [ ] **Step 4: 创建 `README.md`**
 
 ````markdown
-# DBLens（数洞）
+# DATLUMA（数览）
 
 跨平台数据库管理工具，后端 Rust，前端 Web UI，形态是 Tauri 桌面应用加可选的浏览器模式。
 
-- 设计文档：`docs/superpowers/specs/2026-10-22-dblens-design.md`
+- 设计文档：`docs/superpowers/specs/2026-10-22-datluma-design.md`
 - 实施计划：`docs/superpowers/plans/`
 
 ## 开发
@@ -195,9 +195,9 @@ cargo test --workspace
 
 | 环境变量 | 示例 |
 |---|---|
-| `DBLENS_TEST_MYSQL_URL` | `mysql://root:dblens@127.0.0.1:3306/dblens_test` |
-| `DBLENS_TEST_MARIADB_URL` | `mysql://root:dblens@127.0.0.1:3307/dblens_test` |
-| `DBLENS_TEST_PG_URL` | `postgres://postgres:dblens@127.0.0.1:5432/dblens_test` |
+| `DATLUMA_TEST_MYSQL_URL` | `mysql://root:datluma@127.0.0.1:3306/datluma_test` |
+| `DATLUMA_TEST_MARIADB_URL` | `mysql://root:datluma@127.0.0.1:3307/datluma_test` |
+| `DATLUMA_TEST_PG_URL` | `postgres://postgres:datluma@127.0.0.1:5432/datluma_test` |
 
 有 Docker 时可以一键启动这三个测试库：
 
@@ -205,7 +205,7 @@ cargo test --workspace
 docker compose -f docker/docker-compose.test.yml up -d
 ```
 
-PowerShell 中设置环境变量：`$env:DBLENS_TEST_MYSQL_URL = "mysql://root:dblens@127.0.0.1:3306/dblens_test"`
+PowerShell 中设置环境变量：`$env:DATLUMA_TEST_MYSQL_URL = "mysql://root:datluma@127.0.0.1:3306/datluma_test"`
 ````
 
 - [ ] **Step 5: 构建验证**
@@ -216,32 +216,32 @@ Expected: 编译成功（首次会下载工具链和依赖），没有错误。
 - [ ] **Step 6: 初始化 git 并提交**
 
 ```bash
-cd "E:/VibeCoding/16数据库管理工具/dblens"
+cd "E:/VibeCoding/16数据库管理工具/datluma"
 git init -b main
 git add -A
-git commit -m "chore: 初始化 DBLens 工作区与设计文档" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
+git commit -m "chore: 初始化 DATLUMA 工作区与设计文档" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 2: 错误类型与值类型（`dblens-core`）
+### Task 2: 错误类型与值类型（`datluma-core`）
 
 **Files:**
-- Create: `crates/dblens-core/src/error.rs`, `crates/dblens-core/src/value.rs`
-- Modify: `crates/dblens-core/src/lib.rs`
+- Create: `crates/datluma-core/src/error.rs`, `crates/datluma-core/src/value.rs`
+- Modify: `crates/datluma-core/src/lib.rs`
 
 **Interfaces:**
 - Consumes: Task 1 的工作区
 - Produces:
-  - `dblens_core::Error`（枚举，变体为 `Connect{message}`、`Auth{message}`、`Sql{code,message,position:Option<u32>}`、`Timeout`、`Cancelled`、`DriverUnavailable{hint}`、`Internal{message}`），以及 `Error::connect(impl Into<String>)` 和 `Error::internal(impl Into<String>)`
-  - `dblens_core::Result<T>`
-  - `dblens_core::Value`（变体见下）、`dblens_core::LobPreview { binary, preview, total_len, truncated }`、`dblens_core::Row = Vec<Value>`
+  - `datluma_core::Error`（枚举，变体为 `Connect{message}`、`Auth{message}`、`Sql{code,message,position:Option<u32>}`、`Timeout`、`Cancelled`、`DriverUnavailable{hint}`、`Internal{message}`），以及 `Error::connect(impl Into<String>)` 和 `Error::internal(impl Into<String>)`
+  - `datluma_core::Result<T>`
+  - `datluma_core::Value`（变体见下）、`datluma_core::LobPreview { binary, preview, total_len, truncated }`、`datluma_core::Row = Vec<Value>`
   - `Value::cap_large(self, limit: usize) -> Value`
-  - `dblens_core::DEFAULT_LOB_PREVIEW_BYTES: usize = 65536`
+  - `datluma_core::DEFAULT_LOB_PREVIEW_BYTES: usize = 65536`
 
 - [ ] **Step 1: 写失败的测试**
 
-在 `crates/dblens-core/src/error.rs` 末尾写入：
+在 `crates/datluma-core/src/error.rs` 末尾写入：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -264,7 +264,7 @@ mod tests {
 }
 ```
 
-在 `crates/dblens-core/src/value.rs` 末尾写入：
+在 `crates/datluma-core/src/value.rs` 末尾写入：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -287,7 +287,7 @@ mod tests {
             Value::UInt(u64::MAX),
             Value::Float(1.5),
             Value::Decimal("12345678901234567890.123456789".into()),
-            Value::String("数洞".into()),
+            Value::String("数览".into()),
             Value::Bytes(vec![0, 255]),
             Value::Date(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap()),
             Value::Time(chrono::NaiveTime::from_hms_micro_opt(13, 45, 30, 123456).unwrap()),
@@ -313,7 +313,7 @@ mod tests {
     #[test]
     fn cap_large_truncates_on_char_boundary() {
         // "数" 占 3 字节，limit=4 时只能保留一个完整字符
-        let v = Value::String("数洞数洞".into()).cap_large(4);
+        let v = Value::String("数览数览".into()).cap_large(4);
         assert_eq!(v, Value::Lob(LobPreview { binary: false, preview: "数".into(), total_len: 12, truncated: true }));
     }
 
@@ -325,9 +325,9 @@ mod tests {
 }
 ```
 
-把 `crates/dblens-core/src/lib.rs` 改为：
+把 `crates/datluma-core/src/lib.rs` 改为：
 ```rust
-//! DBLens 公共类型：错误、值、列类型、结构模型。本 crate 不做任何 IO。
+//! DATLUMA 公共类型：错误、值、列类型、结构模型。本 crate 不做任何 IO。
 
 mod error;
 mod value;
@@ -338,16 +338,16 @@ pub use value::{DEFAULT_LOB_PREVIEW_BYTES, LobPreview, Row, Value};
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-core`
+Run: `cargo test -p datluma-core`
 Expected: 编译失败，提示找不到 `Error`、`Value` 等类型。
 
 - [ ] **Step 3: 实现 `error.rs`**
 
-在 `crates/dblens-core/src/error.rs` 顶部（测试模块之前）写入：
+在 `crates/datluma-core/src/error.rs` 顶部（测试模块之前）写入：
 ```rust
 use serde::{Deserialize, Serialize};
 
-/// DBLens 统一错误类型。各层都用它向上传递错误，不允许吞掉。
+/// DATLUMA 统一错误类型。各层都用它向上传递错误，不允许吞掉。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum Error {
@@ -384,7 +384,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 - [ ] **Step 4: 实现 `value.rs`**
 
-在 `crates/dblens-core/src/value.rs` 顶部（测试模块之前）写入：
+在 `crates/datluma-core/src/value.rs` 顶部（测试模块之前）写入：
 ```rust
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
@@ -477,23 +477,23 @@ mod b64 {
 
 - [ ] **Step 5: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-core`
+Run: `cargo test -p datluma-core`
 Expected: 7 个测试全部 PASS。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-core
+git add crates/datluma-core
 git commit -m "feat(core): 统一错误类型与值类型" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 3: 列类型与结构模型（`dblens-core`）
+### Task 3: 列类型与结构模型（`datluma-core`）
 
 **Files:**
-- Create: `crates/dblens-core/src/types.rs`, `crates/dblens-core/src/schema.rs`
-- Modify: `crates/dblens-core/src/lib.rs`
+- Create: `crates/datluma-core/src/types.rs`, `crates/datluma-core/src/schema.rs`
+- Modify: `crates/datluma-core/src/lib.rs`
 
 **Interfaces:**
 - Consumes: Task 2
@@ -504,7 +504,7 @@ git commit -m "feat(core): 统一错误类型与值类型" -m "Co-Authored-By: C
 
 - [ ] **Step 1: 写失败的测试**
 
-`crates/dblens-core/src/schema.rs` 末尾：
+`crates/datluma-core/src/schema.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -603,7 +603,7 @@ mod tests {
 
 把 `lib.rs` 改为：
 ```rust
-//! DBLens 公共类型：错误、值、列类型、结构模型。本 crate 不做任何 IO。
+//! DATLUMA 公共类型：错误、值、列类型、结构模型。本 crate 不做任何 IO。
 
 mod error;
 pub mod schema;
@@ -617,12 +617,12 @@ pub use value::{DEFAULT_LOB_PREVIEW_BYTES, LobPreview, Row, Value};
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-core`
+Run: `cargo test -p datluma-core`
 Expected: 编译失败，提示找不到 `types` 模块和 schema 中的各类型。
 
 - [ ] **Step 3: 实现 `types.rs` 和 `schema.rs`**
 
-`crates/dblens-core/src/types.rs`：
+`crates/datluma-core/src/types.rs`：
 ```rust
 use serde::{Deserialize, Serialize};
 
@@ -658,7 +658,7 @@ pub struct ColumnType {
 }
 ```
 
-`crates/dblens-core/src/schema.rs`（测试模块之前）：
+`crates/datluma-core/src/schema.rs`（测试模块之前）：
 ```rust
 //! 统一结构模型。层级：Catalog → Schema → 各类对象。
 //! Oracle/达梦没有 Catalog 层；MySQL 的 database 同时充当 Schema。
@@ -838,27 +838,27 @@ pub struct Synonym {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-core`
+Run: `cargo test -p datluma-core`
 Expected: 共 10 个测试，全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-core
+git add crates/datluma-core
 git commit -m "feat(core): 逻辑类型与统一结构模型" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
 ---
 
-### Task 4: 驱动接口（`dblens-driver`）
+### Task 4: 驱动接口（`datluma-driver`）
 
 **Files:**
-- Create: `crates/dblens-driver/Cargo.toml`
-- Create: `crates/dblens-driver/src/{lib.rs,params.rs,exec.rs,cancel.rs,traits.rs}`
-- Test: `crates/dblens-driver/tests/fake_driver.rs`
+- Create: `crates/datluma-driver/Cargo.toml`
+- Create: `crates/datluma-driver/src/{lib.rs,params.rs,exec.rs,cancel.rs,traits.rs}`
+- Test: `crates/datluma-driver/tests/fake_driver.rs`
 
 **Interfaces:**
-- Consumes: `dblens_core::{Error, Result, Value, Row}`
+- Consumes: `datluma_core::{Error, Result, Value, Row}`
 - Produces:
   - `DriverId { Mysql, Postgres, Oracle, Dameng }`（序列化为 snake_case）
   - `ConnectParams { host: String, port: u16, user: String, password: String, database: Option<String>, options: BTreeMap<String,String>, connect_timeout: Duration }`
@@ -876,10 +876,10 @@ git commit -m "feat(core): 逻辑类型与统一结构模型" -m "Co-Authored-By
 
 - [ ] **Step 1: 创建 `Cargo.toml` 和失败的测试**
 
-`crates/dblens-driver/Cargo.toml`：
+`crates/datluma-driver/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-driver"
+name = "datluma-driver"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -890,7 +890,7 @@ conformance = ["dep:tokio"]
 
 [dependencies]
 async-trait.workspace = true
-dblens-core.workspace = true
+datluma-core.workspace = true
 futures.workspace = true
 percent-encoding.workspace = true
 serde.workspace = true
@@ -901,7 +901,7 @@ url.workspace = true
 tokio.workspace = true
 ```
 
-`crates/dblens-driver/tests/fake_driver.rs`：
+`crates/datluma-driver/tests/fake_driver.rs`：
 ```rust
 //! 用内存假驱动验证接口是否可用：trait 对象、流式拉取、批大小、取消句柄。
 
@@ -909,8 +909,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use async_trait::async_trait;
-use dblens_core::{Result, Value};
-use dblens_driver::*;
+use datluma_core::{Result, Value};
+use datluma_driver::*;
 
 struct FakeDriver;
 struct FakeConn {
@@ -1016,7 +1016,7 @@ async fn cancel_handle_is_cloneable_and_invokes_closure() {
 }
 ```
 
-在 `crates/dblens-driver/src/params.rs` 末尾写入单元测试：
+在 `crates/datluma-driver/src/params.rs` 末尾写入单元测试：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -1050,7 +1050,7 @@ mod tests {
     #[test]
     fn rejects_unknown_scheme() {
         let err = ConnectParams::from_url("redis://h").unwrap_err();
-        assert!(matches!(err, dblens_core::Error::Connect { .. }));
+        assert!(matches!(err, datluma_core::Error::Connect { .. }));
     }
 
     #[test]
@@ -1064,12 +1064,12 @@ mod tests {
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver`
+Run: `cargo test -p datluma-driver`
 Expected: 编译失败（`src/lib.rs` 不存在，或缺少各类型）。
 
 - [ ] **Step 3: 实现各模块**
 
-`crates/dblens-driver/src/lib.rs`：
+`crates/datluma-driver/src/lib.rs`：
 ```rust
 //! 驱动接口：所有数据库驱动都实现这里的 `Driver` / `Connection` / `ExecStream`。
 
@@ -1087,13 +1087,13 @@ pub use params::{Capabilities, ConnectParams, DriverId, ServerInfo};
 pub use traits::{Connection, Driver};
 ```
 
-`crates/dblens-driver/src/params.rs`（测试模块之前）：
+`crates/datluma-driver/src/params.rs`（测试模块之前）：
 ```rust
 use std::collections::BTreeMap;
 use std::fmt;
 use std::time::Duration;
 
-use dblens_core::{Error, Result};
+use datluma_core::{Error, Result};
 use percent_encoding::percent_decode_str;
 use serde::{Deserialize, Serialize};
 
@@ -1196,10 +1196,10 @@ pub struct ServerInfo {
 }
 ```
 
-`crates/dblens-driver/src/exec.rs`：
+`crates/datluma-driver/src/exec.rs`：
 ```rust
 use async_trait::async_trait;
-use dblens_core::{Result, Row};
+use datluma_core::{Result, Row};
 use serde::{Deserialize, Serialize};
 
 /// 结果集列的元信息。
@@ -1257,13 +1257,13 @@ pub async fn collect_all(stream: &mut (dyn ExecStream + '_), max_rows: usize) ->
 }
 ```
 
-`crates/dblens-driver/src/cancel.rs`：
+`crates/datluma-driver/src/cancel.rs`：
 ```rust
 use std::fmt;
 use std::future::Future;
 use std::sync::Arc;
 
-use dblens_core::Result;
+use datluma_core::Result;
 use futures::future::BoxFuture;
 
 type CancelFn = dyn Fn() -> BoxFuture<'static, Result<()>> + Send + Sync;
@@ -1295,10 +1295,10 @@ impl fmt::Debug for CancelHandle {
 }
 ```
 
-`crates/dblens-driver/src/traits.rs`：
+`crates/datluma-driver/src/traits.rs`：
 ```rust
 use async_trait::async_trait;
-use dblens_core::{Result, Value};
+use datluma_core::{Result, Value};
 
 use crate::{CancelHandle, Capabilities, ConnectParams, DriverId, ExecStream, ServerInfo};
 
@@ -1329,13 +1329,13 @@ pub trait Connection: Send {
 
 - [ ] **Step 4: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-driver`
+Run: `cargo test -p datluma-driver`
 Expected: 5 个单元测试 + 2 个集成测试全部 PASS。
 
 - [ ] **Step 5: 提交**
 
 ```bash
-git add crates/dblens-driver
+git add crates/datluma-driver
 git commit -m "feat(driver): 驱动接口、执行流与取消句柄" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1344,32 +1344,32 @@ git commit -m "feat(driver): 驱动接口、执行流与取消句柄" -m "Co-Aut
 ### Task 5: 一致性测试套件与测试数据库
 
 **Files:**
-- Create: `crates/dblens-driver/src/conformance.rs`
+- Create: `crates/datluma-driver/src/conformance.rs`
 - Create: `docker/docker-compose.test.yml`
 
 **Interfaces:**
 - Consumes: Task 4 的全部接口
 - Produces:
-  - `dblens_driver::conformance::Fixture`（字段见下）
+  - `datluma_driver::conformance::Fixture`（字段见下）
   - `conformance::load(env: &str, make: fn(ConnectParams) -> Fixture) -> Option<Fixture>`
   - 9 个检查函数：`ping_and_server_info`、`select_one`、`row_batching`、`dml_and_params`、`transaction_commit_and_rollback`、`cancel_running_query`、`sql_error_has_code`、`large_text_becomes_lob_preview`、`type_round_trip`，签名均为 `pub async fn xxx(f: &Fixture)`
-  - 宏 `dblens_driver::conformance_tests!("ENV_VAR", fixture_fn)`，展开后在调用处生成 `mod conformance`，内含上述 9 个 `#[tokio::test]`
+  - 宏 `datluma_driver::conformance_tests!("ENV_VAR", fixture_fn)`，展开后在调用处生成 `mod conformance`，内含上述 9 个 `#[tokio::test]`
 
 - [ ] **Step 1: 实现 `conformance.rs`**
 
 这个任务产出的是测试工具本身，它的正确性要到 Task 7 和 Task 9 用真实数据库时才能验证。本任务只要求它在开启特性后能编译通过。
 
-`crates/dblens-driver/src/conformance.rs`：
+`crates/datluma-driver/src/conformance.rs`：
 ```rust
 //! 驱动一致性测试套件。
 //!
-//! 用法：驱动 crate 在 dev-dependencies 中开启 `dblens-driver` 的 `conformance` 特性，
+//! 用法：驱动 crate 在 dev-dependencies 中开启 `datluma-driver` 的 `conformance` 特性，
 //! 写一个 `fn fixture(params: ConnectParams) -> Fixture`，再调用
-//! `dblens_driver::conformance_tests!("DBLENS_TEST_XXX_URL", fixture);`。
+//! `datluma_driver::conformance_tests!("DATLUMA_TEST_XXX_URL", fixture);`。
 
 use std::time::{Duration, Instant};
 
-use dblens_core::{Error, Value};
+use datluma_core::{Error, Value};
 
 use crate::{ConnectParams, Connection, Driver, ExecEvent, collect_all};
 
@@ -1485,7 +1485,7 @@ pub async fn row_batching(f: &Fixture) {
 }
 
 pub async fn dml_and_params(f: &Fixture) {
-    let t = "dblens_conf_dml";
+    let t = "datluma_conf_dml";
     let mut c = connect(f).await;
     run(c.as_mut(), &(f.drop_table_if_exists)(t), &[]).await.expect("删表失败");
     run(c.as_mut(), &(f.create_table)(t), &[]).await.expect("建表失败");
@@ -1499,7 +1499,7 @@ pub async fn dml_and_params(f: &Fixture) {
 }
 
 pub async fn transaction_commit_and_rollback(f: &Fixture) {
-    let t = "dblens_conf_tx";
+    let t = "datluma_conf_tx";
     let mut c = connect(f).await;
     run(c.as_mut(), &(f.drop_table_if_exists)(t), &[]).await.expect("删表失败");
     run(c.as_mut(), &(f.create_table)(t), &[]).await.expect("建表失败");
@@ -1554,7 +1554,7 @@ pub async fn large_text_becomes_lob_preview(f: &Fixture) {
         Value::Lob(lob) => {
             assert!(!lob.binary && lob.truncated);
             assert_eq!(lob.total_len, 100_000);
-            assert_eq!(lob.preview.len(), dblens_core::DEFAULT_LOB_PREVIEW_BYTES);
+            assert_eq!(lob.preview.len(), datluma_core::DEFAULT_LOB_PREVIEW_BYTES);
         }
         other => panic!("期望 LOB 预览，实际：{other:?}"),
     }
@@ -1642,35 +1642,35 @@ services:
   mysql:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: dblens
-      MYSQL_DATABASE: dblens_test
+      MYSQL_ROOT_PASSWORD: datluma
+      MYSQL_DATABASE: datluma_test
     ports: ["3306:3306"]
   mariadb:
     image: mariadb:11.4
     environment:
-      MARIADB_ROOT_PASSWORD: dblens
-      MARIADB_DATABASE: dblens_test
+      MARIADB_ROOT_PASSWORD: datluma
+      MARIADB_DATABASE: datluma_test
     ports: ["3307:3306"]
   postgres:
     image: postgres:17
     environment:
-      POSTGRES_PASSWORD: dblens
-      POSTGRES_DB: dblens_test
+      POSTGRES_PASSWORD: datluma
+      POSTGRES_DB: datluma_test
     ports: ["5432:5432"]
 ```
 
 - [ ] **Step 3: 编译验证**
 
-Run: `cargo test -p dblens-driver --features conformance`
+Run: `cargo test -p datluma-driver --features conformance`
 Expected: 编译通过，Task 4 的 7 个测试仍然 PASS。
 
-Run: `cargo clippy -p dblens-driver --features conformance --all-targets -- -D warnings`
+Run: `cargo clippy -p datluma-driver --features conformance --all-targets -- -D warnings`
 Expected: 没有警告。
 
 - [ ] **Step 4: 提交**
 
 ```bash
-git add crates/dblens-driver docker
+git add crates/datluma-driver docker
 git commit -m "test(driver): 驱动一致性测试套件与测试库编排" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -1679,11 +1679,11 @@ git commit -m "test(driver): 驱动一致性测试套件与测试库编排" -m "
 ### Task 6: MySQL 值映射与错误映射（纯函数）
 
 **Files:**
-- Create: `crates/dblens-driver-mysql/Cargo.toml`
-- Create: `crates/dblens-driver-mysql/src/lib.rs`, `src/value.rs`, `src/error.rs`
+- Create: `crates/datluma-driver-mysql/Cargo.toml`
+- Create: `crates/datluma-driver-mysql/src/lib.rs`, `src/value.rs`, `src/error.rs`
 
 **Interfaces:**
-- Consumes: `dblens_core::{Error, Value}`、`dblens_driver::ColumnMeta`
+- Consumes: `datluma_core::{Error, Value}`、`datluma_driver::ColumnMeta`
 - Produces（crate 内部，`pub(crate)`）：
   - `value::native_type_name(&Column) -> String`
   - `value::column_meta(&Column) -> ColumnMeta`
@@ -1693,10 +1693,10 @@ git commit -m "test(driver): 驱动一致性测试套件与测试库编排" -m "
 
 - [ ] **Step 1: 创建 `Cargo.toml` 和 `lib.rs`**
 
-`crates/dblens-driver-mysql/Cargo.toml`：
+`crates/datluma-driver-mysql/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-driver-mysql"
+name = "datluma-driver-mysql"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -1705,19 +1705,19 @@ publish.workspace = true
 [dependencies]
 async-trait.workspace = true
 chrono.workspace = true
-dblens-core.workspace = true
-dblens-driver.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
 mysql_async.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-dblens-driver = { workspace = true, features = ["conformance"] }
+datluma-driver = { workspace = true, features = ["conformance"] }
 serde_json.workspace = true
 tokio.workspace = true
 ```
 
-`crates/dblens-driver-mysql/src/lib.rs`（本任务先只声明这两个模块）：
+`crates/datluma-driver-mysql/src/lib.rs`（本任务先只声明这两个模块）：
 ```rust
 //! MySQL 系驱动（MySQL、MariaDB，以及兼容 MySQL 协议的 TiDB、OceanBase、PolarDB 等）。
 
@@ -1727,7 +1727,7 @@ mod value;
 
 - [ ] **Step 2: 写失败的测试**
 
-`crates/dblens-driver-mysql/src/value.rs` 末尾：
+`crates/datluma-driver-mysql/src/value.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -1759,8 +1759,8 @@ mod tests {
         );
         assert_eq!(to_value(MyValue::Bytes(b"1.5".to_vec()), &col(ColumnType::MYSQL_TYPE_DOUBLE)), Value::Float(1.5));
         assert_eq!(
-            to_value(MyValue::Bytes("数洞".as_bytes().to_vec()), &col(ColumnType::MYSQL_TYPE_VAR_STRING)),
-            Value::String("数洞".into())
+            to_value(MyValue::Bytes("数览".as_bytes().to_vec()), &col(ColumnType::MYSQL_TYPE_VAR_STRING)),
+            Value::String("数览".into())
         );
         assert_eq!(to_value(MyValue::Bytes(vec![1, 2, 3]), &bin(ColumnType::MYSQL_TYPE_VAR_STRING)), Value::Bytes(vec![1, 2, 3]));
         assert_eq!(native_type_name(&bin(ColumnType::MYSQL_TYPE_BLOB)), "BLOB");
@@ -1847,7 +1847,7 @@ mod tests {
 }
 ```
 
-`crates/dblens-driver-mysql/src/error.rs` 末尾：
+`crates/datluma-driver-mysql/src/error.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -1872,16 +1872,16 @@ mod tests {
 
 - [ ] **Step 3: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver-mysql --lib`
+Run: `cargo test -p datluma-driver-mysql --lib`
 Expected: 编译失败，提示找不到 `to_value`、`map_err` 等函数。
 
 - [ ] **Step 4: 实现 `value.rs` 和 `error.rs`**
 
-`crates/dblens-driver-mysql/src/value.rs`（测试模块之前）：
+`crates/datluma-driver-mysql/src/value.rs`（测试模块之前）：
 ```rust
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
-use dblens_core::{Error, Result, Value};
-use dblens_driver::ColumnMeta;
+use datluma_core::{Error, Result, Value};
+use datluma_driver::ColumnMeta;
 use mysql_async::consts::{ColumnFlags, ColumnType};
 use mysql_async::{Column, Value as MyValue};
 
@@ -2071,9 +2071,9 @@ pub(crate) fn to_mysql_param(v: &Value) -> Result<MyValue> {
 }
 ```
 
-`crates/dblens-driver-mysql/src/error.rs`（测试模块之前）：
+`crates/datluma-driver-mysql/src/error.rs`（测试模块之前）：
 ```rust
-use dblens_core::Error;
+use datluma_core::Error;
 
 /// MySQL 错误码：查询被 KILL QUERY 中断。
 const ER_QUERY_INTERRUPTED: u16 = 1317;
@@ -2098,13 +2098,13 @@ pub(crate) fn map_err(e: mysql_async::Error) -> Error {
 
 - [ ] **Step 5: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-driver-mysql --lib`
+Run: `cargo test -p datluma-driver-mysql --lib`
 Expected: 8 个测试全部 PASS（value 7 个、error 1 个）。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-driver-mysql
+git add crates/datluma-driver-mysql
 git commit -m "feat(mysql): 值映射、参数转换与错误映射" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2113,23 +2113,23 @@ git commit -m "feat(mysql): 值映射、参数转换与错误映射" -m "Co-Auth
 ### Task 7: MySQL 连接与流式执行
 
 **Files:**
-- Create: `crates/dblens-driver-mysql/src/conn.rs`, `src/exec.rs`
-- Modify: `crates/dblens-driver-mysql/src/lib.rs`
-- Test: `crates/dblens-driver-mysql/tests/conformance.rs`
+- Create: `crates/datluma-driver-mysql/src/conn.rs`, `src/exec.rs`
+- Modify: `crates/datluma-driver-mysql/src/lib.rs`
+- Test: `crates/datluma-driver-mysql/tests/conformance.rs`
 
 **Interfaces:**
 - Consumes: Task 4 的 trait；Task 5 的 `Fixture` 和 `conformance_tests!`；Task 6 的映射函数
-- Produces: `dblens_driver_mysql::MySqlDriver`（单元结构体，实现 `Driver`）、`dblens_driver_mysql::MySqlConnection`
+- Produces: `datluma_driver_mysql::MySqlDriver`（单元结构体，实现 `Driver`）、`datluma_driver_mysql::MySqlConnection`
 
 - [ ] **Step 1: 写失败的一致性测试**
 
-`crates/dblens-driver-mysql/tests/conformance.rs`：
+`crates/datluma-driver-mysql/tests/conformance.rs`：
 ```rust
 use chrono::{NaiveDate, NaiveTime};
-use dblens_core::Value;
-use dblens_driver::ConnectParams;
-use dblens_driver::conformance::Fixture;
-use dblens_driver_mysql::MySqlDriver;
+use datluma_core::Value;
+use datluma_driver::ConnectParams;
+use datluma_driver::conformance::Fixture;
+use datluma_driver_mysql::MySqlDriver;
 
 /// MySQL 与 MariaDB 都支持的类型用例。
 fn common_type_cases() -> Vec<(&'static str, Value)> {
@@ -2139,7 +2139,7 @@ fn common_type_cases() -> Vec<(&'static str, Value)> {
         ("SELECT CAST(42 AS UNSIGNED)", Value::UInt(42)),
         ("SELECT CAST(1.5 AS DOUBLE)", Value::Float(1.5)),
         ("SELECT CAST('123.4500' AS DECIMAL(10,4))", Value::Decimal("123.4500".into())),
-        ("SELECT '数洞'", Value::String("数洞".into())),
+        ("SELECT '数览'", Value::String("数览".into())),
         ("SELECT CAST('2024-02-29' AS DATE)", Value::Date(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap())),
         (
             "SELECT CAST('2024-02-29 13:45:30.123456' AS DATETIME(6))",
@@ -2167,7 +2167,7 @@ fn base(params: ConnectParams, type_cases: Vec<(&'static str, Value)>) -> Fixtur
         insert_with_params: |t| format!("INSERT INTO {t} (id, name) VALUES (?, ?)"),
         select_name_by_id: |t| format!("SELECT name FROM {t} WHERE id = ?"),
         count_rows: |t| format!("SELECT COUNT(*) FROM {t}"),
-        missing_table_query: "SELECT * FROM dblens_no_such_table",
+        missing_table_query: "SELECT * FROM datluma_no_such_table",
         type_cases,
     }
 }
@@ -2184,29 +2184,29 @@ fn mariadb_fixture(params: ConnectParams) -> Fixture {
 
 mod mysql {
     use super::*;
-    dblens_driver::conformance_tests!("DBLENS_TEST_MYSQL_URL", mysql_fixture);
+    datluma_driver::conformance_tests!("DATLUMA_TEST_MYSQL_URL", mysql_fixture);
 }
 
 mod mariadb {
     use super::*;
-    dblens_driver::conformance_tests!("DBLENS_TEST_MARIADB_URL", mariadb_fixture);
+    datluma_driver::conformance_tests!("DATLUMA_TEST_MARIADB_URL", mariadb_fixture);
 }
 ```
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver-mysql --test conformance`
+Run: `cargo test -p datluma-driver-mysql --test conformance`
 Expected: 编译失败，提示找不到 `MySqlDriver`。
 
 - [ ] **Step 3: 实现 `exec.rs`**
 
-`crates/dblens-driver-mysql/src/exec.rs`：
+`crates/datluma-driver-mysql/src/exec.rs`：
 ```rust
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Result, Row};
-use dblens_driver::{ExecEvent, ExecStream};
+use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Result, Row};
+use datluma_driver::{ExecEvent, ExecStream};
 use mysql_async::prelude::Protocol;
 use mysql_async::{Column, QueryResult};
 
@@ -2294,11 +2294,11 @@ where
 
 - [ ] **Step 4: 实现 `conn.rs` 和 `lib.rs`**
 
-`crates/dblens-driver-mysql/src/conn.rs`：
+`crates/datluma-driver-mysql/src/conn.rs`：
 ```rust
 use async_trait::async_trait;
-use dblens_core::{Error, Result, Value};
-use dblens_driver::{CancelHandle, Connection, ExecStream, ServerInfo};
+use datluma_core::{Error, Result, Value};
+use datluma_driver::{CancelHandle, Connection, ExecStream, ServerInfo};
 use mysql_async::prelude::Queryable;
 use mysql_async::{Conn, Opts};
 
@@ -2371,7 +2371,7 @@ impl Connection for MySqlConnection {
 }
 ```
 
-`crates/dblens-driver-mysql/src/lib.rs`：
+`crates/datluma-driver-mysql/src/lib.rs`：
 ```rust
 //! MySQL 系驱动（MySQL、MariaDB，以及兼容 MySQL 协议的 TiDB、OceanBase、PolarDB 等）。
 
@@ -2381,8 +2381,8 @@ mod exec;
 mod value;
 
 use async_trait::async_trait;
-use dblens_core::{Error, Result};
-use dblens_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId};
+use datluma_core::{Error, Result};
+use datluma_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId};
 use mysql_async::{Conn, Opts, OptsBuilder};
 
 pub use conn::MySqlConnection;
@@ -2429,24 +2429,24 @@ impl Driver for MySqlDriver {
 
 按 Global Constraints 中的"前置条件"准备好 MySQL 8.4 和 MariaDB 11.4，并设置环境变量（PowerShell 示例）：
 ```powershell
-$env:DBLENS_TEST_MYSQL_URL = "mysql://root:dblens@127.0.0.1:3306/dblens_test"
-$env:DBLENS_TEST_MARIADB_URL = "mysql://root:dblens@127.0.0.1:3307/dblens_test"
+$env:DATLUMA_TEST_MYSQL_URL = "mysql://root:datluma@127.0.0.1:3306/datluma_test"
+$env:DATLUMA_TEST_MARIADB_URL = "mysql://root:datluma@127.0.0.1:3307/datluma_test"
 ```
 
-Run: `cargo test -p dblens-driver-mysql --test conformance -- --nocapture`
+Run: `cargo test -p datluma-driver-mysql --test conformance -- --nocapture`
 Expected: `mysql::conformance::*` 和 `mariadb::conformance::*` 共 18 个测试全部 PASS，输出中**没有**"跳过"字样。
 
 如果某个类型用例失败，先确认是映射函数的问题还是数据库返回的类型与预期不同（可以用 `--nocapture` 打印实际的事件），只修正映射代码，不修改期望值。
 
 - [ ] **Step 6: 运行全部测试和 clippy**
 
-Run: `cargo test -p dblens-driver-mysql && cargo clippy -p dblens-driver-mysql --all-targets -- -D warnings`
+Run: `cargo test -p datluma-driver-mysql && cargo clippy -p datluma-driver-mysql --all-targets -- -D warnings`
 Expected: 全部 PASS，没有警告。
 
 - [ ] **Step 7: 提交**
 
 ```bash
-git add crates/dblens-driver-mysql
+git add crates/datluma-driver-mysql
 git commit -m "feat(mysql): MySQL/MariaDB 驱动连接、流式执行、取消与事务" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2455,25 +2455,25 @@ git commit -m "feat(mysql): MySQL/MariaDB 驱动连接、流式执行、取消�
 ### Task 8: PostgreSQL 类型映射（纯函数）
 
 **Files:**
-- Create: `crates/dblens-driver-postgres/Cargo.toml`
-- Create: `crates/dblens-driver-postgres/src/lib.rs`, `src/types.rs`, `src/error.rs`
+- Create: `crates/datluma-driver-postgres/Cargo.toml`
+- Create: `crates/datluma-driver-postgres/src/lib.rs`, `src/types.rs`, `src/error.rs`
 
 **Interfaces:**
-- Consumes: `dblens_core::{Error, Value}`
+- Consumes: `datluma_core::{Error, Value}`
 - Produces（crate 内部）：
   - `types::decode_numeric(&[u8]) -> Result<String, BoxError>`
   - `types::format_interval(months: i32, days: i32, micros: i64) -> String`
   - `types::PgNumeric(String)`、`types::PgInterval(String)`、`types::RawValue<'a>(&'a [u8])`：均实现 `FromSql`
   - `types::PgParam<'a>(&'a Value)`：实现 `ToSql`
-  - `types::pg_value(&tokio_postgres::Row, idx: usize) -> dblens_core::Result<Value>`
+  - `types::pg_value(&tokio_postgres::Row, idx: usize) -> datluma_core::Result<Value>`
   - `error::map_err(tokio_postgres::Error) -> Error`
 
 - [ ] **Step 1: 创建 `Cargo.toml` 和 `lib.rs`**
 
-`crates/dblens-driver-postgres/Cargo.toml`：
+`crates/datluma-driver-postgres/Cargo.toml`：
 ```toml
 [package]
-name = "dblens-driver-postgres"
+name = "datluma-driver-postgres"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -2483,8 +2483,8 @@ publish.workspace = true
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-dblens-core.workspace = true
-dblens-driver.workspace = true
+datluma-core.workspace = true
+datluma-driver.workspace = true
 futures.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
@@ -2492,12 +2492,12 @@ tokio-postgres.workspace = true
 uuid.workspace = true
 
 [dev-dependencies]
-dblens-driver = { workspace = true, features = ["conformance"] }
+datluma-driver = { workspace = true, features = ["conformance"] }
 serde_json.workspace = true
 tokio.workspace = true
 ```
 
-`crates/dblens-driver-postgres/src/lib.rs`（本任务先只声明这两个模块）：
+`crates/datluma-driver-postgres/src/lib.rs`（本任务先只声明这两个模块）：
 ```rust
 //! PostgreSQL 系驱动（PostgreSQL，以及兼容 PG 协议的人大金仓、openGauss、瀚高等）。
 
@@ -2507,7 +2507,7 @@ mod types;
 
 - [ ] **Step 2: 写失败的测试**
 
-`crates/dblens-driver-postgres/src/types.rs` 末尾：
+`crates/datluma-driver-postgres/src/types.rs` 末尾：
 ```rust
 #[cfg(test)]
 mod tests {
@@ -2552,16 +2552,16 @@ mod tests {
 
 - [ ] **Step 3: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver-postgres --lib`
+Run: `cargo test -p datluma-driver-postgres --lib`
 Expected: 编译失败，提示找不到 `decode_numeric`、`format_interval`。
 
 - [ ] **Step 4: 实现 `types.rs` 和 `error.rs`**
 
-`crates/dblens-driver-postgres/src/types.rs`（测试模块之前）：
+`crates/datluma-driver-postgres/src/types.rs`（测试模块之前）：
 ```rust
 use bytes::BytesMut;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, Utc};
-use dblens_core::{Error, Result, Value};
+use datluma_core::{Error, Result, Value};
 use tokio_postgres::Row;
 use tokio_postgres::types::{FromSql, IsNull, ToSql, Type, to_sql_checked};
 
@@ -2767,9 +2767,9 @@ impl ToSql for PgParam<'_> {
 const NUMERIC_PARAM_HINT: &str = "暂不支持直接绑定 NUMERIC 参数，请在 SQL 中写成 $1::text::numeric";
 ```
 
-`crates/dblens-driver-postgres/src/error.rs`：
+`crates/datluma-driver-postgres/src/error.rs`：
 ```rust
-use dblens_core::Error;
+use datluma_core::Error;
 use tokio_postgres::error::ErrorPosition;
 
 pub(crate) fn map_err(e: tokio_postgres::Error) -> Error {
@@ -2799,13 +2799,13 @@ pub(crate) fn map_err(e: tokio_postgres::Error) -> Error {
 
 - [ ] **Step 5: 运行测试，确认通过**
 
-Run: `cargo test -p dblens-driver-postgres --lib`
+Run: `cargo test -p datluma-driver-postgres --lib`
 Expected: 2 个测试全部 PASS。`pg_value` 和 `PgParam` 要依赖真实连接，在 Task 9 的一致性测试中覆盖。
 
 - [ ] **Step 6: 提交**
 
 ```bash
-git add crates/dblens-driver-postgres
+git add crates/datluma-driver-postgres
 git commit -m "feat(postgres): numeric/interval 解码、值映射与参数绑定" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -2814,23 +2814,23 @@ git commit -m "feat(postgres): numeric/interval 解码、值映射与参数绑�
 ### Task 9: PostgreSQL 连接与流式执行
 
 **Files:**
-- Create: `crates/dblens-driver-postgres/src/conn.rs`, `src/exec.rs`
-- Modify: `crates/dblens-driver-postgres/src/lib.rs`
-- Test: `crates/dblens-driver-postgres/tests/conformance.rs`
+- Create: `crates/datluma-driver-postgres/src/conn.rs`, `src/exec.rs`
+- Modify: `crates/datluma-driver-postgres/src/lib.rs`
+- Test: `crates/datluma-driver-postgres/tests/conformance.rs`
 
 **Interfaces:**
 - Consumes: Task 4 的 trait；Task 5 的套件；Task 8 的 `pg_value`、`PgParam`、`map_err`
-- Produces: `dblens_driver_postgres::PgDriver`（单元结构体，实现 `Driver`）、`dblens_driver_postgres::PgConnection`
+- Produces: `datluma_driver_postgres::PgDriver`（单元结构体，实现 `Driver`）、`datluma_driver_postgres::PgConnection`
 
 - [ ] **Step 1: 写失败的一致性测试**
 
-`crates/dblens-driver-postgres/tests/conformance.rs`：
+`crates/datluma-driver-postgres/tests/conformance.rs`：
 ```rust
 use chrono::{FixedOffset, NaiveDate, TimeZone};
-use dblens_core::Value;
-use dblens_driver::ConnectParams;
-use dblens_driver::conformance::Fixture;
-use dblens_driver_postgres::PgDriver;
+use datluma_core::Value;
+use datluma_driver::ConnectParams;
+use datluma_driver::conformance::Fixture;
+use datluma_driver_postgres::PgDriver;
 
 fn fixture(params: ConnectParams) -> Fixture {
     Fixture {
@@ -2845,7 +2845,7 @@ fn fixture(params: ConnectParams) -> Fixture {
         insert_with_params: |t| format!("INSERT INTO {t} (id, name) VALUES ($1, $2)"),
         select_name_by_id: |t| format!("SELECT name FROM {t} WHERE id = $1"),
         count_rows: |t| format!("SELECT COUNT(*) FROM {t}"),
-        missing_table_query: "SELECT * FROM dblens_no_such_table",
+        missing_table_query: "SELECT * FROM datluma_no_such_table",
         type_cases: vec![
             ("SELECT NULL::text", Value::Null),
             ("SELECT true", Value::Bool(true)),
@@ -2858,7 +2858,7 @@ fn fixture(params: ConnectParams) -> Fixture {
                 Value::Decimal("12345678901234567890.123456789".into()),
             ),
             ("SELECT 'NaN'::numeric", Value::Decimal("NaN".into())),
-            ("SELECT '数洞'::text", Value::String("数洞".into())),
+            ("SELECT '数览'::text", Value::String("数览".into())),
             ("SELECT DATE '2024-02-29'", Value::Date(NaiveDate::from_ymd_opt(2024, 2, 29).unwrap())),
             (
                 "SELECT TIMESTAMP '2024-02-29 13:45:30.123456'",
@@ -2880,23 +2880,23 @@ fn fixture(params: ConnectParams) -> Fixture {
     }
 }
 
-dblens_driver::conformance_tests!("DBLENS_TEST_PG_URL", fixture);
+datluma_driver::conformance_tests!("DATLUMA_TEST_PG_URL", fixture);
 ```
 
 - [ ] **Step 2: 运行测试，确认失败**
 
-Run: `cargo test -p dblens-driver-postgres --test conformance`
+Run: `cargo test -p datluma-driver-postgres --test conformance`
 Expected: 编译失败，提示找不到 `PgDriver`。
 
 - [ ] **Step 3: 实现 `exec.rs`**
 
-`crates/dblens-driver-postgres/src/exec.rs`：
+`crates/datluma-driver-postgres/src/exec.rs`：
 ```rust
 use std::pin::Pin;
 
 use async_trait::async_trait;
-use dblens_core::{DEFAULT_LOB_PREVIEW_BYTES, Result, Row};
-use dblens_driver::{ColumnMeta, ExecEvent, ExecStream};
+use datluma_core::{DEFAULT_LOB_PREVIEW_BYTES, Result, Row};
+use datluma_driver::{ColumnMeta, ExecEvent, ExecStream};
 use futures::StreamExt;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio_postgres::RowStream;
@@ -2974,11 +2974,11 @@ impl ExecStream for PgExec<'_> {
 
 - [ ] **Step 4: 实现 `conn.rs` 和 `lib.rs`**
 
-`crates/dblens-driver-postgres/src/conn.rs`：
+`crates/datluma-driver-postgres/src/conn.rs`：
 ```rust
 use async_trait::async_trait;
-use dblens_core::{Result, Value};
-use dblens_driver::{CancelHandle, ColumnMeta, Connection, ExecStream, ServerInfo};
+use datluma_core::{Result, Value};
+use datluma_driver::{CancelHandle, ColumnMeta, Connection, ExecStream, ServerInfo};
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::task::JoinHandle;
 use tokio_postgres::{Client, NoTls};
@@ -3075,7 +3075,7 @@ impl Connection for PgConnection {
 }
 ```
 
-`crates/dblens-driver-postgres/src/lib.rs`：
+`crates/datluma-driver-postgres/src/lib.rs`：
 ```rust
 //! PostgreSQL 系驱动（PostgreSQL，以及兼容 PG 协议的人大金仓、openGauss、瀚高等）。
 
@@ -3085,8 +3085,8 @@ mod exec;
 mod types;
 
 use async_trait::async_trait;
-use dblens_core::Result;
-use dblens_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId};
+use datluma_core::Result;
+use datluma_driver::{Capabilities, ConnectParams, Connection, Driver, DriverId};
 use futures::StreamExt;
 use tokio::sync::mpsc;
 use tokio_postgres::{AsyncMessage, NoTls};
@@ -3122,7 +3122,7 @@ impl Driver for PgDriver {
             .password(&p.password)
             .dbname(p.database.as_deref().unwrap_or("postgres"))
             .connect_timeout(p.connect_timeout)
-            .application_name("DBLens");
+            .application_name("DATLUMA");
         let (client, mut connection) = cfg.connect(NoTls).await.map_err(map_err)?;
 
         // 驱动连接任务，同时把服务器发来的 notice 转发给执行流
@@ -3148,23 +3148,23 @@ impl Driver for PgDriver {
 - [ ] **Step 5: 准备测试库并运行一致性测试**
 
 ```powershell
-$env:DBLENS_TEST_PG_URL = "postgres://postgres:dblens@127.0.0.1:5432/dblens_test"
+$env:DATLUMA_TEST_PG_URL = "postgres://postgres:datluma@127.0.0.1:5432/datluma_test"
 ```
 
-Run: `cargo test -p dblens-driver-postgres --test conformance -- --nocapture`
+Run: `cargo test -p datluma-driver-postgres --test conformance -- --nocapture`
 Expected: 9 个测试全部 PASS，输出中**没有**"跳过"字样。
 
 如果某个类型用例失败，用 `--nocapture` 看实际值，只修正映射代码，不修改期望值。唯一的例外是 `"char"` 用例：如果 PG 返回的二进制不是可读文本，可以把期望改为对应的 `\x..` 十六进制文本，并在测试旁边写注释说明原因。
 
 - [ ] **Step 6: 运行全部测试和 clippy**
 
-Run: `cargo test -p dblens-driver-postgres && cargo clippy -p dblens-driver-postgres --all-targets -- -D warnings`
+Run: `cargo test -p datluma-driver-postgres && cargo clippy -p datluma-driver-postgres --all-targets -- -D warnings`
 Expected: 全部 PASS，没有警告。
 
 - [ ] **Step 7: 提交**
 
 ```bash
-git add crates/dblens-driver-postgres
+git add crates/datluma-driver-postgres
 git commit -m "feat(postgres): PostgreSQL 驱动连接、流式执行、notice、取消与手动事务" -m "Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```
 
@@ -3217,17 +3217,17 @@ jobs:
       mysql:
         image: mysql:8.4
         env:
-          MYSQL_ROOT_PASSWORD: dblens
-          MYSQL_DATABASE: dblens_test
+          MYSQL_ROOT_PASSWORD: datluma
+          MYSQL_DATABASE: datluma_test
         ports: ["3306:3306"]
         options: >-
-          --health-cmd "mysqladmin ping -h 127.0.0.1 -pdblens"
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -pdatluma"
           --health-interval 5s --health-timeout 5s --health-retries 20
       mariadb:
         image: mariadb:11.4
         env:
-          MARIADB_ROOT_PASSWORD: dblens
-          MARIADB_DATABASE: dblens_test
+          MARIADB_ROOT_PASSWORD: datluma
+          MARIADB_DATABASE: datluma_test
         ports: ["3307:3306"]
         options: >-
           --health-cmd "healthcheck.sh --connect --innodb_initialized"
@@ -3235,23 +3235,23 @@ jobs:
       postgres:
         image: postgres:17
         env:
-          POSTGRES_PASSWORD: dblens
-          POSTGRES_DB: dblens_test
+          POSTGRES_PASSWORD: datluma
+          POSTGRES_DB: datluma_test
         ports: ["5432:5432"]
         options: >-
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 20
     env:
-      DBLENS_TEST_MYSQL_URL: mysql://root:dblens@127.0.0.1:3306/dblens_test
-      DBLENS_TEST_MARIADB_URL: mysql://root:dblens@127.0.0.1:3307/dblens_test
-      DBLENS_TEST_PG_URL: postgres://postgres:dblens@127.0.0.1:5432/dblens_test
+      DATLUMA_TEST_MYSQL_URL: mysql://root:datluma@127.0.0.1:3306/datluma_test
+      DATLUMA_TEST_MARIADB_URL: mysql://root:datluma@127.0.0.1:3307/datluma_test
+      DATLUMA_TEST_PG_URL: postgres://postgres:datluma@127.0.0.1:5432/datluma_test
     steps:
       - uses: actions/checkout@v4
       - run: rustup show
       - uses: Swatinem/rust-cache@v2
       - name: 运行驱动一致性测试（不允许跳过）
         run: |
-          cargo test -p dblens-driver-mysql -p dblens-driver-postgres --test conformance -- --nocapture 2>&1 | tee test.log
+          cargo test -p datluma-driver-mysql -p datluma-driver-postgres --test conformance -- --nocapture 2>&1 | tee test.log
           if grep -q "跳过" test.log; then echo "有测试被跳过，环境变量未生效"; exit 1; fi
 ```
 

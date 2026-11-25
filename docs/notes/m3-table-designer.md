@@ -5,16 +5,16 @@
 ## 结构
 
 ```text
-crates/dblens-dialect/src/design/
+crates/datluma-dialect/src/design/
   mod.rs       Renames、TableChange、Diff、DesignIssue；Dialect::prepare_draft（重新解析逻辑类型、主键列 NOT NULL）
   diff.rs      validate（校验草稿）、diff_table（比对出变更列表）
   catalog.rs   design_caps：类型目录和方言能力
   sql.rs       design_unsupported、design_sql（按家族分派）、design_transactional；共用的外键、检查约束、索引列写法
   mysql.rs / postgres.rs / oracle.rs（含达梦）   各家族的 DDL
   rebuild.rs   重建表的脚本（RebuildContext → RebuildOutcome）
-crates/dblens-dialect/sql/*.sql   新增 referencing_keys、dependent_views、grants、table_storage、trigger_ddl（只有 Oracle）
-crates/dblens-service/src/design.rs   design_caps / design_table / preview_design / start_design；执行任务（Run）
-crates/dblens-api/src/design.rs       /profiles/{id}/design/{caps,table,preview,apply}
+crates/datluma-dialect/sql/*.sql   新增 referencing_keys、dependent_views、grants、table_storage、trigger_ddl（只有 Oracle）
+crates/datluma-service/src/design.rs   design_caps / design_table / preview_design / start_design；执行任务（Run）
+crates/datluma-api/src/design.rs       /profiles/{id}/design/{caps,table,preview,apply}
 web/src/features/design/
   logic.ts          草稿（每行 key、origin、deleted）、改名跟踪、类型的拆分与拼接、改动标记、校验错误换回草稿中的行
   designStore.ts    每个设计器标签的状态
@@ -44,7 +44,7 @@ web/src/features/design/
 
 ## 验证
 
-- 后端：fmt、clippy 通过；全部测试在 `DBLENS_LANG=en` 下通过。
+- 后端：fmt、clippy 通过；全部测试在 `DATLUMA_LANG=en` 下通过。
   - dialect：比对、校验、各家族每种变更的快照、版本差异（MySQL 5.6 的 CHANGE、MariaDB 的 DROP CONSTRAINT）、生成的每条语句经拆分仍是一条、重建脚本快照（四个家族）、拒绝重建、临时表名截断。
   - service（假驱动）：新建表的预览和执行（一个事务、执行历史）；重建在删除旧表之前失败时删除新表、之后失败时列出没有执行的语句。
   - 实库（5 个库）：用设计器新建表；改名并加长、改可空/默认值/注释、换索引、加列后读回与草稿比对无差异；原表被别人改过时拒绝执行；强制重建（调整列顺序、VARCHAR 改为数值类型）后数据、约束、索引、注释、触发器、其他表指向本表的外键、自增接续、授权（PG、Oracle、达梦授予 PUBLIC）、依赖视图（MySQL 按名字、Oracle 和达梦重新编译；PG 有依赖视图时拒绝）都正确；中途失败时 PG 全部回滚、其他库保留已执行的。
