@@ -121,7 +121,7 @@ async fn test_and_ask_reach_provider_with_key() {
         &app,
         "POST",
         "/api/profiles",
-        Some(json!({"profile": {"name": "p", "driver": "postgres", "host": "h", "port": 5432, "user": "u"}, "password": "pw"})),
+        Some(json!({"profile": {"name": "p", "driver": "postgres", "host": "h", "port": 5432, "user": "u", "environment": "dev"}, "password": "pw"})),
     )
     .await;
     let id = p["id"].as_str().unwrap().to_owned();
@@ -152,7 +152,7 @@ async fn ask_needs_enabled_provider_and_fields() {
         &app,
         "POST",
         "/api/profiles",
-        Some(json!({"profile": {"name": "p", "driver": "postgres", "host": "h", "port": 5432, "user": "u"}, "password": "pw"})),
+        Some(json!({"profile": {"name": "p", "driver": "postgres", "host": "h", "port": 5432, "user": "u", "environment": "dev"}, "password": "pw"})),
     )
     .await;
     let id = p["id"].as_str().unwrap().to_owned();

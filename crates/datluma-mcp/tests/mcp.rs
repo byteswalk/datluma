@@ -17,7 +17,7 @@ fn service() -> Arc<Service> {
     ));
     let s = Arc::new(Service::with_parts(store, secrets, registry, Arc::new(DefaultPolicy)));
     let input = |name: &str, mcp: bool| {
-        let mut v = json!({"name": name, "driver": "postgres", "host": "h", "port": 5432, "user": "u"});
+        let mut v = json!({"name": name, "driver": "postgres", "host": "h", "port": 5432, "user": "u", "environment": "dev"});
         if mcp {
             v["options"] = json!({"mcp_access": "1"});
         }

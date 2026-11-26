@@ -58,6 +58,7 @@ fn connections_are_opened_in_known_places() {
             "import/job.rs",
             "metadata.rs",
             "migrate/run.rs",
+            "namespace.rs",
             "privilege.rs",
             "service.rs",
             "sqlfile.rs",
