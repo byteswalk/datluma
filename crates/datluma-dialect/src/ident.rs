@@ -367,6 +367,7 @@ const RESERVED: &[&str] = &[
     "CONSTRAINT",
     "CONTINUE",
     "CONVERT",
+    "COSOUTFILE",
     "CREATE",
     "CROSS",
     "CSN",
@@ -638,6 +639,7 @@ const RESERVED: &[&str] = &[
     "SQLSTATE",
     "SQLWARNING",
     "SQL_BIG_RESULT",
+    "SQL_CACHE",
     "SQL_CALC_FOUND_ROWS",
     "SQL_SMALL_RESULT",
     "SSL",
@@ -655,6 +657,9 @@ const RESERVED: &[&str] = &[
     "SYS_CONNECT_BY_PATH",
     "TABLE",
     "TABLESAMPLE",
+    "TDSQL_TIMEOUT_TRXS",
+    "TDSQL_TLOG",
+    "TDSQL_WITHGTS",
     "TERMINATED",
     "THEN",
     "TIDB_CURRENT_TSO",
@@ -667,6 +672,8 @@ const RESERVED: &[&str] = &[
     "TRAILING",
     "TRIGGER",
     "TRUE",
+    "TXSQL_CHECK",
+    "TXSQL_RETURNING",
     "UID",
     "UNDO",
     "UNIMCSTORED",
@@ -920,6 +927,9 @@ mod tests {
         assert_eq!(ident(Family::Oracle, "COMMENT"), "\"COMMENT\"");
         // GBase 8c 把 UNPIVOT 列为保留字
         assert_eq!(ident(Family::Postgres, "unpivot"), "\"unpivot\"");
+        // TDSQL-C（腾讯云 MySQL 8.0 兼容）在 KEYWORDS 表里多出的保留字
+        assert_eq!(ident(Family::MySql, "tdsql_tlog"), "`tdsql_tlog`");
+        assert_eq!(ident(Family::MySql, "sql_cache"), "`sql_cache`");
         assert_eq!(ident(Family::Oracle, "UID"), "\"UID\"");
         assert_eq!(ident(Family::Dameng, "TOP"), "\"TOP\"");
         assert!(RESERVED.windows(2).all(|w| w[0] < w[1]));
